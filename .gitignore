@@ -15,3 +15,7 @@ next-env.d.ts
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# playwright
+test-results/
+playwright-report/

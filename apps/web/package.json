@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "dev:lan": "AILI_LAN_HOST=$(hostname -I | cut -d\" \" -f1) next dev -H 0.0.0.0",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@aili/engine": "^0.0.0",
@@ -25,6 +27,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.0",
     "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
