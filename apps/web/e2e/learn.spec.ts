@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { installVoiceFakes } from "./voiceFakes";
 
 const stage = (p: Page) => p.getByRole("region", { name: "Stage" });
 const side = (p: Page) => p.getByRole("complementary");
@@ -14,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 test("starts with the stage, command bar and captions; text panel closed", async ({ page }) => {
   await expect(stage(page)).toBeVisible();
   await expect(page.getByText("Prepared", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/Sample caption/)).toBeVisible();
+  await expect(page.locator('p[role="status"][data-state]')).toHaveText("Ready");
   await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toBeVisible();
   await expect(side(page)).toHaveCount(0);
   await expect(explanationBtn(page)).toHaveAttribute("aria-expanded", "false");
@@ -90,31 +91,22 @@ test("typing a space in the text box types a space", async ({ page }) => {
   await expect(box).toHaveValue("why not ");
 });
 
-test("sending says plainly that replies are not connected", async ({ page }) => {
-  const box = page.getByRole("textbox", { name: "Ask Aili or answer" });
-  await box.fill("What is a servo?");
-  await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText(/Replies aren't connected yet/)).toBeVisible();
-  await expect(box).toHaveValue("");
-});
-
 test("quick-reply chips fill the text box", async ({ page }) => {
   await page.getByRole("group", { name: "Suggested replies" }).getByRole("button", { name: "Why?" }).click();
   await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toHaveValue("Why?");
 });
 
-test("captions can be turned off and on", async ({ page }) => {
-  const cc = page.getByRole("button", { name: "Captions" });
-  await expect(cc).toHaveAttribute("aria-pressed", "true");
-  await cc.click();
-  await expect(cc).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByText(/Sample caption/)).toHaveCount(0);
-  await cc.click();
-  await expect(page.getByText(/Sample caption/)).toBeVisible();
+test("captions and mute are toggle buttons", async ({ page }) => {
+  for (const name of ["Captions", "Mute"]) {
+    const b = page.getByRole("button", { name });
+    const before = await b.getAttribute("aria-pressed");
+    await b.click();
+    await expect(b).toHaveAttribute("aria-pressed", before === "true" ? "false" : "true");
+  }
 });
 
 test("voice button: bottom-centre of the stage from 768 px, command bar on phones", async ({ page }) => {
-  const mic = page.getByRole("button", { name: "Voice input" });
+  const mic = page.locator("button[data-state]:visible");
   await expect(mic).toHaveCount(1); // the other placement is display:none at this width
   const m = (await mic.boundingBox())!;
   const st = (await stage(page).boundingBox())!;
@@ -140,8 +132,14 @@ test("Captions sits bottom-left and Library bottom-right of the stage at every w
 });
 
 test("captions never overlap the stage's bottom controls", async ({ page }) => {
-  const cap = (await page.getByText(/Sample caption/).boundingBox())!;
-  for (const name of ["Captions", "Voice input", "Library"]) {
+  await installVoiceFakes(page, { speakMs: 4000 });
+  await page.reload();
+  await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("What is a servo?");
+  await page.getByRole("button", { name: "Send" }).click();
+  const capText = page.getByText("This is a prepared demo line, not a live answer.");
+  await expect(capText).toBeVisible();
+  const cap = (await capText.locator("..").boundingBox())!;
+  for (const name of ["Captions", "Mute", "Start voice input", "Stop speaking", "Library"]) {
     const b = stage(page).getByRole("button", { name });
     if (!(await b.isVisible())) continue;
     const r = (await b.boundingBox())!;
@@ -161,12 +159,6 @@ test("hover styles: work with a mouse, never stick after a tap", async ({ page }
     await page.waitForTimeout(400);
     expect(await bg()).toBe(resting);
   }
-});
-
-test("voice button is present but marked as not available yet", async ({ page }) => {
-  const mic = page.getByRole("button", { name: "Voice input" });
-  await expect(mic).toHaveAttribute("aria-disabled", "true");
-  await expect(mic).toHaveAccessibleDescription(/Coming soon/);
 });
 
 test("no horizontal scrolling, with the panel closed and open", async ({ page }) => {

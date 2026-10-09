@@ -56,11 +56,11 @@ test.describe("app shell", () => {
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("unbuilt menu items say Coming and do nothing", async ({ page }) => {
+  test("unbuilt menu items say Coming and do nothing; Settings is a link", async ({ page }) => {
     await page.goto("/home");
     await page.getByRole("button", { name: "Menu" }).click();
     const items = page.locator("nav li button");
-    await expect(items).toHaveCount(5);
+    await expect(items).toHaveCount(4);
     for (const item of await items.all()) {
       await expect(item).toHaveAttribute("aria-disabled", "true");
       await expect(item).toContainText("Coming");
@@ -68,7 +68,9 @@ test.describe("app shell", () => {
     // Playwright refuses to click aria-disabled elements unless forced; forcing proves the click is inert.
     await page.getByRole("button", { name: /Sign out/ }).click({ force: true });
     await expect(page).toHaveURL(/\/home$/);
+    await expect(page.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
   });
+
 
   test("touch targets in the top bar are at least 44 px", async ({ page }) => {
     await page.goto("/home");
