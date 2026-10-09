@@ -33,14 +33,17 @@ export function useVoiceController(opts: {
   const recognition = useRef<RecognitionHandle | null>(null);
   const { onTranscript, onUnsupported, askConsent } = opts;
 
+  // Callers bump the revision *before* calling this, so any callback fired synchronously by
+  // abort()/cancel() is already stale. Detach our own handlers before cancelling the browser's.
   const stopEverything = useCallback(() => {
-    cancelSpeech();
     cancelSegment.current?.();
     cancelSegment.current = null;
-    recognition.current?.abort();
-    recognition.current = null;
     timers.current.forEach(clearTimeout);
     timers.current.clear();
+    const r = recognition.current;
+    recognition.current = null;
+    r?.abort();
+    cancelSpeech();
   }, []);
 
   const later = useCallback((fn: () => void, ms: number) => {
@@ -52,8 +55,8 @@ export function useVoiceController(opts: {
   }, []);
 
   const interrupt = useCallback(() => {
-    stopEverything();
     useVoice.getState().dispatch({ type: "interrupt" });
+    stopEverything();
   }, [stopEverything]);
 
   const playReply = useCallback((rev: number) => {
@@ -74,10 +77,10 @@ export function useVoiceController(opts: {
   const submit = useCallback(
     (text: string) => {
       if (!text.trim()) return;
-      stopEverything();
       const s = useVoice.getState();
       s.setHint(null);
       s.dispatch({ type: "submit" });
+      stopEverything();
       const rev = useVoice.getState().rev;
       later(() => playReply(rev), THINKING_MS);
     },
@@ -86,11 +89,11 @@ export function useVoiceController(opts: {
 
   const startListening = useCallback(
     (mode: RecognitionMode) => {
-      stopEverything();
       const s = useVoice.getState();
       s.setMode(mode);
       s.setHint(null);
       s.dispatch({ type: "listen" });
+      stopEverything();
       const rev = useVoice.getState().rev;
       const current = () => useVoice.getState().rev === rev;
       recognition.current = startRecognition({
@@ -105,7 +108,7 @@ export function useVoiceController(opts: {
           useVoice.getState().dispatch({ type: "error", rev, message: recognitionErrorText(code) });
         },
         onEnd: () => {
-          recognition.current = null;
+          if (current()) recognition.current = null;
           useVoice.getState().dispatch({ type: "listenEnd", rev });
         },
       });
