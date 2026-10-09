@@ -1,0 +1,70 @@
+# AILI — Claude Code project instructions
+
+AILI (Artificial Intelligence Learning Interface) is an interactive learning-and-building environment. A person understands a complex technical topic through a one-on-one AI professor using 3D visuals, analogies, calculation and simulation, then is guided into building a real project. Core loop: **understand → visualize → experiment → reason → build.**
+
+This is a **fresh build in an empty folder**. There is no existing code. Propose the stack and structure for my approval before creating anything.
+
+## Scope (do not exceed)
+- AILI is a **platform**; **robotics is the only module** for now. No other subjects, no whiteboard, no search, no mascot, no AI/ML module, no AR/VR (design for it later, build nothing now).
+- Two intents: **understand**, **build**, or both. Two stages on one shared engine: the **Learn stage** and the **Build Workbench**.
+- Beta target: 20–30 invited users plus a waitlist. Honest labelling matters more than breadth.
+
+## Read first (`docs/`) — source-of-truth order
+1. `aili-professor-behavior-spec.md` — professor behavior, tests (explaining is a core job).
+2. `aili-stage-layout.md` — Learn stage and Build Workbench layouts.
+3. `aili-brand-design-language.md` — "Tactile Spatialism", palette, type, accessibility.
+4. `aili-architecture.md` — registry, solvers, validator, planner, robotics concept graph, reference library. Its lines "explanation is a fallback", "living knot presence" and "one stage" are **superseded** by 1–3.
+5. `aili-visuals-curriculum-billing.md` — assets, AI-visual tiers, billing.
+6. `aili-milestones-and-checklist.md` — build order M0–M8. Do one item at a time.
+7. `00-master-prompt.md` — original constraints. Images in `design/`.
+If docs conflict, follow the lower number and tell me.
+
+## Proposed stack (confirm or counter-propose with reasons; prefer the simpler option)
+Next.js + TypeScript; React Three Fiber (three.js) for 3D; Supabase (Postgres, auth); Vercel; **solvers in TypeScript in a shared package** (runs in the browser for instant sliders and on the server for validation), with a units-aware approach and tests against worked textbook examples. Add a Python service only if a heavy simulation needs it. Content (concepts, assets, simulations, analogies, readings, project templates) is versioned JSON/YAML in git, synced to Postgres. Provider and model are configuration, never hard-coded.
+
+## Product rules
+**Professor (live AI) — see the behavior spec.**
+- It must *explain* concepts: probe briefly → learner commits → explain (intuition, mechanism, equation with assumptions, visual, analogy) → check. True beginners get a short explanation first. At most one probe before an explanation.
+- Postures: Answer / Learning / Build. Moves: probe, explain, challenge, demand_evidence, debate, assign, teach_back, review, answer, hold. Professor behavior is the default during learning time, not every interaction.
+- Pacing: one open question at a time; never two questions in a row without giving something back; challenge budget one in three turns except safety errors; help ladder for problems (not for withholding concepts).
+- Anti-sycophancy: hold a correct position under pushback without new evidence; update on valid evidence; no flattery.
+- Assign readings only from the verified library; never invent books, chapters, pages, videos or timestamps. Teach-back is graded against the human-written guide, not the source text. Never declare mastery from one answer.
+- Presence is the logo's orb. No talking-head professor, no mascot.
+
+**Director contract (engine).** The LLM proposes a structured response (move, narration, actions, calc requests, evidence, prompt, assumptions, limitations). A **validator** checks IDs exist, values in bounds, citations exist, pedagogy rules, and rejects any **hard-coded engineering number** in narration (use placeholders like `{{torque_nm}}`). **All numbers come from deterministic solvers.** The arm's own mass must be included in torque models. The professor only sees a **shortlist** of *published* capabilities retrieved by concept and level. Per turn: shortlist → director → validate → solver → compile → events (WebSocket/SSE) → client renders locally. Stale actions are invalidated via sequence numbers/request IDs/state revision (interrupt must stop audio and queued actions immediately). On any failure keep the last valid state and say so plainly.
+
+**Capability registry.** Items: assets/anatomy, animations, simulations, solvers, analogies, readings/evidence, project templates. Each declares `teaches` (concept IDs), `fidelity` (verified / simplified teaching / illustrative), `version`, `review_status` (draft / reviewed / published), `provenance`. **The AI never publishes** — draft → automated checks → human expert review → publish. Visual tiers: T0 library asset; T1 AI-composed from library primitives (label "Illustrative (AI-composed)"); T2 AI-generated 2D diagram; T3 AI 3D mesh is **offline authoring only**. An animation is not a simulation. No invented anatomy of a named real product.
+
+**Learn stage:** one scene at a time; orbit/select/label/exploded view; temporary inspector with sliders (units + bounds); voice button with idle/listening/thinking/speaking/error + **interrupt**; text box; captions overlay; right text-explanation panel (usually closed); Library drawer of verified readings. Voice is optional; start with browser speech; provider behind config.
+**Build Workbench:** Blender-style: parts/outliner + catalog (left), viewport (centre), properties + Guide/Tests (right), checks strip (torque margin, mass), timeline/log (versions, tests, measurements). Source of truth is `design.json` (parts, parameters with units, connections, milestones, tests, versions; undo/redo). **Parametric first** (sliders/dropdowns), not drag-and-snap. Aili proposes changes; the learner accepts or rejects — no silent edits. Phones are view-only in V1. Label "simulation only; hardware untested" until a real measurement is logged. Learn↔Build handoff and side quests per the layout doc. Milestones declare `requires_concepts` with evidence-or-waiver readiness (safety-critical waivers need explicit acknowledgement).
+**Study planner:** goal, baseline, time, intent → editable table of contents built and **validated by code** from the concept graph (prerequisites first, every unit has a checkpoint, IDs exist).
+**Robotics coverage levels:** lab / guided / discussion. MVP labs: servo torque (statics), inside the servo/gearing, feedback control. Say honestly when something is not supported and log it as demand.
+
+## Honesty and safety
+- Never claim verified live behavior you did not run; label **prepared/demo vs live** content visibly. Never invent sources, part numbers, prices, availability or specs. Say "I can't verify that" when true.
+- Battery, mains, motor and drone topics: conservative wording, datasheet citations, explicit acknowledgements.
+- Frontier Lab cards: dated, primary-source linked, manufacturer claim separated from Aili's simplified model; never auto-published; not a live news feed.
+- Do not use the word "investigation" as a product label. Unbuilt features are omitted or marked "coming".
+
+## Design (see brand doc)
+Palette: Canvas #F5F1EB, Deep canvas #EBE4DA, Surface #FFFDFA, Ink #282724, Copper #C96543, Strong copper #A7482F, Sage #83957E, Sky #8DAEB9, Gold #C99A56, Plum #917383. Create `design/tokens.css` with **light and dark semantic tokens** (dark is its own set, not an inversion).
+- Primary buttons: Strong copper background + Surface label (passes 4.5:1). Sage/Sky/Gold/Plum are fills/icons/3D materials only; text on them is Ink. Never as text on Canvas.
+- Meaning never by colour alone (icon + label + shape). Safety/warning has its own pattern.
+- Type: self-hosted **Newsreader** (display) + **Inter** (UI). Avoid generic neon-AI graphics, crowded dashboards, glassmorphism, decoration without purpose, rainbow UI.
+- Motion: UI 200–300 ms, spatial 500–700 ms; honour `prefers-reduced-motion` with a still alternative.
+- Accessibility: keyboard for everything, captions always available, labelled landmarks, ≥44 px touch targets, spacebar shortcuts never interfere with typing.
+- Performance: test on a **mid-range Android phone**; low-poly assets with size budgets, lazy loading, a fallback viewer; scenes in real units (metres).
+
+## Security and secrets
+Provider keys and Supabase service-role credentials are **server-only**, in `.env.local`/host settings; `.env*` in `.gitignore`; never commit, print or log them; never ask me to paste secrets into chat. Validate all inputs; sanitize any AI-produced SVG/scene description; never run model-written code in the live app. Learner memory: keep what they say, what was observed, what Aili infers and explicit preferences separate; let learners inspect, correct and delete it. Check consent and data-protection requirements (Kenya and the data location) before beta.
+
+## Money
+Billing is **unresolved**: no forced paywall or trial tollbooth. Meter every session (tokens in/out, voice, hosting) from config-held unit prices; cap the free tier by cost; global kill switch. Max two runtime models: a professor model and a cheap router (provider/model in config; bake-off planned). Top-tier models are for authoring only.
+
+## Working method
+- Work on a **branch**; **never merge into main**. No destructive resets, unrequested migrations, paid provisioning, publishing, or deleting without my approval.
+- Plan first and wait for approval; one milestone item at a time; small commits; run tests/lint/typecheck before saying done.
+- Write tests for solvers (worked examples), the validator, the planner and professor session tests (17 in the behavior spec).
+- Report plainly: what was built, what was verified (and how), what was not, and any doc conflicts. Do not claim access to anything you can't reach.
+- I use a limited Claude plan: keep prompts and file reads focused; don't spawn parallel work unless asked.
+- Keep this file current; if a decision changes, propose the edit.

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="AILI favicon"><title>AILI favicon</title><defs>
+<linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3987A"/><stop offset="1" stop-color="#C96543"/></linearGradient>
+<linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C96543"/><stop offset="1" stop-color="#A7482F"/></linearGradient>
+<radialGradient id="go" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#E3987A"/><stop offset="1" stop-color="#C96543"/></radialGradient>
+</defs><rect width="64" height="64" rx="14" fill="#FFFDFA"/><g transform="translate(7 6) scale(.25)"><path d="M100 16 C93 16 90 19 88 26 L36 158 C33 167 37 172 45 172 L66 172 C71 172 74 169 75 165 L100 82 Z" fill="#C96543"/><path d="M100 16 C107 16 110 19 112 26 L164 158 C167 167 163 172 155 172 L134 172 C129 172 126 169 125 165 L100 82 Z" fill="#A7482F"/><circle cx="100" cy="142" r="10" fill="#C96543"/></g></svg>

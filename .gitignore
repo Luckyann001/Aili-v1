@@ -1,0 +1,17 @@
+# secrets
+.env*
+!.env.example
+
+# dependencies and builds
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# os / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
