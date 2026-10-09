@@ -5,7 +5,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main aria-label="AILI" style={{ padding: "var(--aili-space-8)", maxWidth: 720, margin: "0 auto" }}>
-      <Image src="/logo/logo-horizontal.svg" alt="AILI" width={260} height={75} priority />
+      <Image src="/logo/logo-horizontal-compact.svg" alt="AILI" width={235} height={80} priority />
       <p>Foundations build (M0). The product surfaces start in M1.</p>
       <p>
         <Link href="/preview">Open the design preview</Link>

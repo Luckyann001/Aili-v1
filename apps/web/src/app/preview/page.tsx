@@ -28,14 +28,15 @@ const STATUSES: Array<{ status: Exclude<Status, "safety">; word: string; detail:
 ];
 
 const LOGOS: Array<{ file: string; label: string; dark?: boolean; w: number; h: number }> = [
-  { file: "logo-primary.svg", label: "Primary", w: 213, h: 220 },
-  { file: "logo-primary-dark.svg", label: "Primary, dark background", dark: true, w: 213, h: 220 },
-  { file: "logo-horizontal.svg", label: "Horizontal", w: 260, h: 75 },
+  { file: "logo-primary-outlined.svg", label: "Primary", w: 213, h: 220 },
+  { file: "logo-primary-dark-outlined.svg", label: "Primary, dark background", dark: true, w: 213, h: 220 },
+  { file: "logo-horizontal-outlined.svg", label: "Horizontal", w: 260, h: 75 },
+  { file: "logo-horizontal-compact.svg", label: "Horizontal compact (navigation)", w: 235, h: 80 },
   { file: "logo-mark.svg", label: "Mark", w: 120, h: 120 },
   { file: "logo-icon.svg", label: "App icon", w: 120, h: 120 },
   { file: "favicon.svg", label: "Favicon", w: 48, h: 48 },
-  { file: "logo-mono-ink.svg", label: "Mono, ink", w: 213, h: 220 },
-  { file: "logo-mono-light.svg", label: "Mono, light", dark: true, w: 213, h: 220 },
+  { file: "logo-mono-ink-outlined.svg", label: "Mono, ink", w: 213, h: 220 },
+  { file: "logo-mono-light-outlined.svg", label: "Mono, light (transparent)", dark: true, w: 213, h: 220 },
 ];
 
 function loadTokens() {
@@ -118,7 +119,7 @@ export default function PreviewPage() {
   return (
     <>
       <header className={styles.header}>
-        <Image src="/logo/logo-horizontal.svg" alt="AILI" width={208} height={60} priority />
+        <Image src="/logo/logo-horizontal-compact.svg" alt="AILI" width={188} height={64} priority />
         <div>
           <h1 className={styles.title}>Design preview</h1>
           <p className={styles.note}>M0 development page: tokens, type, logos and a 3D renderer check. Not a product surface.</p>
@@ -151,8 +152,8 @@ export default function PreviewPage() {
         <section aria-labelledby="logos-title" className={styles.block}>
           <h2 id="logos-title" className={styles.sectionTitle}>Logo set</h2>
           <p className={styles.note}>
-            Served unchanged from design/logo. Taglines are live text in Inter; inside an image they fall back to a system
-            font (see the logo README).
+            Served unchanged from design/logo. The app uses the -outlined versions: taglines are outlined from Inter, so
+            they render the same with or without the font.
           </p>
           <ul className={styles.logos}>
             {LOGOS.map((l) => (
