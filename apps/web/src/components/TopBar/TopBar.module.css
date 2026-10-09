@@ -1,0 +1,64 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-4);
+  min-height: 64px;
+  padding: var(--aili-space-2) var(--aili-space-4);
+  background: var(--aili-bg);
+  border-bottom: 1px solid var(--aili-border);
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--aili-touch-target);
+  border-radius: var(--aili-radius-sm);
+}
+
+.menuRoot {
+  position: relative;
+}
+
+.menuList {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--aili-space-2));
+  z-index: 50;
+  min-width: 280px;
+  margin: 0;
+  padding: var(--aili-space-2);
+  list-style: none;
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-3);
+  width: 100%;
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 0;
+  border-radius: var(--aili-radius-sm);
+  background: transparent;
+  color: var(--aili-text-muted);
+  font: 1rem var(--aili-font-ui);
+  text-align: left;
+  cursor: not-allowed;
+}
+
+.menuItem:hover {
+  background: var(--aili-bg-recessed);
+}
+
+.coming {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

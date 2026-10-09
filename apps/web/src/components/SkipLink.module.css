@@ -1,0 +1,15 @@
+.skip {
+  position: absolute;
+  left: var(--aili-space-3);
+  top: -100px;
+  z-index: 100;
+  padding: var(--aili-space-3) var(--aili-space-4);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-surface);
+  color: var(--aili-link);
+  font-weight: 600;
+}
+
+.skip:focus {
+  top: var(--aili-space-3);
+}

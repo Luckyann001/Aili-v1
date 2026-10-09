@@ -1,0 +1,33 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  padding: 2px var(--aili-space-2);
+  border-radius: 999px;
+  border: 1px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+}
+
+.prepared {
+  border-style: solid;
+}
+
+.live {
+  border-color: var(--aili-accent);
+}
+
+.illustrative {
+  border-style: dashed;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -1,0 +1,55 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--aili-space-2);
+  min-height: var(--aili-touch-target);
+  min-width: var(--aili-touch-target);
+  padding: 0 var(--aili-space-4);
+  border-radius: 999px;
+  font: 500 1rem var(--aili-font-ui);
+  cursor: pointer;
+  transition:
+    background var(--aili-duration-ui) var(--aili-ease-out),
+    border-color var(--aili-duration-ui) var(--aili-ease-out);
+}
+
+.button[aria-disabled="true"],
+.button:disabled {
+  cursor: not-allowed;
+}
+
+.primary {
+  border: 0;
+  background: var(--aili-action-bg);
+  color: var(--aili-action-text);
+  font-weight: 600;
+}
+
+.primary:hover {
+  background: var(--aili-action-bg-hover);
+}
+
+.primary:active {
+  background: var(--aili-action-bg-pressed);
+}
+
+.secondary {
+  border: 1px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+}
+
+.secondary:hover {
+  background: var(--aili-bg-recessed);
+}
+
+.quiet {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--aili-text);
+}
+
+.quiet:hover {
+  background: var(--aili-bg-recessed);
+}
