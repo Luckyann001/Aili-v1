@@ -7,6 +7,7 @@ import { useLearnUi, type SideView } from "@/state/learnUi";
 import { CommandBar } from "./CommandBar";
 import { SidePanel } from "./SidePanel";
 import { SAMPLE_CAPTION } from "./sampleContent";
+import { VoiceButton } from "./VoiceButton";
 import styles from "./learn.module.css";
 
 // Static Learn stage layout (M1 slice 2). No AI, voice or 3D yet: the stage shows a still placeholder.
@@ -56,6 +57,7 @@ export function LearnStage() {
           <Button variant="secondary" aria-pressed={captionsOn} onClick={toggleCaptions}>
             <CaptionIcon /> Captions
           </Button>
+          <VoiceButton placement="stage" />
           <Button
             variant="secondary"
             aria-expanded={side === "library"}

@@ -20,12 +20,14 @@ test("starts with the stage, command bar and captions; text panel closed", async
   await expect(explanationBtn(page)).toHaveAttribute("aria-expanded", "false");
 });
 
-test("explanation panel opens by keyboard, takes focus, Esc closes and returns focus", async ({ page }) => {
+test("explanation panel opens by keyboard, focuses its tab, Esc closes and returns focus", async ({ page }) => {
   await explanationBtn(page).focus();
   await page.keyboard.press("Enter");
   await expect(side(page)).toBeVisible();
   await expect(explanationBtn(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("heading", { name: "Explanation", level: 2 })).toBeFocused();
+  const tab = page.getByRole("tab", { name: "Explanation" });
+  await expect(tab).toBeFocused();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
   await expect(side(page).getByText(/Not reviewed teaching content/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(side(page)).toHaveCount(0);
@@ -49,7 +51,7 @@ test("panel is a right column on wide screens and a bottom sheet on narrow ones"
 
 test("library opens as a view in the same panel; tabs switch with arrow keys", async ({ page }) => {
   await libraryBtn(page).click();
-  await expect(page.getByRole("heading", { name: "Library", level: 2 })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "Library" })).toBeFocused();
   const cards = side(page).locator("li");
   await expect(cards).toHaveCount(2);
   for (const c of await cards.all()) await expect(c).toContainText("Sample");
@@ -61,7 +63,17 @@ test("library opens as a view in the same panel; tabs switch with arrow keys", a
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByRole("tab", { name: "Explanation" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "Explanation" })).toBeFocused();
-  await expect(page.getByRole("heading", { name: "Explanation", level: 2 })).toBeVisible();
+  await expect(page.getByRole("tabpanel")).toContainText("Why reach makes holding harder");
+});
+
+test("the panel names each view once: tabs only, no repeated visible heading", async ({ page }) => {
+  for (const [btn, name] of [[libraryBtn, "Library"], [explanationBtn, "Explanation"]] as const) {
+    await btn(page).click();
+    await expect(side(page).getByText(name, { exact: true })).toHaveCount(1);
+    await expect(side(page).getByRole("heading", { name: "Text panel", level: 2 })).toBeAttached();
+    await expect(side(page).getByRole("heading", { name: "Text panel" })).not.toBeInViewport();
+    await side(page).getByRole("button", { name: "Close" }).click();
+  }
 });
 
 test("close button closes the panel and returns focus", async ({ page }) => {
@@ -101,6 +113,56 @@ test("captions can be turned off and on", async ({ page }) => {
   await expect(page.getByText(/Sample caption/)).toBeVisible();
 });
 
+test("voice button: bottom-centre of the stage from 768 px, command bar on phones", async ({ page }) => {
+  const mic = page.getByRole("button", { name: "Voice input" });
+  await expect(mic).toHaveCount(1); // the other placement is display:none at this width
+  const m = (await mic.boundingBox())!;
+  const st = (await stage(page).boundingBox())!;
+  const box = (await page.getByRole("textbox", { name: "Ask Aili or answer" }).boundingBox())!;
+  if (page.viewportSize()!.width >= 768) {
+    expect(m.y).toBeGreaterThan(st.y + st.height * 0.7);
+    expect(m.y + m.height).toBeLessThanOrEqual(st.y + st.height);
+    expect(Math.abs(m.x + m.width / 2 - (st.x + st.width / 2))).toBeLessThan(2);
+    expect(m.width).toBeGreaterThanOrEqual(64);
+  } else {
+    expect(m.y).toBeGreaterThan(st.y + st.height);
+    expect(m.x + m.width).toBeLessThanOrEqual(box.x);
+    expect(Math.abs(m.y + m.height / 2 - (box.y + box.height / 2))).toBeLessThan(4);
+  }
+});
+
+test("Captions sits bottom-left and Library bottom-right of the stage at every width", async ({ page }) => {
+  const st = (await stage(page).boundingBox())!;
+  const cc = (await stage(page).getByRole("button", { name: "Captions" }).boundingBox())!;
+  const lib = (await libraryBtn(page).boundingBox())!;
+  expect(cc.x - st.x).toBeLessThan(24);
+  expect(st.x + st.width - (lib.x + lib.width)).toBeLessThan(24);
+});
+
+test("captions never overlap the stage's bottom controls", async ({ page }) => {
+  const cap = (await page.getByText(/Sample caption/).boundingBox())!;
+  for (const name of ["Captions", "Voice input", "Library"]) {
+    const b = stage(page).getByRole("button", { name });
+    if (!(await b.isVisible())) continue;
+    const r = (await b.boundingBox())!;
+    expect(cap.y + cap.height, name).toBeLessThanOrEqual(r.y);
+  }
+});
+
+test("hover styles: work with a mouse, never stick after a tap", async ({ page }, info) => {
+  const chip = page.getByRole("group", { name: "Suggested replies" }).getByRole("button", { name: "Why?" });
+  const bg = () => chip.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const resting = await bg();
+  if (info.project.name === "desktop") {
+    await chip.hover();
+    await expect.poll(bg).not.toBe(resting);
+  } else {
+    await chip.tap();
+    await page.waitForTimeout(400);
+    expect(await bg()).toBe(resting);
+  }
+});
+
 test("voice button is present but marked as not available yet", async ({ page }) => {
   const mic = page.getByRole("button", { name: "Voice input" });
   await expect(mic).toHaveAttribute("aria-disabled", "true");
@@ -116,7 +178,7 @@ test("no horizontal scrolling, with the panel closed and open", async ({ page })
 
 test("every control sits fully inside the screen (nothing clipped)", async ({ page }) => {
   const vw = page.viewportSize()!.width;
-  for (const c of await page.locator("main button, main input").all()) {
+  for (const c of await page.locator("main button:visible, main input:visible").all()) {
     const box = (await c.boundingBox())!;
     const name = (await c.getAttribute("aria-label")) ?? (await c.innerText());
     expect(box.x, name).toBeGreaterThanOrEqual(0);
@@ -126,7 +188,7 @@ test("every control sits fully inside the screen (nothing clipped)", async ({ pa
 
 test("every control on the Learn stage is at least 44 px", async ({ page }) => {
   await libraryBtn(page).click();
-  const controls = page.locator("main button, main input");
+  const controls = page.locator("main button:visible, main input:visible");
   for (const c of await controls.all()) {
     const box = (await c.boundingBox())!;
     const name = (await c.getAttribute("aria-label")) ?? (await c.innerText());
@@ -147,13 +209,16 @@ for (const scheme of ["light", "dark"] as const) {
   }
 }
 
-test("screenshots", async ({ page }, info) => {
-  await page.screenshot({ path: info.outputPath("learn-closed.png") });
-  await explanationBtn(page).click();
-  await page.screenshot({ path: info.outputPath("learn-explanation.png") });
-  await page.getByRole("tab", { name: "Library" }).click();
-  await page.screenshot({ path: info.outputPath("learn-library.png") });
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.waitForTimeout(400); // let the 240 ms colour transitions finish
-  await page.screenshot({ path: info.outputPath("learn-library-dark.png") });
+test("screenshots, light and dark", async ({ page }, info) => {
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.waitForTimeout(400); // let the 240 ms colour transitions finish
+    await page.screenshot({ path: info.outputPath(`learn-closed-${scheme}.png`) });
+    await explanationBtn(page).click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: info.outputPath(`learn-explanation-${scheme}.png`) });
+    await page.getByRole("tab", { name: "Library" }).click();
+    await page.screenshot({ path: info.outputPath(`learn-library-${scheme}.png`) });
+    await side(page).getByRole("button", { name: "Close" }).click();
+  }
 });

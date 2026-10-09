@@ -35,19 +35,44 @@
   overflow: hidden;
 }
 
+/* The stage's control rows only catch pointer events on their buttons, so the 3D scene
+   (slice 4) can still be orbited through the gaps. */
 .stageTop,
 .stageBottom {
   position: relative;
   z-index: 2;
+  padding: var(--aili-space-3);
+  pointer-events: none;
+}
+
+.stageTop > *,
+.stageBottom > * {
+  pointer-events: auto;
+}
+
+.stageTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--aili-space-2);
-  padding: var(--aili-space-3);
 }
 
+/* Captions | voice (centre) | Library */
 .stageBottom {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--aili-space-2);
+}
+
+.stageBottom > :first-child {
+  justify-self: start;
+}
+
+/* Pinned to column 3: on phones the voice button is display:none and takes no cell. */
+.stageBottom > :last-child {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .scene {
@@ -116,8 +141,10 @@
   cursor: pointer;
 }
 
-.chip:hover {
-  background: var(--aili-bg-recessed);
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--aili-bg-recessed);
+  }
 }
 
 .commandRow {
@@ -127,7 +154,8 @@
   gap: var(--aili-space-2);
 }
 
-.voice {
+/* Phone placement: in the command bar beside the text box. */
+.voiceBar {
   flex: none;
   display: grid;
   place-items: center;
@@ -138,6 +166,35 @@
   background: var(--aili-surface);
   color: var(--aili-text-muted);
   cursor: not-allowed;
+}
+
+/* Tablet/desktop placement: large orb, bottom-centre of the stage. Icon is action-text on
+   accent/action-bg (light 3.81:1 and up, dark 5.96:1; icons need 3:1). */
+.voiceStage {
+  display: none;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--aili-accent), var(--aili-action-bg));
+  color: var(--aili-action-text);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .voiceStage {
+    display: grid;
+  }
+
+  .voiceBar {
+    display: none;
+  }
+
+  .caption {
+    bottom: 100px;
+  }
 }
 
 .input {
@@ -171,30 +228,20 @@
 
 .sideHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--aili-space-2);
   padding: var(--aili-space-2) var(--aili-space-2) 0 var(--aili-space-4);
+  border-bottom: 1px solid var(--aili-border);
 }
 
-.sideTitle {
-  margin: 0;
-  font-size: 1.35rem;
-}
-
-.sideTitle:focus {
-  outline: none;
-}
-
-.sideTitle:focus-visible {
-  outline: var(--aili-focus-width) solid var(--aili-focus-ring);
+.sideHeader > button {
+  margin-bottom: var(--aili-space-1);
 }
 
 .tabs {
   display: flex;
   gap: var(--aili-space-1);
-  padding: var(--aili-space-2) var(--aili-space-4) 0;
-  border-bottom: 1px solid var(--aili-border);
 }
 
 .tab {
@@ -204,7 +251,7 @@
   border-bottom: 3px solid transparent;
   background: transparent;
   color: var(--aili-text-muted);
-  font: 500 0.95rem var(--aili-font-ui);
+  font: 500 1rem var(--aili-font-ui);
   cursor: pointer;
 }
 
@@ -296,7 +343,10 @@
     box-shadow: 0 -8px 24px rgb(0 0 0 / 0.16);
     animation: sheetIn var(--aili-duration-ui) var(--aili-ease-out);
   }
+}
 
+/* Phones: voice is in the command bar, so captions sit lower in the stage. */
+@media (max-width: 767px) {
   .caption {
     bottom: 64px;
     font-size: 0.95rem;

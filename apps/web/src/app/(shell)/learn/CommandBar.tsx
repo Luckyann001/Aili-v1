@@ -3,11 +3,12 @@
 import { useId, useState } from "react";
 import { Button } from "@/components/Button";
 import { SAMPLE_CHIPS } from "./sampleContent";
+import { VoiceButton } from "./VoiceButton";
 import styles from "./learn.module.css";
 
 const NOT_CONNECTED = "Replies aren't connected yet. This is a prepared layout preview.";
 
-/** Bottom command area: voice button, text box and quick replies. */
+/** Bottom command area: quick replies, text box, and the voice button on phones. */
 export function CommandBar({ onNotice }: { onNotice: (text: string) => void }) {
   const [text, setText] = useState("");
   const inputId = useId();
@@ -31,13 +32,7 @@ export function CommandBar({ onNotice }: { onNotice: (text: string) => void }) {
           setText("");
         }}
       >
-        <button type="button" className={styles.voice} aria-disabled="true" aria-describedby={`${inputId}-voice`}>
-          <MicIcon />
-          <span className={styles.srOnly}>Voice input</span>
-        </button>
-        <span id={`${inputId}-voice`} className={styles.srOnly}>
-          Coming soon. Type instead.
-        </span>
+        <VoiceButton placement="bar" />
 
         <label htmlFor={inputId} className={styles.srOnly}>
           Ask Aili or answer
@@ -55,14 +50,5 @@ export function CommandBar({ onNotice }: { onNotice: (text: string) => void }) {
         </Button>
       </form>
     </div>
-  );
-}
-
-function MicIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-      <rect x="8" y="3" width="6" height="10" rx="3" />
-      <path d="M5 10.5a6 6 0 0 0 12 0M11 16.5V19" />
-    </svg>
   );
 }
