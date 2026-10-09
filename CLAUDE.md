@@ -2,7 +2,7 @@
 
 AILI (Artificial Intelligence Learning Interface) is an interactive learning-and-building environment. A person understands a complex technical topic through a one-on-one AI professor using 3D visuals, analogies, calculation and simulation, then is guided into building a real project. Core loop: **understand → visualize → experiment → reason → build.**
 
-This is a **fresh build in an empty folder**. There is no existing code. Propose the stack and structure for my approval before creating anything.
+Stack and structure approved Oct 9 2026. M0 (foundations) is complete and merged locally into `main`.
 
 ## Scope (do not exceed)
 - AILI is a **platform**; **robotics is the only module** for now. No other subjects, no whiteboard, no search, no mascot, no AI/ML module, no AR/VR (design for it later, build nothing now).
@@ -19,8 +19,21 @@ This is a **fresh build in an empty folder**. There is no existing code. Propose
 7. `00-master-prompt.md` — original constraints. Images in `design/`.
 If docs conflict, follow the lower number and tell me.
 
-## Proposed stack (confirm or counter-propose with reasons; prefer the simpler option)
-Next.js + TypeScript; React Three Fiber (three.js) for 3D; Supabase (Postgres, auth); Vercel; **solvers in TypeScript in a shared package** (runs in the browser for instant sliders and on the server for validation), with a units-aware approach and tests against worked textbook examples. Add a Python service only if a heavy simulation needs it. Content (concepts, assets, simulations, analogies, readings, project templates) is versioned JSON/YAML in git, synced to Postgres. Provider and model are configuration, never hard-coded.
+## Stack (approved Oct 9 2026)
+- **Next.js 16 App Router + TypeScript**, npm workspaces: `apps/web`, `packages/schemas` (Zod), `packages/solvers`, `packages/engine` (validator, planner, shortlist from M2).
+- **React Three Fiber 9 + drei** (three.js) for 3D; **Zustand** for client state; **Zod** for every schema; **Vitest** for tests.
+- **CSS Modules + `design/tokens.css`** (no Tailwind); fonts self-hosted via `@fontsource-variable/newsreader` and `@fontsource-variable/inter`.
+- **Supabase** (Postgres, auth); **Vercel**.
+- **Turn events over SSE, plus a POST interrupt endpoint** carrying the request ID and state revision (Vercel serverless functions cannot hold WebSockets open).
+- **Solvers are plain TypeScript, SI units only inside**, with the unit in every field name (`arm_length_m`); conversions only at the edges; tests against worked textbook examples. Add a Python service only if a heavy simulation needs it.
+- Content (concepts, assets, simulations, analogies, readings, project templates) is versioned JSON/YAML in git, synced to Postgres. Provider and model are configuration, never hard-coded.
+
+## Setup and commands
+- **Node 22 is required** (`.nvmrc`); check with `node -v`.
+- `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build` (all from the repo root).
+- `/preview` is the design check page (tokens, type, logos, 3D renderer).
+- Next 16 allows only **one dev server per project** at a time.
+- Next 16 differs from older versions: read `node_modules/next/dist/docs/` before writing Next.js code (see `apps/web/AGENTS.md`).
 
 ## Product rules
 **Professor (live AI) — see the behavior spec.**
@@ -31,7 +44,7 @@ Next.js + TypeScript; React Three Fiber (three.js) for 3D; Supabase (Postgres, a
 - Assign readings only from the verified library; never invent books, chapters, pages, videos or timestamps. Teach-back is graded against the human-written guide, not the source text. Never declare mastery from one answer.
 - Presence is the logo's orb. No talking-head professor, no mascot.
 
-**Director contract (engine).** The LLM proposes a structured response (move, narration, actions, calc requests, evidence, prompt, assumptions, limitations). A **validator** checks IDs exist, values in bounds, citations exist, pedagogy rules, and rejects any **hard-coded engineering number** in narration (use placeholders like `{{torque_nm}}`). **All numbers come from deterministic solvers.** The arm's own mass must be included in torque models. The professor only sees a **shortlist** of *published* capabilities retrieved by concept and level. Per turn: shortlist → director → validate → solver → compile → events (WebSocket/SSE) → client renders locally. Stale actions are invalidated via sequence numbers/request IDs/state revision (interrupt must stop audio and queued actions immediately). On any failure keep the last valid state and say so plainly.
+**Director contract (engine).** The LLM proposes a structured response (move, narration, actions, calc requests, evidence, prompt, assumptions, limitations). A **validator** checks IDs exist, values in bounds, citations exist, pedagogy rules, and rejects any **hard-coded engineering number** in narration (use placeholders like `{{torque_nm}}`). **All numbers come from deterministic solvers.** The arm's own mass must be included in torque models. The professor only sees a **shortlist** of *published* capabilities retrieved by concept and level. Per turn: shortlist → director → validate → solver → compile → events (SSE; interrupt via POST) → client renders locally. Stale actions are invalidated via sequence numbers/request IDs/state revision (interrupt must stop audio and queued actions immediately). On any failure keep the last valid state and say so plainly.
 
 **Capability registry.** Items: assets/anatomy, animations, simulations, solvers, analogies, readings/evidence, project templates. Each declares `teaches` (concept IDs), `fidelity` (verified / simplified teaching / illustrative), `version`, `review_status` (draft / reviewed / published), `provenance`. **The AI never publishes** — draft → automated checks → human expert review → publish. Visual tiers: T0 library asset; T1 AI-composed from library primitives (label "Illustrative (AI-composed)"); T2 AI-generated 2D diagram; T3 AI 3D mesh is **offline authoring only**. An animation is not a simulation. No invented anatomy of a named real product.
 
@@ -54,6 +67,9 @@ Palette: Canvas #F5F1EB, Deep canvas #EBE4DA, Surface #FFFDFA, Ink #282724, Copp
 - Motion: UI 200–300 ms, spatial 500–700 ms; honour `prefers-reduced-motion` with a still alternative.
 - Accessibility: keyboard for everything, captions always available, labelled landmarks, ≥44 px touch targets, spacebar shortcuts never interfere with typing.
 - Performance: test on a **mid-range Android phone**; low-poly assets with size budgets, lazy loading, a fallback viewer; scenes in real units (metres).
+- Token rules as built: brand doc §3a. Plum takes large text only. The decorative border is for dividers only; controls use border-strong. Pass / Warn / Fail each have a distinct icon shape plus the word. The fail tint never goes on buttons.
+- The app uses the `*-outlined` logos, and `logo-horizontal-compact.svg` in navigation.
+- The docs in `docs/` are the source of truth; propose any change to them before making it.
 
 ## Security and secrets
 Provider keys and Supabase service-role credentials are **server-only**, in `.env.local`/host settings; `.env*` in `.gitignore`; never commit, print or log them; never ask me to paste secrets into chat. Validate all inputs; sanitize any AI-produced SVG/scene description; never run model-written code in the live app. Learner memory: keep what they say, what was observed, what Aili infers and explicit preferences separate; let learners inspect, correct and delete it. Check consent and data-protection requirements (Kenya and the data location) before beta.
@@ -67,4 +83,13 @@ Billing is **unresolved**: no forced paywall or trial tollbooth. Meter every ses
 - Write tests for solvers (worked examples), the validator, the planner and professor session tests (17 in the behavior spec).
 - Report plainly: what was built, what was verified (and how), what was not, and any doc conflicts. Do not claim access to anything you can't reach.
 - I use a limited Claude plan: keep prompts and file reads focused; don't spawn parallel work unless asked.
+- Keep each task small because the Claude plan has limited prompts; if a task would take more than one session, split it and tell me.
 - Keep this file current; if a decision changes, propose the edit.
+
+## Never do (unless I ask)
+- Push, add a remote, or run `gh repo create`.
+- Merge into `main`.
+- Run migrations, provision paid services, publish anything, or delete without approval.
+- Commit, open, print or log `.env*` files.
+- Edit files in `design/logo/` (the app uses copies; new variants go beside the originals).
+- Say something works without running it, or hide a failing test.
