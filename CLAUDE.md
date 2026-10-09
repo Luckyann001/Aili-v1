@@ -31,6 +31,8 @@ If docs conflict, follow the lower number and tell me.
 ## Setup and commands
 - **Node 22 is required** (`.nvmrc`); check with `node -v`.
 - `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build` (all from the repo root).
+- `npm run test:e2e`: Playwright with the installed Google Chrome against a production build on port 3200 (desktop and phone viewports, axe accessibility scans).
+- `npm run dev:lan`: dev server reachable from a phone on the same Wi-Fi at `http://<laptop IP>:3000` (`hostname -I`, first address). The laptop firewall (ufw) must allow it, for the home network only: `sudo ufw allow from 192.168.100.0/24 to any port 3000 proto tcp` (remove with `sudo ufw delete allow from 192.168.100.0/24 to any port 3000 proto tcp`).
 - `/preview` is the design check page (tokens, type, logos, 3D renderer).
 - Next 16 allows only **one dev server per project** at a time.
 - Next 16 differs from older versions: read `node_modules/next/dist/docs/` before writing Next.js code (see `apps/web/AGENTS.md`).
@@ -93,3 +95,4 @@ Billing is **unresolved**: no forced paywall or trial tollbooth. Meter every ses
 - Commit, open, print or log `.env*` files.
 - Edit files in `design/logo/` (the app uses copies; new variants go beside the originals).
 - Say something works without running it, or hide a failing test.
+- Kill processes I did not start. Never use broad `pkill`; only stop a server Claude started, by its own PID.
