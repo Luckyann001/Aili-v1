@@ -1,8 +1,6 @@
 // Placeholder text for the layout only. Not reviewed teaching content, not a real reading.
 // No engineering numbers here: in the product, numbers come only from solvers.
 
-export const SAMPLE_CAPTION = "Sample caption. Captions appear here, in step with Aili's voice.";
-
 export const SAMPLE_EXPLANATION = {
   title: "Why reach makes holding harder",
   body: "The farther a load sits from a joint, the more twist the joint must resist to hold it still. That twist is the load's weight multiplied by its perpendicular distance from the joint.",
