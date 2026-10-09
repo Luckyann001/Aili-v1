@@ -72,6 +72,24 @@
   }
 }
 
+.menuLink {
+  display: flex;
+  align-items: center;
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border-radius: var(--aili-radius-sm);
+  color: var(--aili-text);
+  font: 1rem var(--aili-font-ui);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .menuLink:hover {
+    background: var(--aili-bg-recessed);
+    text-decoration: underline;
+  }
+}
+
 .coming {
   font-size: 0.75rem;
   font-weight: 600;

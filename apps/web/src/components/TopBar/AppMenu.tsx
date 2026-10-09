@@ -1,12 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { IconButton } from "../IconButton";
 import styles from "./TopBar.module.css";
 
 // Disclosure pattern (button + list), not an ARIA menu: Tab moves through items, Esc closes.
-// Nothing behind these items is built yet, so each is marked "Coming" rather than pretending.
-const ITEMS = ["Plan and contents", "Notes", "Settings", "Help", "Sign out"] as const;
+// Items without an href are not built yet, so they are marked "Coming" rather than pretending.
+const ITEMS: Array<{ label: string; href?: string }> = [
+  { label: "Plan and contents" },
+  { label: "Notes" },
+  { label: "Settings", href: "/settings" },
+  { label: "Help" },
+  { label: "Sign out" },
+];
 
 export function AppMenu() {
   const [open, setOpen] = useState(false);
@@ -52,11 +59,17 @@ export function AppMenu() {
       />
       <ul id={id} className={styles.menuList} hidden={!open}>
         {ITEMS.map((item) => (
-          <li key={item}>
-            <button type="button" className={styles.menuItem} aria-disabled="true">
-              <span>{item}</span>
-              <span className={styles.coming}>Coming</span>
-            </button>
+          <li key={item.label}>
+            {item.href ? (
+              <Link href={item.href} className={styles.menuLink} onClick={() => setOpen(false)}>
+                {item.label}
+              </Link>
+            ) : (
+              <button type="button" className={styles.menuItem} aria-disabled="true">
+                <span>{item.label}</span>
+                <span className={styles.coming}>Coming</span>
+              </button>
+            )}
           </li>
         ))}
       </ul>

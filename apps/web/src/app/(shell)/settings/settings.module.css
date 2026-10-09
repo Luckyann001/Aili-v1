@@ -1,0 +1,44 @@
+.wrap {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--aili-space-8) var(--aili-space-4);
+}
+
+.section {
+  padding: var(--aili-space-4) var(--aili-space-6) var(--aili-space-6);
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-surface);
+}
+
+.note {
+  color: var(--aili-text-muted);
+}
+
+.label {
+  margin: var(--aili-space-6) 0 var(--aili-space-1);
+  font: 600 0.8rem var(--aili-font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aili-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-2);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-3);
+  min-height: var(--aili-touch-target);
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--aili-action-bg);
+}
