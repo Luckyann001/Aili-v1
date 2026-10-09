@@ -14,16 +14,18 @@ const TABS: Array<{ view: SideView; label: string }> = [
 
 /**
  * Right-hand text panel on desktop, bottom sheet on phones (stage layout doc §1).
- * Non-modal: the stage stays usable. Esc or Close returns focus to the button that opened it.
+ * Non-modal: the stage stays usable. Opening focuses the selected tab; Esc or Close returns
+ * focus to the button that opened it. The tabs are the visible title (no repeated heading).
  */
 export function SidePanel({ view, returnFocusTo }: { view: SideView; returnFocusTo: RefObject<HTMLButtonElement | null> }) {
   const openSide = useLearnUi((s) => s.openSide);
   const closeSide = useLearnUi((s) => s.closeSide);
-  const heading = useRef<HTMLHeadingElement>(null);
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
 
+  // Focus the selected tab when the panel first opens (not on later tab switches).
   useEffect(() => {
-    heading.current?.focus();
+    tabs.current[TABS.findIndex((t) => t.view === view)]?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const close = () => {
@@ -48,35 +50,34 @@ export function SidePanel({ view, returnFocusTo }: { view: SideView; returnFocus
         if (e.key === "Escape") close();
       }}
     >
+      <h2 id="learn-side-title" className={styles.srOnly}>
+        Text panel
+      </h2>
       <div className={styles.sideHeader}>
-        <h2 id="learn-side-title" ref={heading} tabIndex={-1} className={styles.sideTitle}>
-          {view === "explanation" ? "Explanation" : "Library"}
-        </h2>
+        <div role="tablist" aria-label="Text panel" className={styles.tabs}>
+          {TABS.map((t, i) => (
+            <button
+              key={t.view}
+              ref={(el) => {
+                tabs.current[i] = el;
+              }}
+              type="button"
+              role="tab"
+              id={`learn-tab-${t.view}`}
+              aria-selected={view === t.view}
+              aria-controls="learn-tabpanel"
+              tabIndex={view === t.view ? 0 : -1}
+              className={styles.tab}
+              onClick={() => openSide(t.view)}
+              onKeyDown={(e) => onTabKey(e, i)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         <Button variant="quiet" onClick={close}>
           Close
         </Button>
-      </div>
-
-      <div role="tablist" aria-label="Text panel" className={styles.tabs}>
-        {TABS.map((t, i) => (
-          <button
-            key={t.view}
-            ref={(el) => {
-              tabs.current[i] = el;
-            }}
-            type="button"
-            role="tab"
-            id={`learn-tab-${t.view}`}
-            aria-selected={view === t.view}
-            aria-controls="learn-tabpanel"
-            tabIndex={view === t.view ? 0 : -1}
-            className={styles.tab}
-            onClick={() => openSide(t.view)}
-            onKeyDown={(e) => onTabKey(e, i)}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
       <div id="learn-tabpanel" role="tabpanel" aria-labelledby={`learn-tab-${view}`} className={styles.sideBody}>
