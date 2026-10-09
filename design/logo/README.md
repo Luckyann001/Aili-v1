@@ -14,3 +14,4 @@ Notes: the wordmark letters are drawn as paths (no font needed). The tagline is 
   - Checked against the live-text originals rendered in Chrome with Inter loaded: 0.12–0.20% of pixels differ, all anti-aliasing along letter edges.
 - `logo-horizontal-compact.svg`: symbol, divider and AILI wordmark with no tagline, for the navigation bar. The mark and divider are unchanged; the wordmark is moved down to centre on the mark.
 - `logo-mono-light.svg` and its outlined version now have a **transparent background** (the #282724 rectangle was removed), so they sit on any dark surface.
+- `logo-horizontal-compact-dark.svg`: the compact lockup for dark backgrounds. Same mark; wordmark and divider in Surface (#FFFDFA), as in `logo-primary-dark.svg`. The top bar switches to it when the OS is in dark mode.

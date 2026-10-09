@@ -16,6 +16,20 @@
   border-radius: var(--aili-radius-sm);
 }
 
+.logoDark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .logoLight {
+    display: none;
+  }
+
+  .logoDark {
+    display: block;
+  }
+}
+
 .menuRoot {
   position: relative;
 }
