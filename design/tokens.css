@@ -1,0 +1,199 @@
+/*
+ * AILI design tokens — "Tactile Spatialism" (docs/aili-brand-design-language.md)
+ *
+ * Components use only the semantic --aili-* tokens, never raw hex.
+ * Light and dark are separate authored sets (dark is not an inversion).
+ * Every allowed text/background pair is checked by apps/web/src/design/contrast.test.ts.
+ *
+ * Theme selection:
+ *   default            → light
+ *   OS dark preference → dark, unless an ancestor sets data-theme="light"
+ *   data-theme="dark"  → dark (any element, so previews can show both)
+ */
+
+:root {
+  /* ── Brand palette (primitives; reference only through semantic tokens) ── */
+  --brand-canvas: #f5f1eb;
+  --brand-canvas-deep: #ebe4da;
+  --brand-surface: #fffdfa;
+  --brand-ink: #282724;
+  --brand-copper: #c96543;
+  --brand-copper-strong: #a7482f;
+  --brand-sage: #83957e;
+  --brand-sky: #8daeb9;
+  --brand-gold: #c99a56;
+  --brand-plum: #917383;
+
+  /* ── Type ── */
+  --aili-font-display: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --aili-font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --aili-font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+
+  /* ── Motion (brand doc §7) ── */
+  --aili-duration-ui: 240ms;
+  --aili-duration-spatial: 600ms;
+  --aili-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Shape and space ── */
+  --aili-radius-sm: 8px;
+  --aili-radius-md: 14px;
+  --aili-radius-lg: 24px;
+  --aili-space-1: 4px;
+  --aili-space-2: 8px;
+  --aili-space-3: 12px;
+  --aili-space-4: 16px;
+  --aili-space-6: 24px;
+  --aili-space-8: 32px;
+  --aili-space-12: 48px;
+  --aili-touch-target: 44px;
+  --aili-focus-width: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --aili-duration-ui: 0ms;
+    --aili-duration-spatial: 0ms;
+  }
+}
+
+/* ── LIGHT ─────────────────────────────────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* backgrounds */
+  --aili-bg: #f5f1eb;               /* Canvas: main learning canvas */
+  --aili-bg-recessed: #ebe4da;      /* Deep canvas: stage / viewport well */
+  --aili-surface: #fffdfa;          /* Surface: panels and cards */
+
+  /* text */
+  --aili-text: #282724;             /* Ink */
+  --aili-text-muted: #5c574f;
+  --aili-link: #a7482f;             /* Strong copper: the only copper allowed as text */
+
+  /* lines */
+  /* RULE: --aili-border is for non-essential dividers only. Inputs, controls and anything the
+     learner must find use --aili-border-strong. Enforced by apps/web/src/design/token-usage.test.ts. */
+  --aili-border: #ddd4c7;           /* decorative separators only */
+  --aili-border-strong: #847a6e;    /* input and control boundaries (3:1) */
+
+  /* primary action */
+  --aili-action-bg: #a7482f;        /* Strong copper */
+  --aili-action-bg-hover: #8f3c26;
+  --aili-action-bg-pressed: #7a3320;
+  --aili-action-text: #fffdfa;      /* Surface */
+
+  /* accent: icons, focus ring, large decorative fills — never body text */
+  --aili-accent: #c96543;           /* Copper */
+  --aili-focus-ring: #c96543;
+
+  /* role fills (also 3D materials). Text on them is --aili-on-fill only. */
+  --aili-fill-explore: #83957e;     /* Sage */
+  --aili-fill-technical: #8daeb9;   /* Sky */
+  --aili-fill-discovery: #c99a56;   /* Gold */
+  --aili-fill-expressive: #917383;  /* Plum: icons/fills/large text only (Ink on Plum is 3.55:1) */
+  --aili-on-fill: #282724;          /* Ink */
+
+  /* status: pass / warn / fail each use a distinct icon shape AND the word Pass / Warn / Fail.
+     RULE: --aili-status-fail-bg never goes on anything that looks like a button or link
+     (enforced by token-usage.test.ts). */
+  --aili-status-text: #282724;
+  --aili-status-pass-bg: #dce3d8;
+  --aili-status-pass-border: #83957e;
+  --aili-status-warn-bg: #f2e3c8;
+  --aili-status-warn-border: #c99a56;
+  --aili-status-fail-bg: #f3dcd2;
+  --aili-status-fail-border: #a7482f;
+
+  /* safety: own pattern = warning icon + "Safety" label + heavy border */
+  --aili-safety-bg: #f2e3c8;
+  --aili-safety-border: #282724;
+  --aili-safety-border-width: 3px;
+}
+
+/* ── DARK ──────────────────────────────────────────────────────────────── */
+/* Warm charcoal, authored separately. Keep both dark blocks identical (the test checks).
+   #d9805f, #e3987a and #e8a68b are dark-mode shades derived from Copper (brand doc §3a). */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --aili-bg: #1c1a17;
+  --aili-bg-recessed: #141210;
+  --aili-surface: #262320;
+
+  --aili-text: #f2ece3;
+  --aili-text-muted: #b5aca0;
+  --aili-link: #e3987a;
+
+  --aili-border: #3a3631;
+  --aili-border-strong: #857a6d;
+
+  --aili-action-bg: #d9805f;
+  --aili-action-bg-hover: #e3987a;
+  --aili-action-bg-pressed: #e8a68b;
+  --aili-action-text: #1c1a17;
+
+  --aili-accent: #d9805f;
+  --aili-focus-ring: #e3987a;
+
+  --aili-fill-explore: #83957e;
+  --aili-fill-technical: #8daeb9;
+  --aili-fill-discovery: #c99a56;
+  --aili-fill-expressive: #917383;
+  --aili-on-fill: #282724;
+
+  --aili-status-text: #f2ece3;
+  --aili-status-pass-bg: #25302a;
+  --aili-status-pass-border: #83957e;
+  --aili-status-warn-bg: #3a3122;
+  --aili-status-warn-border: #c99a56;
+  --aili-status-fail-bg: #3a2a22;
+  --aili-status-fail-border: #d9805f;
+
+  --aili-safety-bg: #3a3122;
+  --aili-safety-border: #f2ece3;
+  --aili-safety-border-width: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --aili-bg: #1c1a17;
+    --aili-bg-recessed: #141210;
+    --aili-surface: #262320;
+
+    --aili-text: #f2ece3;
+    --aili-text-muted: #b5aca0;
+    --aili-link: #e3987a;
+
+    --aili-border: #3a3631;
+    --aili-border-strong: #857a6d;
+
+    --aili-action-bg: #d9805f;
+    --aili-action-bg-hover: #e3987a;
+    --aili-action-bg-pressed: #e8a68b;
+    --aili-action-text: #1c1a17;
+
+    --aili-accent: #d9805f;
+    --aili-focus-ring: #e3987a;
+
+    --aili-fill-explore: #83957e;
+    --aili-fill-technical: #8daeb9;
+    --aili-fill-discovery: #c99a56;
+    --aili-fill-expressive: #917383;
+    --aili-on-fill: #282724;
+
+    --aili-status-text: #f2ece3;
+    --aili-status-pass-bg: #25302a;
+    --aili-status-pass-border: #83957e;
+    --aili-status-warn-bg: #3a3122;
+    --aili-status-warn-border: #c99a56;
+    --aili-status-fail-bg: #3a2a22;
+    --aili-status-fail-border: #d9805f;
+
+    --aili-safety-bg: #3a3122;
+    --aili-safety-border: #f2ece3;
+    --aili-safety-border-width: 3px;
+  }
+}
