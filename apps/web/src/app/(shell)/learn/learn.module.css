@@ -1,0 +1,311 @@
+/* Learn stage (stage layout doc §1): stage + command bar, with an on-demand right panel.
+   Desktop ≥ 900px: panel is a right column. Below 900px: panel is a bottom sheet. */
+
+.learn {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--aili-space-3);
+  padding: var(--aili-space-3);
+}
+
+@media (min-width: 900px) {
+  .learn[data-side="explanation"],
+  .learn[data-side="library"] {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+
+  .side {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* ── Stage ── */
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-bg-recessed);
+  overflow: hidden;
+}
+
+.stageTop,
+.stageBottom {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+  padding: var(--aili-space-3);
+}
+
+.stageBottom {
+  justify-content: space-between;
+}
+
+.scene {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--aili-space-3);
+  min-height: 0;
+}
+
+.orb {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--aili-accent) 55%, white), var(--aili-accent));
+}
+
+.sceneNote {
+  margin: 0;
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
+}
+
+.caption {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  width: min(92%, 640px);
+  margin: 0;
+  padding: var(--aili-space-2) var(--aili-space-4);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.4;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+}
+
+/* ── Command bar ── */
+
+.command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--aili-space-2);
+  min-width: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-2);
+}
+
+.chip {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-4);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 0.95rem var(--aili-font-ui);
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--aili-bg-recessed);
+}
+
+.commandRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+}
+
+.voice {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 50%;
+  background: var(--aili-surface);
+  color: var(--aili-text-muted);
+  cursor: not-allowed;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 var(--aili-space-4);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 1rem var(--aili-font-ui);
+}
+
+.input::placeholder {
+  color: var(--aili-text-muted);
+  opacity: 1;
+}
+
+/* ── Side panel (Explanation / Library) ── */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border);
+  overflow: hidden;
+}
+
+.sideHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+  padding: var(--aili-space-2) var(--aili-space-2) 0 var(--aili-space-4);
+}
+
+.sideTitle {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.sideTitle:focus {
+  outline: none;
+}
+
+.sideTitle:focus-visible {
+  outline: var(--aili-focus-width) solid var(--aili-focus-ring);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--aili-space-1);
+  padding: var(--aili-space-2) var(--aili-space-4) 0;
+  border-bottom: 1px solid var(--aili-border);
+}
+
+.tab {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--aili-text-muted);
+  font: 500 0.95rem var(--aili-font-ui);
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--aili-text);
+  border-bottom-color: var(--aili-accent);
+}
+
+.sideBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--aili-space-3) var(--aili-space-4) var(--aili-space-6);
+}
+
+.sampleNote {
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
+}
+
+.stepTitle {
+  margin: var(--aili-space-4) 0 var(--aili-space-2);
+  font-size: 1.25rem;
+}
+
+.listTitle {
+  margin: var(--aili-space-4) 0 var(--aili-space-1);
+  font: 600 0.8rem var(--aili-font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aili-text-muted);
+}
+
+.readings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--aili-space-3);
+}
+
+.reading {
+  padding: var(--aili-space-3) var(--aili-space-4);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-bg);
+}
+
+.reading p {
+  margin: var(--aili-space-1) 0 0;
+}
+
+.readingTitle {
+  margin: var(--aili-space-1) 0 0;
+  font-size: 1.1rem;
+}
+
+.sampleTag {
+  display: inline-block;
+  padding: 0 var(--aili-space-2);
+  border: 1px dashed var(--aili-border-strong);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Phones and narrow tablets: bottom sheet ── */
+
+@media (max-width: 899px) {
+  .learn {
+    padding: var(--aili-space-2);
+  }
+
+  .side {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 70dvh;
+    border-radius: var(--aili-radius-lg) var(--aili-radius-lg) 0 0;
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 0.16);
+    animation: sheetIn var(--aili-duration-ui) var(--aili-ease-out);
+  }
+
+  .caption {
+    bottom: 64px;
+    font-size: 0.95rem;
+  }
+}
+
+@keyframes sheetIn {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}

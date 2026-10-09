@@ -11,6 +11,7 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}`, channel: "chrome", trace: "retain-on-failure" },
   projects: [
     { name: "desktop", use: { viewport: { width: 1280, height: 800 } } },
+    { name: "tablet", use: { viewport: { width: 768, height: 1024 }, hasTouch: true } },
     { name: "phone", use: { ...devices["Pixel 7"], channel: "chrome" } },
   ],
   webServer: {
