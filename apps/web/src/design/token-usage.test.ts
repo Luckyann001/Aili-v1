@@ -68,3 +68,31 @@ describe("the checker itself", () => {
     expect(failTintOnClickable(sample)).toEqual([".retryButton"]);
   });
 });
+
+/** Removes every `@media (hover: hover) { ... }` block, matching braces. */
+function withoutHoverMedia(css: string): string {
+  let out = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (let i = out.indexOf("@media (hover: hover)"); i >= 0; i = out.indexOf("@media (hover: hover)")) {
+    let depth = 0;
+    let j = out.indexOf("{", i);
+    for (; j < out.length; j++) {
+      if (out[j] === "{") depth++;
+      else if (out[j] === "}" && --depth === 0) break;
+    }
+    out = out.slice(0, i) + out.slice(j + 1);
+  }
+  return out;
+}
+
+// Touch browsers keep :hover after a tap, so a tapped button looks stuck. Hover styles only
+// apply on devices with a real pointer.
+describe("hover styles", () => {
+  it.each(files)("%s: every :hover rule is inside @media (hover: hover)", (file) => {
+    expect(withoutHoverMedia(readFileSync(file, "utf8"))).not.toMatch(/:hover/);
+  });
+
+  it("the check catches a bare :hover rule", () => {
+    expect(withoutHoverMedia(".a:hover { color: red; }")).toMatch(/:hover/);
+    expect(withoutHoverMedia("@media (hover: hover) {\n  .a:hover { color: red; }\n}")).not.toMatch(/:hover/);
+  });
+});

@@ -26,8 +26,10 @@
   font-weight: 600;
 }
 
-.primary:hover {
-  background: var(--aili-action-bg-hover);
+@media (hover: hover) {
+  .primary:hover {
+    background: var(--aili-action-bg-hover);
+  }
 }
 
 .primary:active {
@@ -40,8 +42,10 @@
   color: var(--aili-text);
 }
 
-.secondary:hover {
-  background: var(--aili-bg-recessed);
+@media (hover: hover) {
+  .secondary:hover {
+    background: var(--aili-bg-recessed);
+  }
 }
 
 .quiet {
@@ -50,6 +54,8 @@
   color: var(--aili-text);
 }
 
-.quiet:hover {
-  background: var(--aili-bg-recessed);
+@media (hover: hover) {
+  .quiet:hover {
+    background: var(--aili-bg-recessed);
+  }
 }

@@ -66,8 +66,10 @@
   cursor: not-allowed;
 }
 
-.menuItem:hover {
-  background: var(--aili-bg-recessed);
+@media (hover: hover) {
+  .menuItem:hover {
+    background: var(--aili-bg-recessed);
+  }
 }
 
 .coming {
