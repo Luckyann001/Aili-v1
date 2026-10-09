@@ -68,8 +68,7 @@ Palette: Canvas #F5F1EB, Deep canvas #EBE4DA, Surface #FFFDFA, Ink #282724, Copp
 - Type: self-hosted **Newsreader** (display) + **Inter** (UI). Avoid generic neon-AI graphics, crowded dashboards, glassmorphism, decoration without purpose, rainbow UI.
 - Motion: UI 200–300 ms, spatial 500–700 ms; honour `prefers-reduced-motion` with a still alternative.
 - Accessibility: keyboard for everything, captions always available, labelled landmarks, ≥44 px touch targets, spacebar shortcuts never interfere with typing.
-- Performance: test on a **mid-range Android phone**; low-poly assets with size budgets, lazy loading, a fallback viewer; scenes in real units (metres).
-- **Target low-end test device (M1 slice 6 performance check): Itel A667L, Android 14** (Lucky's phone). Judge speed on a production build on this phone, not the dev server.
+- Performance: Test on a low-end Android phone (Itel A667L, Android 14), judging speed on a production build, not the dev server; low-poly assets with size budgets, lazy loading, a fallback viewer; scenes in real units (metres).
 - Token rules as built: brand doc §3a. Plum takes large text only. The decorative border is for dividers only; controls use border-strong. Pass / Warn / Fail each have a distinct icon shape plus the word. The fail tint never goes on buttons.
 - The app uses the `*-outlined` logos, and `logo-horizontal-compact.svg` in navigation.
 - The docs in `docs/` are the source of truth; propose any change to them before making it.
