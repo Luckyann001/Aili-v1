@@ -40,7 +40,10 @@ export function SceneViewport({
           spatialMs={theme.spatialMs}
           host={host}
           onReady={({ triangles }) => {
-            if (host.current) host.current.dataset.triangles = String(triangles);
+            if (host.current) {
+              host.current.dataset.triangles = String(triangles);
+              host.current.dataset.trianglesScene = useScene.getState().activeScene;
+            }
             setViewer("ready");
           }}
           onFail={() => setViewer("fallback")}

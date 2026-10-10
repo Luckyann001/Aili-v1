@@ -7,6 +7,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { BackSide, PerspectiveCamera, Vector3, type Camera, type Mesh } from "three";
+import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
 import { cornersOf, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
@@ -82,7 +83,8 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       <LabelTracker safeArea={props.safeArea} labels={props.labels} host={props.host} />
       <ExplodeDriver spatialMs={props.spatialMs} host={props.host} />
       <CameraRig spatialMs={props.spatialMs} host={props.host} />
-      <ReadyProbe onReady={props.onReady} />
+      {/* Re-mounted per scene, so each scene's triangle count is reported (and budget-tested). */}
+      <ReadyProbe key={activeScene} onReady={props.onReady} />
     </Canvas>
   );
 }
@@ -285,6 +287,8 @@ function LabelTracker({
     const h = area.clientHeight;
     const layout = MODELS[activeScene].layout({ params, leverDistance_m }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
+    // 1. Where each shown label wants to go (clamped inside the safe area).
+    const wanted: LabelBox[] = [];
     for (const part of MODELS[activeScene].parts) {
       const el = labels.current.get(part.id);
       if (!el) continue;
@@ -294,16 +298,26 @@ function LabelTracker({
       // For tests: where the part's anchor is on the canvas, before clamping.
       el.dataset.x = sx.toFixed(1);
       el.dataset.y = sy.toFixed(1);
-      if (v.z > 1) {
+      const lw = el.offsetWidth;
+      const lh = el.offsetHeight;
+      if (v.z > 1 || lw === 0) {
         el.style.visibility = "hidden";
         continue;
       }
-      el.style.visibility = "";
-      const lw = el.offsetWidth;
-      const lh = el.offsetHeight;
-      const x = Math.min(Math.max(sx - area.offsetLeft - lw / 2, PAD), Math.max(PAD, w - lw - PAD));
-      const y = Math.min(Math.max(sy - area.offsetTop - lh - 10, PAD), Math.max(PAD, h - lh - PAD));
-      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      wanted.push({
+        id: part.id,
+        x: Math.min(Math.max(sx - area.offsetLeft - lw / 2, PAD), Math.max(PAD, w - lw - PAD)),
+        y: Math.min(Math.max(sy - area.offsetTop - lh - 10, PAD), Math.max(PAD, h - lh - PAD)),
+        w: lw,
+        h: lh,
+        priority: part.id === selectedId ? 10 : 0,
+      });
+    }
+    // 2. Resolve collisions: the selected label stays put; others move aside or hide.
+    for (const p of placeLabels(wanted, { w, h }, PAD)) {
+      const el = labels.current.get(p.id)!;
+      el.style.visibility = p.hidden ? "hidden" : "";
+      el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
     }
   });
   return null;
