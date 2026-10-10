@@ -280,6 +280,117 @@ test.describe("clearing the selection", () => {
   });
 });
 
+test.describe("exploded view", () => {
+  const explode = async (p: Page) => Number(await host(p).getAttribute("data-explode"));
+
+  test("moves parts apart over the spatial duration and back; parts stay selectable", async ({ page }, info) => {
+    await openScene(page);
+    const btn = page.getByRole("button", { name: "Exploded view" });
+    await expect(btn).toHaveAttribute("aria-pressed", "false");
+    const t0 = Date.now();
+    await btn.click();
+    await expect(btn).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => explode(page), { timeout: 3000, intervals: [20] }).toBe(1);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(450); // a tween, not a cut
+    // Select the end weight where it now is.
+    const c = await rect(canvas(page));
+    const end = label(page, "end-weight");
+    const x = c.x + Number(await end.getAttribute("data-x"));
+    const y = c.y + Number(await end.getAttribute("data-y")) + 4;
+    if (info.project.name === "desktop") await page.mouse.click(x, y);
+    else await page.touchscreen.tap(x, y);
+    await expect(partsButton(page)).toHaveText("Parts: End weight");
+    await btn.click();
+    await expect.poll(() => explode(page), { timeout: 3000 }).toBe(0);
+  });
+
+  test("cuts straight there under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openScene(page);
+    await page.getByRole("button", { name: "Exploded view" }).click();
+    await expect(host(page)).toHaveAttribute("data-explode", "1.000", { timeout: 250 });
+  });
+});
+
+test.describe("inspector", () => {
+  const inspector = (p: Page) => p.getByRole("region", { name: /^Inspector:/ });
+  const armSlider = (p: Page) => p.getByRole("slider", { name: "Arm length" });
+
+  test("shows the selected part's settings with units and bounds, and no results", async ({ page }) => {
+    await openScene(page);
+    await pickPart(page, "Arm");
+    await expect(inspector(page)).toHaveAccessibleName("Inspector: Arm");
+    await expect(inspector(page)).toContainText("Placeholder settings. They change the drawing only; nothing is calculated yet.");
+    const s = armSlider(page);
+    await expect(s).toHaveAttribute("min", "0.1");
+    await expect(s).toHaveAttribute("max", "0.3");
+    await expect(s).toHaveAttribute("step", "0.01");
+    await expect(s).toHaveValue("0.18");
+    await expect(s).toHaveAttribute("aria-valuetext", "0.18 metres");
+    await expect(inspector(page)).toContainText("0.18 m");
+    await expect(inspector(page)).toContainText("0.10 m to 0.30 m");
+    await pickPart(page, "Servo body");
+    await expect(inspector(page)).toContainText("No settings for this part yet.");
+  });
+
+  test("keyboard moves the slider within its bounds and the drawing follows", async ({ page }) => {
+    await openScene(page);
+    await pickPart(page, "Arm");
+    const s = armSlider(page);
+    const endX = async () => Number(await label(page, "end-weight").getAttribute("data-x"));
+    const before = await endX();
+    await s.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(s).toHaveValue("0.19");
+    await expect(inspector(page)).toContainText("0.19 m");
+    await page.keyboard.press("End");
+    await expect(s).toHaveValue("0.3");
+    await expect(inspector(page)).toContainText("0.30 m");
+    await expect.poll(endX).toBeGreaterThan(before); // the end weight moved out with the longer arm
+    await page.keyboard.press("Home");
+    await expect(s).toHaveValue("0.1");
+    await page.keyboard.press("ArrowLeft"); // already at the minimum
+    await expect(s).toHaveValue("0.1");
+  });
+
+  test("Escape closes it and keeps the selection; Close does too; selecting reopens it", async ({ page }) => {
+    await openScene(page);
+    await pickPart(page, "Arm");
+    await armSlider(page).focus();
+    await page.keyboard.press("Escape");
+    await expect(inspector(page)).toHaveCount(0);
+    await expect(partsButton(page)).toHaveText("Parts: Arm");
+    await expect(partsButton(page)).toBeFocused();
+    await pickPart(page, "Arm");
+    await expect(inspector(page)).toBeVisible();
+    await page.locator("main").focus();
+    await page.keyboard.press("Escape"); // focus elsewhere on the page
+    await expect(inspector(page)).toHaveCount(0);
+    await pickPart(page, "End weight");
+    await page.getByRole("button", { name: "Close inspector" }).click();
+    await expect(inspector(page)).toHaveCount(0);
+    await expect(partsButton(page)).toHaveText("Parts: End weight");
+  });
+
+  test("never covers the voice orb, captions or bottom controls", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 8000 });
+    await openScene(page);
+    await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("hi");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.getByText("This is a prepared demo line, not a live answer.")).toBeVisible();
+    await page.getByRole("button", { name: "Exploded view" }).click();
+    await pickPart(page, "Arm");
+    const box = await rect(inspector(page));
+    const blockers = [
+      page.getByText("This is a prepared demo line, not a live answer.").locator(".."),
+      page.locator('p[role="status"][data-state]'),
+      page.locator("main button[data-state]:visible"), // the voice orb (or the phone's mic button)
+      ...["Captions", "Mute", "Library"].map((name) => page.locator('section[aria-label="Stage"]').getByRole("button", { name })),
+    ];
+    for (const b of blockers) expect(overlaps(box, await rect(b))).toBe(false);
+  });
+});
+
 test.describe("labels", () => {
   test("labels are off by default; Labels shows them; the selected part always keeps its label", async ({ page }) => {
     await openScene(page);
@@ -412,8 +523,12 @@ test.describe("honesty and accessibility", () => {
 
   test("no engineering numbers on the stage", async ({ page }) => {
     await openScene(page);
+    // Dimensions in metres are allowed in the inspector (placeholder drawing values); results such
+    // as mass, force, torque, power or electrical values must never appear.
+    await pickPart(page, "Arm");
     const text = await page.locator('section[aria-label="Stage"]').innerText();
-    expect(text).not.toMatch(/\d+(\.\d+)?\s?(kg|g|N|N·m|Nm|mm|cm|m|kgf)\b/);
+    expect(text).toContain("0.18 m");
+    expect(text).not.toMatch(/\d+(\.\d+)?\s?(kg|g|N|N·m|Nm|kgf|kgf·cm|W|V|A|mA)\b/);
   });
 
   for (const scheme of ["light", "dark"] as const) {
@@ -425,6 +540,17 @@ test.describe("honesty and accessibility", () => {
       await page.waitForTimeout(400);
       expect(await axe(page)).toEqual([]);
       await page.screenshot({ path: info.outputPath(`scene-selected-${scheme}.png`) });
+    });
+
+    test(`axe and screenshot, exploded with the inspector open, ${scheme}`, async ({ page }, info) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await openScene(page);
+      await page.getByRole("button", { name: "Exploded view" }).click();
+      await pickPart(page, "Arm");
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(900);
+      expect(await axe(page)).toEqual([]);
+      await page.screenshot({ path: info.outputPath(`scene-exploded-inspector-${scheme}.png`) });
     });
   }
 });
