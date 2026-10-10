@@ -71,9 +71,4 @@ export type SceneManifest = z.infer<typeof SceneManifest>;
 export const ConceptSeed = z.object({ id: ConceptId, title: z.string().min(1), review_status: ReviewStatus }).strict();
 export type ConceptSeed = z.infer<typeof ConceptSeed>;
 
-/** What a learner sees for each review status. Drafts are always labelled as such. */
-export const REVIEW_LABEL: Record<z.infer<typeof ReviewStatus>, string> = {
-  draft: "Draft (not expert-reviewed)",
-  reviewed: "Reviewed",
-  published: "Published",
-};
+export { REVIEW_LABEL } from "./labels";
