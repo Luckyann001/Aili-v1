@@ -12,7 +12,7 @@ import {
   type RecognitionHandle,
   type RecognitionMode,
 } from "./recognition";
-import { PREPARED_REPLY, THINKING_MS } from "./script";
+import { PREPARED_CHIPS, PREPARED_REPLY, THINKING_MS } from "./script";
 import { cancelSpeech, speakSegment } from "./speech";
 import { useVoice } from "./store";
 
@@ -65,7 +65,8 @@ export function useVoiceController(opts: {
       const s = useVoice.getState();
       if (s.rev !== rev) return; // interrupted or superseded: stop scheduling
       if (seq >= PREPARED_REPLY.length) {
-        s.dispatch({ type: "done", rev });
+        // The prepared reply ends with a question, so it offers quick replies.
+        s.dispatch({ type: "done", rev, chips: PREPARED_CHIPS });
         return;
       }
       s.dispatch({ type: "speak", rev, seq, text: PREPARED_REPLY[seq]! });

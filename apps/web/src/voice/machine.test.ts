@@ -72,6 +72,22 @@ describe("voice state machine", () => {
     expect(s).toMatchObject({ status: "idle", caption: null, note: null, rev: 1 });
   });
 
+  it("quick replies appear only after a reply that asked a question, and go with the next action", () => {
+    let s = run([{ type: "submit" }]);
+    const rev = s.rev;
+    s = run([{ type: "speak", rev, seq: 0, text: "What would you like to look at first?" }, { type: "done", rev, chips: ["Why?"] }], s);
+    expect(s.prompt).toEqual({ chips: ["Why?"] });
+    expect(run([{ type: "submit" }], s).prompt).toBeNull();
+    expect(run([{ type: "listen" }], s).prompt).toBeNull();
+    expect(run([{ type: "interrupt" }], s).prompt).toBeNull();
+    // A reply without a question offers no chips; a stale "done" offers nothing.
+    let t = run([{ type: "submit" }]);
+    t = run([{ type: "speak", rev: t.rev, seq: 0, text: "x" }, { type: "done", rev: t.rev }], t);
+    expect(t.prompt).toBeNull();
+    const u = run([{ type: "interrupt" }], s);
+    expect(run([{ type: "done", rev, chips: ["late"] }], u).prompt).toBeNull();
+  });
+
   it("demo control can show every state", () => {
     for (const status of ["idle", "listening", "thinking", "speaking", "error"] as const) {
       expect(run([{ type: "demoSet", status }]).status).toBe(status);

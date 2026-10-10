@@ -20,6 +20,8 @@ export interface VoiceState {
   error: string | null;
   /** Short note shown after a stop, e.g. "Stopped". Cleared by the next action. */
   note: string | null;
+  /** Quick replies offered because Aili just asked a question; cleared by the learner's next action. */
+  prompt: { chips: string[] } | null;
 }
 
 export type VoiceEvent =
@@ -27,13 +29,13 @@ export type VoiceEvent =
   | { type: "listenEnd"; rev: number }
   | { type: "submit" }
   | { type: "speak"; rev: number; seq: number; text: string }
-  | { type: "done"; rev: number }
+  | { type: "done"; rev: number; chips?: string[] }
   | { type: "error"; rev: number; message: string }
   | { type: "interrupt" }
   | { type: "reset" }
   | { type: "demoSet"; status: VoiceStatus; message?: string };
 
-export const initialVoiceState: VoiceState = { status: "idle", rev: 0, caption: null, error: null, note: null };
+export const initialVoiceState: VoiceState = { status: "idle", rev: 0, caption: null, error: null, note: null, prompt: null };
 
 const isStale = (state: VoiceState, rev: number) => rev !== state.rev;
 
@@ -41,14 +43,14 @@ export function voiceReducer(state: VoiceState, event: VoiceEvent): VoiceState {
   switch (event.type) {
     case "listen":
       // Starting to listen is new user input: anything still queued is now stale.
-      return { ...state, status: "listening", rev: state.rev + 1, error: null, note: null };
+      return { ...state, status: "listening", rev: state.rev + 1, error: null, note: null, prompt: null };
 
     case "listenEnd":
       if (isStale(state, event.rev) || state.status !== "listening") return state;
       return { ...state, status: "idle" };
 
     case "submit":
-      return { ...state, status: "thinking", rev: state.rev + 1, caption: null, error: null, note: null };
+      return { ...state, status: "thinking", rev: state.rev + 1, caption: null, error: null, note: null, prompt: null };
 
     case "speak": {
       if (isStale(state, event.rev)) return state;
@@ -59,15 +61,15 @@ export function voiceReducer(state: VoiceState, event: VoiceEvent): VoiceState {
 
     case "done":
       if (isStale(state, event.rev) || state.status !== "speaking") return state;
-      return { ...state, status: "idle" };
+      return { ...state, status: "idle", prompt: event.chips?.length ? { chips: event.chips } : null };
 
     case "error":
       if (isStale(state, event.rev)) return state;
       return { ...state, status: "error", error: event.message };
 
     case "interrupt":
-      if (state.status === "idle" && !state.caption) return { ...state, rev: state.rev + 1 };
-      return { ...state, status: "idle", rev: state.rev + 1, caption: null, error: null, note: "Stopped" };
+      if (state.status === "idle" && !state.caption) return { ...state, rev: state.rev + 1, prompt: null };
+      return { ...state, status: "idle", rev: state.rev + 1, caption: null, error: null, note: "Stopped", prompt: null };
 
     case "reset":
       return { ...state, status: "idle", error: null, note: null };
@@ -79,6 +81,7 @@ export function voiceReducer(state: VoiceState, event: VoiceEvent): VoiceState {
         error: event.status === "error" ? (event.message ?? "Demo error") : null,
         caption: event.status === "speaking" ? { text: "Demo caption while speaking.", rev: state.rev, seq: 0 } : null,
         note: null,
+        prompt: null,
       };
   }
 }

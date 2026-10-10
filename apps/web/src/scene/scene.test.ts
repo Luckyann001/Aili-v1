@@ -37,8 +37,8 @@ describe("scene selection state", () => {
     store = createStore<SceneState>()((set) => createSceneSlice(set));
   });
 
-  it("starts with nothing selected and labels on", () => {
-    expect(store.getState()).toMatchObject({ selectedId: null, labelsOn: true, resetToken: 0 });
+  it("starts with nothing selected and labels off", () => {
+    expect(store.getState()).toMatchObject({ selectedId: null, labelsOn: false, resetToken: 0 });
   });
 
   it("selects known parts, clears, and ignores unknown IDs", () => {
@@ -54,7 +54,7 @@ describe("scene selection state", () => {
     store.getState().toggleLabels();
     store.getState().resetView();
     store.getState().resetView();
-    expect(store.getState()).toMatchObject({ labelsOn: false, resetToken: 2 });
+    expect(store.getState()).toMatchObject({ labelsOn: true, resetToken: 2 });
   });
 
   it("arrow-key stepping wraps at both ends", () => {

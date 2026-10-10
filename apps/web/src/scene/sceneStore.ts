@@ -20,7 +20,7 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   viewer: "loading",
   setViewer: (viewer) => set(() => ({ viewer })),
   selectedId: null,
-  labelsOn: true,
+  labelsOn: false, // off by default: the stage should be mostly picture; selection still labels its part
   resetToken: 0,
   // Unknown IDs are ignored, so a stale or mistyped selection can never point at nothing.
   select: (id) => set(() => (id === null || PART_IDS.includes(id) ? { selectedId: id } : {})),
