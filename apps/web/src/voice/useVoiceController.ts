@@ -59,21 +59,42 @@ export function useVoiceController(opts: {
     stopEverything();
   }, [stopEverything]);
 
-  const playReply = useCallback((rev: number) => {
+  /** Speaks lines as caption segments under revision `rev`; stops scheduling once `rev` is stale. */
+  const playLines = useCallback((rev: number, lines: readonly string[], chips: string[] | undefined, onDone?: () => void) => {
     const lang = recognitionLang();
     const step = (seq: number) => {
       const s = useVoice.getState();
       if (s.rev !== rev) return; // interrupted or superseded: stop scheduling
-      if (seq >= PREPARED_REPLY.length) {
-        // The prepared reply ends with a question, so it offers quick replies.
-        s.dispatch({ type: "done", rev, chips: PREPARED_CHIPS });
+      if (seq >= lines.length) {
+        s.dispatch({ type: "done", rev, chips });
+        onDone?.();
         return;
       }
-      s.dispatch({ type: "speak", rev, seq, text: PREPARED_REPLY[seq]! });
-      cancelSegment.current = speakSegment(PREPARED_REPLY[seq]!, { muted: getMuted(), lang, onDone: () => step(seq + 1) });
+      s.dispatch({ type: "speak", rev, seq, text: lines[seq]! });
+      cancelSegment.current = speakSegment(lines[seq]!, { muted: getMuted(), lang, onDone: () => step(seq + 1) });
     };
     step(0);
   }, []);
+
+  // The prepared reply ends with a question, so it offers quick replies.
+  const playReply = useCallback((rev: number) => playLines(rev, PREPARED_REPLY, PREPARED_CHIPS), [playLines]);
+
+  /**
+   * Speaks prepared lesson lines straight away (no "thinking" pause). Returns the revision it runs
+   * under; `onDone` fires only if nothing interrupted it.
+   */
+  const say = useCallback(
+    (lines: readonly string[], onDone: () => void) => {
+      const s = useVoice.getState();
+      s.setHint(null);
+      s.dispatch({ type: "submit" });
+      stopEverything();
+      const rev = useVoice.getState().rev;
+      playLines(rev, lines, undefined, onDone);
+      return rev;
+    },
+    [playLines, stopEverything],
+  );
 
   const submit = useCallback(
     (text: string) => {
@@ -139,5 +160,5 @@ export function useVoiceController(opts: {
   // Leaving the page (or Next hiding the route) stops speech and drops anything queued.
   useEffect(() => () => interrupt(), [interrupt]);
 
-  return { press, interrupt, submit, startListening };
+  return { press, interrupt, submit, startListening, say };
 }
