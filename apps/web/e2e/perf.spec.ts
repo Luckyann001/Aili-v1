@@ -24,6 +24,9 @@ test("load, 3D and orbit timings (emulated low-end phone)", async ({ page }, inf
   await throttle(page);
   const t0 = Date.now();
   await page.goto("/learn", { waitUntil: "commit" });
+  // First picture: the still drawing shown while the 3D code loads.
+  await expect(page.locator('[data-fallback="loading"]').or(page.locator('[data-viewer="ready"]'))).toBeVisible({ timeout: 120_000 });
+  const picture = Date.now() - t0;
   // First usable: the page responds to input (the Menu opens), i.e. it has hydrated.
   const menu = page.getByRole("button", { name: "Menu" });
   await expect(async () => {
@@ -59,7 +62,7 @@ test("load, 3D and orbit timings (emulated low-end phone)", async ({ page }, inf
   const pct = (p: number) => frames[Math.min(frames.length - 1, Math.floor(p * frames.length))]!.toFixed(1);
   console.log(
     `EMULATION (6x CPU, Slow 4G, Pixel 7 viewport): first contentful paint ${Math.round(fcp)} ms; ` +
-      `first usable (hydrated) ${usable} ms; 3D scene ready ${scene} ms; ` +
+      `still picture shown ${picture} ms; first usable (hydrated) ${usable} ms; 3D scene ready ${scene} ms; ` +
       `orbit frames: ${frames.length}, median ${pct(0.5)} ms, p95 ${pct(0.95)} ms, worst ${frames[frames.length - 1]!.toFixed(1)} ms`,
   );
 });

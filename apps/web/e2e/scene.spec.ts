@@ -71,7 +71,7 @@ test.describe("loading and budget", () => {
     });
     await installVoiceFakes(page);
     await page.goto("/learn");
-    await expect(page.getByText("Loading 3D view…")).toBeVisible();
+    await expect(page.getByText("Loading the 3D view… here is a still picture of the parts meanwhile.")).toBeVisible();
     // The rest of the stage works while the 3D code is still on its way.
     await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("What is a servo?");
     await page.getByRole("button", { name: "Send" }).click();
@@ -83,6 +83,43 @@ test.describe("loading and budget", () => {
     console.log(`lazy 3D chunks: ${lazy.length}, ${(raw / 1024).toFixed(1)} KB raw, ${(gz / 1024).toFixed(1)} KB gzip`);
     expect(lazy.length).toBeGreaterThan(0);
     expect(gz).toBeLessThanOrEqual(SCENE_JS_BUDGET_GZ);
+  });
+
+  test("the still picture shows at once, works, and is replaced by 3D with no layout jump", async ({ page }) => {
+    const html = await (await page.request.get("/learn")).text();
+    const initial = new Set([...html.matchAll(/\/_next\/static\/[^"'\\\s]+?\.js/g)].map((m) => m[0]));
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route("**/_next/static/**/*.js", async (route) => {
+      if (initial.has(new URL(route.request().url()).pathname)) return route.continue();
+      await held; // keep the 3D code back until we have looked at the loading state
+      await route.continue();
+    });
+    await page.goto("/learn");
+    const still = page.locator('[data-fallback="loading"]');
+    await expect(still).toBeVisible();
+    await expect(page.getByRole("img", { name: /Still side view of the placeholder model/ })).toBeVisible();
+    // Usable meanwhile: pick a part in the still picture.
+    await pickPart(page, "Arm");
+    await expect(page.locator('g[data-part-id="arm"] text')).toHaveText("Selected: Arm");
+    const controls = ["Labels", "Reset view", "Explanation", "Captions", "Mute", "Library", "Send"];
+    const where = async () => {
+      const out: Record<string, string> = {};
+      for (const name of controls) {
+        const b = (await page.getByRole("button", { name, exact: true }).first().boundingBox())!;
+        out[name] = `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)},${Math.round(b.height)}`;
+      }
+      const sa = (await page.locator("[data-safe-area]").boundingBox())!;
+      out.safeArea = `${Math.round(sa.x)},${Math.round(sa.y)},${Math.round(sa.width)},${Math.round(sa.height)}`;
+      return out;
+    };
+    const before = await where();
+    release();
+    await expect(ready(page)).toBeVisible({ timeout: 20000 });
+    await expect(still).toHaveCount(0);
+    await expect(canvas(page)).toBeVisible();
+    await expect(partsButton(page)).toHaveText("Parts: Arm"); // the selection carried over
+    expect(await where()).toEqual(before);
   });
 
   test("both scenes stay within the triangle budget (arm, then lever)", async ({ page }) => {
@@ -584,4 +621,37 @@ test.describe("honesty and accessibility", () => {
       await page.screenshot({ path: info.outputPath(`scene-exploded-inspector-${scheme}.png`) });
     });
   }
+});
+
+test.describe("testing-only performance readout (?demo=1)", () => {
+  test("shows load, 3D-ready and orbit timings and the renderer; copies them as text", async ({ page, context }, info) => {
+    test.skip(info.project.name === "tablet");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/learn?demo=1");
+    await expect(ready(page)).toBeVisible({ timeout: 20000 });
+    await page.getByText("Demo controls (testing only)").click();
+    const panel = page.getByRole("region", { name: "Performance readout (testing only)" });
+    await expect(panel).toContainText("nothing is sent anywhere");
+    await expect(panel.getByTestId("perf-load")).toHaveText(/^\d+ ms$/);
+    await expect(panel.getByTestId("perf-scene")).toHaveText(/^\d+ ms$/);
+    await expect(panel.getByTestId("perf-frames")).toHaveText("drag the 3D view to measure");
+    await expect(panel.getByTestId("perf-renderer")).not.toBeEmpty();
+    // Orbit with the panel closed (on a phone it covers part of the 3D view), then read it again.
+    const summary = page.getByText("Demo controls (testing only)");
+    await summary.click();
+    const c = await rect(canvas(page));
+    await drag(page, { x: c.x + c.width / 2, y: c.y + c.height * 0.6 }, 120, 10);
+    await summary.click();
+    await expect(panel.getByTestId("perf-frames")).toHaveText(/^median \d+\.\d ms, worst \d+\.\d ms \(\d+ frames\)$/);
+    await panel.getByRole("button", { name: "Copy results" }).click();
+    await expect(panel.getByRole("status")).toHaveText(/Copied/);
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toMatch(/^Aili phone test readout \(testing only\)\nPage load: \d+ ms\n3D scene ready: \d+ ms\nOrbit frames: \d+, median/);
+  });
+
+  test("is not shown without ?demo=1", async ({ page }) => {
+    await page.goto("/learn");
+    await expect(ready(page)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("region", { name: "Performance readout (testing only)" })).toHaveCount(0);
+  });
 });
