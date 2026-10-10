@@ -6,8 +6,8 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
-import { BackSide, PerspectiveCamera, Vector3, type Mesh } from "three";
-import { layoutParts, modelBounds } from "@/scene/layout";
+import { BackSide, PerspectiveCamera, Vector3, type Camera, type Mesh } from "three";
+import { layoutParts, modelBounds, modelCorners } from "@/scene/layout";
 import { DEFAULT_VIEW, PLACEHOLDER_MODEL, type FillRole } from "@/scene/placeholderModel";
 import { useScene } from "@/scene/sceneStore";
 import type { SceneColors } from "./useSceneTheme";
@@ -70,7 +70,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         }}
       />
       <Framing safeArea={props.safeArea} />
-      <LabelTracker safeArea={props.safeArea} labels={props.labels} />
+      <LabelTracker safeArea={props.safeArea} labels={props.labels} host={props.host} />
       <ExplodeDriver spatialMs={props.spatialMs} host={props.host} />
       <CameraRig spatialMs={props.spatialMs} host={props.host} />
       <ReadyProbe onReady={props.onReady} />
@@ -138,26 +138,42 @@ function setCursor(target: EventTarget | null, cursor: string) {
 
 // Camera framing: fit the model's current bounds (they change with the arm length and the
 // explode) inside the safe area, width and height separately (the model is wide and flat).
-const MARGIN = 1.12;
+const MARGIN = 1.06;
 const defaultDir = new Vector3(...DEFAULT_VIEW.position).sub(new Vector3(...DEFAULT_VIEW.target)).normalize();
 /** Last known screen shape, kept by Framing. */
 const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1 };
 
-/** Where the camera and orbit target should go to frame the model from direction `dir`. */
+const worldUp = new Vector3(0, 1, 0);
+const right = new Vector3();
+const up = new Vector3();
+const offset = new Vector3();
+
+/**
+ * Where the camera and orbit target should go to frame the model from direction `dir`: the
+ * smallest distance at which every part corner, seen through this camera, falls inside the free
+ * area (exact for a pinhole camera aimed at the model's centre), plus a small margin.
+ */
 function fitGoal(dir: Vector3, explode: number) {
-  const b = modelBounds(useScene.getState().params, explode);
+  const params = useScene.getState().params;
+  const target = new Vector3(...modelBounds(params, explode).center);
   const tanHalf = Math.tan((frame.fov * Math.PI) / 360);
   const tanV = tanHalf * (frame.areaH / frame.canvasH);
   const tanH = tanHalf * (frame.areaW / frame.canvasH);
-  const distance = Math.max(b.halfWidth / tanH, b.halfHeight / tanV) * MARGIN;
-  const target = new Vector3(...b.center);
-  return { target, position: target.clone().addScaledVector(dir, distance) };
+  right.crossVectors(worldUp, dir).normalize(); // camera's right, seen from `dir`
+  up.crossVectors(dir, right).normalize();
+  let distance = 0;
+  for (const c of modelCorners(params, explode)) {
+    offset.set(...c).sub(target);
+    const towardCamera = offset.dot(dir);
+    distance = Math.max(distance, towardCamera + Math.abs(offset.dot(right)) / tanH, towardCamera + Math.abs(offset.dot(up)) / tanV);
+  }
+  return { target, position: target.clone().addScaledVector(dir, distance * MARGIN) };
 }
 
 /**
  * Centres the model in the free part of the safe area (not the whole stage, and not under the
  * inspector) by shifting the projection, and records the free area for camera fitting. The first
- * pass also places the camera. The inspector sits to the right from 768 px, at the bottom below.
+ * pass also places the camera. The inspector sits to the right from 900 px, at the bottom below.
  */
 function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const camera = useThree((s) => s.camera);
@@ -166,6 +182,7 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const inspectorShown = useScene((s) => s.inspectorOpen && s.selectedId !== null);
   const placed = useRef(false);
+  const lastInspector = useRef(inspectorShown);
 
   useLayoutEffect(() => {
     const el = safeArea.current;
@@ -173,7 +190,7 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
     const inspector = () => el.querySelector<HTMLElement>("[data-inspector]");
     const apply = () => {
       const insp = inspector();
-      const side = window.matchMedia("(min-width: 768px)").matches;
+      const side = window.matchMedia("(min-width: 900px)").matches; // matches learn.module.css
       const takeW = insp && side ? insp.offsetWidth + 16 : 0;
       const takeH = insp && !side ? insp.offsetHeight + 16 : 0;
       const freeW = el.clientWidth - takeW;
@@ -200,6 +217,9 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
       const insp = inspector();
       if (insp) ro.observe(insp);
       apply();
+      // The free area changed size: refit the camera to it, keeping the viewing direction.
+      if (placed.current && lastInspector.current !== inspectorShown) refitCamera.current?.();
+      lastInspector.current = inspectorShown;
     });
     return () => {
       cancelAnimationFrame(raf);
@@ -220,9 +240,11 @@ const PAD = 6;
 function LabelTracker({
   safeArea,
   labels,
+  host,
 }: {
   safeArea: RefObject<HTMLDivElement | null>;
   labels: RefObject<Map<string, HTMLElement>>;
+  host: RefObject<HTMLDivElement | null>;
 }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -240,6 +262,7 @@ function LabelTracker({
     const w = area.clientWidth;
     const h = area.clientHeight;
     const layout = layoutParts(params, anim.explode);
+    writeData(host, "modelBox", projectedBox(layout, camera, size));
     for (const part of PLACEHOLDER_MODEL.parts) {
       const el = labels.current.get(part.id);
       if (!el) continue;
@@ -262,6 +285,21 @@ function LabelTracker({
     }
   });
   return null;
+}
+
+/** On-screen box (canvas pixels) around every part's corners: "x0,y0,x1,y1". For tests. */
+function projectedBox(layout: ReturnType<typeof layoutParts>, camera: Camera, size: { width: number; height: number }) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of Object.values(layout)) {
+    const h = p.kind === "cylinder" ? [p.size[0], p.size[1] / 2, p.size[0]] : p.size.map((d) => d / 2);
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      v.set(p.position[0] + sx * h[0]!, p.position[1] + sy * h[1]!, p.position[2] + sz * h[2]!).project(camera);
+      const x = ((v.x + 1) / 2) * size.width;
+      const y = ((1 - v.y) / 2) * size.height;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+  }
+  return [x0, y0, x1, y1].map((n) => n.toFixed(1)).join(",");
 }
 
 /** Mirrors the camera position (metres) onto the host element, for tests and debugging. */
@@ -306,6 +344,8 @@ function ExplodeDriver({ spatialMs, host }: { spatialMs: number; host: RefObject
 const start = { pos: new Vector3(), target: new Vector3() };
 const goal = { pos: new Vector3(), target: new Vector3() };
 const dir = new Vector3();
+/** Set by CameraRig: refit to the current free area from the current direction (tweened). */
+const refitCamera: { current: (() => void) | null } = { current: null };
 
 /**
  * Camera moves: "Reset view" returns to the default direction; exploding or assembling keeps the
@@ -324,26 +364,33 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
   useEffect(() => writeCamera(host, camera), [camera, host]);
 
   useEffect(() => {
+    const moveTo = (fromDefault: boolean) => {
+      if (!controls) return;
+      const d = fromDefault ? defaultDir : dir.copy(camera.position).sub(controls.target).normalize();
+      const g = fitGoal(d, useScene.getState().exploded ? 1 : 0);
+      goal.pos.copy(g.position);
+      goal.target.copy(g.target);
+      if (spatialMs <= 0) {
+        camera.position.copy(goal.pos);
+        controls.target.copy(goal.target);
+        controls.update();
+        writeCamera(host, camera);
+        invalidate();
+        return;
+      }
+      start.pos.copy(camera.position);
+      start.target.copy(controls.target);
+      tween.current = { t0: performance.now(), ms: spatialMs };
+      invalidate();
+    };
+    refitCamera.current = () => moveTo(false);
+
     const prev = seen.current;
     seen.current = { resetToken, exploded };
-    if (!controls || (prev.resetToken === resetToken && prev.exploded === exploded)) return;
-    const reset = prev.resetToken !== resetToken;
-    const d = reset ? defaultDir : dir.copy(camera.position).sub(controls.target).normalize();
-    const g = fitGoal(d, exploded ? 1 : 0);
-    goal.pos.copy(g.position);
-    goal.target.copy(g.target);
-    if (spatialMs <= 0) {
-      camera.position.copy(goal.pos);
-      controls.target.copy(goal.target);
-      controls.update();
-      writeCamera(host, camera);
-      invalidate();
-      return;
-    }
-    start.pos.copy(camera.position);
-    start.target.copy(controls.target);
-    tween.current = { t0: performance.now(), ms: spatialMs };
-    invalidate();
+    if (prev.resetToken !== resetToken || prev.exploded !== exploded) moveTo(prev.resetToken !== resetToken);
+    return () => {
+      refitCamera.current = null;
+    };
   }, [resetToken, exploded, spatialMs, camera, controls, host, invalidate]);
 
   useFrame(() => {

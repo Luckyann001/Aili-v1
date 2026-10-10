@@ -372,6 +372,27 @@ test.describe("inspector", () => {
     await expect(partsButton(page)).toHaveText("Parts: End weight");
   });
 
+  test("at 768 px, exploded with the inspector open, the inspector sits below the model", async ({ page }, info) => {
+    test.skip(info.project.name !== "tablet", "768 px tablet");
+    await openScene(page);
+    await page.getByRole("button", { name: "Exploded view" }).click();
+    await expect.poll(async () => Number(await host(page).getAttribute("data-explode")), { timeout: 3000 }).toBe(1);
+    await pickPart(page, "Arm");
+    const box = await rect(inspector(page));
+    const c = await rect(canvas(page));
+    expect(box.y + box.height).toBeGreaterThan(c.y + c.height * 0.5); // along the bottom, not the right
+    expect(box.width).toBeGreaterThan(c.width * 0.8);
+    // The whole model (every part's corners, on screen) stays clear of the inspector and on screen.
+    await page.waitForTimeout(700); // refit tween after the inspector opens
+    const [x0, y0, x1, y1] = (await host(page).getAttribute("data-model-box"))!.split(",").map(Number) as [number, number, number, number];
+    const model = { x: c.x + x0, y: c.y + y0, width: x1 - x0, height: y1 - y0 };
+    expect(overlaps(model, box), "model under the inspector").toBe(false);
+    expect(model.x).toBeGreaterThanOrEqual(c.x);
+    expect(model.x + model.width).toBeLessThanOrEqual(c.x + c.width);
+    expect(model.y).toBeGreaterThanOrEqual(c.y);
+    await page.screenshot({ path: info.outputPath("tablet-768-exploded-inspector.png") });
+  });
+
   test("never covers the voice orb, captions or bottom controls", async ({ page }) => {
     await installVoiceFakes(page, { speakMs: 8000 });
     await openScene(page);

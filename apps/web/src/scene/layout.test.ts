@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PARAMS, EXPLODE_GAP_M, PARAMS, clampParam, layoutParts, modelBounds, paramsFor } from "./layout";
+import { DEFAULT_PARAMS, EXPLODE_GAP_M, PARAMS, clampParam, layoutParts, modelBounds, modelCorners, paramsFor } from "./layout";
 import { PART_IDS } from "./placeholderModel";
 
 const arm = PARAMS.find((p) => p.id === "arm_length_m")!;
@@ -47,6 +47,16 @@ describe("layout", () => {
       expect(b[id]!.position[0]).toBe(a[id]!.position[0]);
       expect(b[id]!.position[2]).toBe(a[id]!.position[2]);
       expect(b[id]!.position[1] - a[id]!.position[1]).toBeCloseTo(level * EXPLODE_GAP_M, 10);
+    }
+  });
+
+  it("corners: eight per part, all inside the model bounds", () => {
+    const corners = modelCorners(DEFAULT_PARAMS, 1);
+    expect(corners).toHaveLength(8 * 4);
+    const b = modelBounds(DEFAULT_PARAMS, 1);
+    for (const c of corners) {
+      expect(Math.abs(c[1] - b.center[1])).toBeLessThanOrEqual(b.halfHeight + 1e-9);
+      expect(Math.abs(c[0] - b.center[0])).toBeLessThanOrEqual(b.halfWidth + 1e-9);
     }
   });
 

@@ -80,3 +80,15 @@ export function modelBounds(params: Params, explode = 0) {
     halfHeight: (hi[1]! - lo[1]!) / 2,
   };
 }
+
+/** Every corner of every part's box (cylinders as their bounding box), metres. For framing. */
+export function modelCorners(params: Params, explode = 0): Vec3[] {
+  const out: Vec3[] = [];
+  for (const p of Object.values(layoutParts(params, explode))) {
+    const h = p.kind === "cylinder" ? [p.size[0], p.size[1] / 2, p.size[0]] : p.size.map((d) => d / 2);
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      out.push([p.position[0] + sx * h[0]!, p.position[1] + sy * h[1]!, p.position[2] + sz * h[2]!]);
+    }
+  }
+  return out;
+}

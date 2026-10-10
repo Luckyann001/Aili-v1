@@ -425,8 +425,9 @@
   font-size: 0.75rem;
 }
 
-/* Phones: along the bottom of the safe area (the model is re-framed above it). */
-@media (max-width: 767px) {
+/* Below 900 px (phones and tablets): along the bottom of the safe area, so it never sits over
+   the model, which is re-framed above it. */
+@media (max-width: 899px) {
   .inspector {
     top: auto;
     bottom: var(--aili-space-2);

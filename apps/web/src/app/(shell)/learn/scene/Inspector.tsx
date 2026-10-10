@@ -13,7 +13,7 @@ const fmt = (d: ParamDef, v: number) => v.toFixed(decimals(d));
 /**
  * Temporary inspector for the selected part: settings with units and bounds. Placeholder values
  * that change the drawing only; no engineering results. Lives inside the stage's safe area, so it
- * never covers the voice orb, captions or controls. Escape or Close hides it (the selection stays).
+ * never covers the voice orb, captions or controls; at the right from 900 px, along the bottom below. Escape or Close hides it (the selection stays).
  */
 export function Inspector({ onClosed }: { onClosed: () => void }) {
   const selectedId = useScene((s) => s.selectedId);
