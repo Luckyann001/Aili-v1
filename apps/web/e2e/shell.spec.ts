@@ -87,7 +87,7 @@ test.describe("app shell", () => {
 
   test("the Prepared badge says what it means", async ({ page }) => {
     await page.goto("/learn");
-    const badge = page.getByRole("button", { name: /Prepared · placeholder/ });
+    const badge = page.getByRole("button", { name: /Prepared · Draft \(not expert-reviewed\)/ });
     await expect(badge).toBeVisible();
     await expect(badge).toHaveAccessibleDescription(/Not a live AI response/);
   });

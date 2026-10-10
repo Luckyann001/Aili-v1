@@ -525,10 +525,12 @@ test.describe("phones", () => {
 });
 
 test.describe("honesty and accessibility", () => {
-  test("the badge says Prepared · placeholder; the full wording shows on tap and on keyboard focus", async ({ page }) => {
+  test("the badge says Prepared · Draft (not expert-reviewed); the full wording shows on tap and on keyboard focus", async ({ page }) => {
     await openScene(page);
-    const badge = page.getByRole("button", { name: /Prepared · placeholder/ });
-    const note = page.getByText("Prepared content, written in advance. Not a live AI response. Placeholder model for layout testing. Not a real product.");
+    const badge = page.getByRole("button", { name: /Prepared · Draft \(not expert-reviewed\)/ });
+    const note = page.getByText(
+      "Prepared content, written in advance. Not a live AI response. Draft (not expert-reviewed). Placeholder model for layout testing. Not a real product.",
+    );
     await expect(badge).toBeVisible();
     await expect(badge).toHaveAccessibleDescription(/Placeholder model for layout testing\. Not a real product\./);
     await expect(note).toBeHidden();

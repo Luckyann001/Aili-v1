@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 
 test("starts with the stage, command bar and captions; text panel closed", async ({ page }) => {
   await expect(stage(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Prepared · placeholder/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Prepared · Draft \(not expert-reviewed\)/ })).toBeVisible();
   await expect(page.getByRole("group", { name: "Suggested replies" })).toHaveCount(0); // no question yet
   await expect(page.locator('p[role="status"][data-state]')).toHaveText("Ready");
   await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toBeVisible();
