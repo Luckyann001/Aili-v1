@@ -180,7 +180,7 @@ test.describe("consent before the microphone", () => {
   });
 
   test("Version A only when the language pack is confirmed; listens on-device", async ({ page }) => {
-    await installVoiceFakes(page, { recognition: "available", listenMs: 800 });
+    await installVoiceFakes(page, { recognition: "available", listenMs: 2000 });
     await page.goto("/learn");
     await voiceBtn(page).click();
     await expect(dialog(page)).toContainText(
@@ -196,7 +196,7 @@ test.describe("consent before the microphone", () => {
   });
 
   test("a browser without the availability check uses online mode (Version B)", async ({ page }) => {
-    await installVoiceFakes(page, { recognition: "no-available-api", listenMs: 800 });
+    await installVoiceFakes(page, { recognition: "no-available-api", listenMs: 2000 });
     await page.goto("/learn");
     await voiceBtn(page).click();
     await expect(dialog(page)).toContainText("online speech service");
@@ -213,7 +213,7 @@ test.describe("consent before the microphone", () => {
   });
 
   test("with a saved yes for this mode, the mic starts straight away", async ({ page }) => {
-    await installVoiceFakes(page, { recognition: "downloadable", listenMs: 800, consent: { choice: "voice", mode: "online" } });
+    await installVoiceFakes(page, { recognition: "downloadable", listenMs: 2000, consent: { choice: "voice", mode: "online" } });
     await page.goto("/learn");
     await voiceBtn(page).click();
     await expect(dialog(page)).toHaveCount(0);
@@ -258,7 +258,7 @@ test.describe("fallbacks, errors and keyboard", () => {
   });
 
   test("Space starts voice when focus is on the page, never while typing", async ({ page }) => {
-    await installVoiceFakes(page, { listenMs: 800, consent: { choice: "voice", mode: "online" } });
+    await installVoiceFakes(page, { listenMs: 2000, consent: { choice: "voice", mode: "online" } });
     await page.goto("/learn");
     await textbox(page).click();
     await page.keyboard.type("a b c");
@@ -277,7 +277,7 @@ test.describe("fallbacks, errors and keyboard", () => {
   });
 
   test("the page never records audio itself (no getUserMedia, no MediaRecorder)", async ({ page }) => {
-    await installVoiceFakes(page, { recognition: "available", listenMs: 500 });
+    await installVoiceFakes(page, { recognition: "available", listenMs: 500, speakMs: 4000 });
     await page.goto("/learn");
     await voiceBtn(page).click();
     await dialog(page).getByRole("button", { name: "Use voice" }).click();
