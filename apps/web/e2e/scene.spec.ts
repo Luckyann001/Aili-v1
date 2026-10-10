@@ -85,12 +85,20 @@ test.describe("loading and budget", () => {
     expect(gz).toBeLessThanOrEqual(SCENE_JS_BUDGET_GZ);
   });
 
-  test("the scene stays within the triangle budget", async ({ page }) => {
+  test("both scenes stay within the triangle budget (arm, then lever)", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 200 });
     await openScene(page);
-    const triangles = Number(await host(page).getAttribute("data-triangles"));
-    console.log(`triangles: ${triangles}`);
-    expect(triangles).toBeGreaterThan(0);
-    expect(triangles).toBeLessThanOrEqual(SCENE_TRIANGLE_BUDGET);
+    await expect(host(page)).toHaveAttribute("data-triangles-scene", "base-joint-arm");
+    const arm = Number(await host(page).getAttribute("data-triangles"));
+    // The lesson switches the stage to the lever scene; its first frame reports again.
+    await page.getByRole("group", { name: "Lesson" }).getByRole("button").click();
+    await expect(host(page)).toHaveAttribute("data-triangles-scene", "lever-analogy", { timeout: 15000 });
+    const lever = Number(await host(page).getAttribute("data-triangles"));
+    console.log(`triangles: arm ${arm}, lever ${lever} (counts include a highlighted part's outline shell, if any)`);
+    for (const t of [arm, lever]) {
+      expect(t).toBeGreaterThan(0);
+      expect(t).toBeLessThanOrEqual(SCENE_TRIANGLE_BUDGET);
+    }
   });
 });
 

@@ -202,3 +202,42 @@ test.describe("beginner lever lesson", () => {
     });
   }
 });
+
+test.describe("labels never overlap each other", () => {
+  const visibleLabelBoxes = async (page: Page) => {
+    const out: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
+    for (const l of await page.locator("span[data-part-id]").all()) {
+      if (!(await l.isVisible()) || (await l.evaluate((el) => getComputedStyle(el).visibility === "hidden"))) continue;
+      out.push({ id: (await l.getAttribute("data-part-id"))!, ...(await l.boundingBox())! });
+    }
+    return out;
+  };
+  const expectNoOverlap = (boxes: Awaited<ReturnType<typeof visibleLabelBoxes>>) => {
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!;
+        const b = boxes[j]!;
+        const hit = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        expect(hit, `${a.id} overlaps ${b.id}`).toBe(false);
+      }
+  };
+
+  test("phone width, weight next to the hand: 'Selected: Weight' and the hand label stay apart", async ({ page }, info) => {
+    test.skip(info.project.name !== "phone", "phone width");
+    await openLearn(page);
+    await startLesson(page);
+    await expect(replies(page)).toBeVisible({ timeout: 15000 }); // probe: weight selected, close to the hand
+    await page.waitForTimeout(300);
+    const boxes = await visibleLabelBoxes(page);
+    expect(boxes.map((b) => b.id).sort()).toEqual(["hand", "weight"]);
+    expectNoOverlap(boxes);
+    await page.screenshot({ path: info.outputPath("labels-phone-probe.png") });
+  });
+
+  test("arm scene with every label on", async ({ page }) => {
+    await openLearn(page);
+    await page.getByRole("button", { name: "Labels" }).click();
+    await page.waitForTimeout(300);
+    expectNoOverlap(await visibleLabelBoxes(page));
+  });
+});
