@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { Component, useEffect, useRef, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { usePerf } from "@/scene/perfReadout";
 import { useScene } from "@/scene/sceneStore";
+import { useDemoMode } from "../DemoControls";
 import { hasWebGL, useSceneTheme } from "./useSceneTheme";
 import styles from "../learn.module.css";
 
@@ -24,6 +26,27 @@ export function SceneViewport({
   const setViewer = useScene((s) => s.setViewer);
   const webgl = useSyncExternalStore(noSubscribe, hasWebGL, () => true);
   const theme = useSceneTheme();
+  const demo = useDemoMode();
+  const startRecording = () => {
+    const frames: number[] = [];
+    let last = performance.now();
+    let on = true;
+    const tick = (t: number) => {
+      if (!on) return;
+      frames.push(t - last);
+      last = t;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    const stop = () => {
+      on = false;
+      usePerf.getState().setOrbitFrames(frames.slice(1));
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
 
   useEffect(() => {
     if (!webgl) setViewer("fallback");
@@ -31,7 +54,13 @@ export function SceneViewport({
 
   if (viewer === "fallback" || !webgl || !theme) return null;
   return (
-    <div ref={host} className={styles.canvasHost} data-viewer={viewer}>
+    <div
+      ref={host}
+      className={styles.canvasHost}
+      data-viewer={viewer}
+      // Testing only (?demo=1): record frame-to-frame times while a finger or mouse orbits.
+      onPointerDown={demo ? startRecording : undefined}
+    >
       <SceneErrorBoundary onError={() => setViewer("fallback")}>
         <SceneCanvas
           safeArea={safeArea}
@@ -44,6 +73,7 @@ export function SceneViewport({
               host.current.dataset.triangles = String(triangles);
               host.current.dataset.trianglesScene = useScene.getState().activeScene;
             }
+            usePerf.getState().setSceneReady(performance.now());
             setViewer("ready");
           }}
           onFail={() => setViewer("fallback")}

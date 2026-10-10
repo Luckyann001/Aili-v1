@@ -835,6 +835,22 @@
   cursor: pointer;
 }
 
+.demoReadout {
+  margin-top: var(--aili-space-3);
+  padding-top: var(--aili-space-2);
+  border-top: 1px dashed var(--aili-border-strong);
+}
+
+.demoText {
+  display: block;
+  width: 100%;
+  margin-top: var(--aili-space-2);
+  font: 0.8rem var(--aili-font-mono);
+  color: var(--aili-text);
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border-strong);
+}
+
 .demoFacts {
   display: grid;
   grid-template-columns: auto 1fr;

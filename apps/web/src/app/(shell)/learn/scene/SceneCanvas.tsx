@@ -12,6 +12,7 @@ import { cornersOf, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
+import { usePerf } from "@/scene/perfReadout";
 import { useScene } from "@/scene/sceneStore";
 import type { SceneColors } from "./useSceneTheme";
 
@@ -55,6 +56,10 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         if (e.type === "click") useScene.getState().select(null);
       }}
       onCreated={({ gl }) => {
+        // For the testing-only readout (?demo=1): the GPU name, if the browser exposes it.
+        const ctx = gl.getContext();
+        const info = ctx.getExtension("WEBGL_debug_renderer_info");
+        usePerf.getState().setRenderer(info ? String(ctx.getParameter(info.UNMASKED_RENDERER_WEBGL)) : null);
         gl.domElement.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();
           props.onFail();
