@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContentBadge } from "@/components/ContentBadge";
 import { Button } from "@/components/Button";
-import { PLACEHOLDER_MODEL } from "@/scene/placeholderModel";
 import { useScene } from "@/scene/sceneStore";
 import { useLearnUi, type SideView } from "@/state/learnUi";
 import { saveConsent, setMuted, useMuted } from "@/voice/consent";
@@ -15,7 +14,9 @@ import { useVoiceController } from "@/voice/useVoiceController";
 import { CommandBar } from "./CommandBar";
 import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
-import { PartsList } from "./scene/PartsList";
+import { IconTool } from "./IconTool";
+import { PlaceholderBadge } from "./PlaceholderBadge";
+import { PartsMenu } from "./scene/PartsMenu";
 import { SceneFallback } from "./scene/SceneFallback";
 import { SceneLabels } from "./scene/SceneLabels";
 import { SceneViewport } from "./scene/SceneViewport";
@@ -99,27 +100,20 @@ export function LearnStage() {
 
         <div className={styles.stageTop}>
           <div className={styles.topRow}>
-            <ContentBadge kind="prepared" />
-            <Button
-              variant="secondary"
-              aria-expanded={side === "explanation"}
-              aria-controls="learn-side"
-              onClick={(e) => open("explanation", e.currentTarget)}
-            >
-              <TextIcon /> Explanation
-            </Button>
-          </div>
-          <div className={styles.topRow}>
-            <PartsList />
-            <div className={styles.sceneTools}>
-              <Button variant="secondary" aria-pressed={labelsOn} onClick={toggleLabels}>
-                <LabelIcon />
-                <span className={styles.btnLabel}>Labels</span>
-              </Button>
-              <Button variant="secondary" onClick={resetView}>
-                <ResetIcon />
-                <span className={styles.btnLabel}>Reset view</span>
-              </Button>
+            <div className={styles.topLeft}>
+              <PlaceholderBadge />
+              <PartsMenu />
+            </div>
+            <div className={styles.sceneTools} role="group" aria-label="View">
+              <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />
+              <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />
+              <IconTool
+                label="Explanation"
+                icon={<TextIcon />}
+                aria-expanded={side === "explanation"}
+                aria-controls="learn-side"
+                onClick={(e) => open("explanation", e.currentTarget)}
+              />
             </div>
           </div>
         </div>
@@ -128,7 +122,6 @@ export function LearnStage() {
 
         {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
         <div ref={safeArea} className={styles.scene}>
-          <p className={styles.placeholderNote}>{PLACEHOLDER_MODEL.note}</p>
           {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
           {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
         </div>

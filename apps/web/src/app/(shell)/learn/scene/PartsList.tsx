@@ -1,19 +1,25 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
-import { PART_IDS, PLACEHOLDER_MODEL, partName } from "@/scene/placeholderModel";
+import { useEffect, useRef, type KeyboardEvent } from "react";
+import { PART_IDS, PLACEHOLDER_MODEL } from "@/scene/placeholderModel";
 import { stepPart, useScene } from "@/scene/sceneStore";
 import styles from "../learn.module.css";
 
 /**
  * Keyboard and screen-reader way to select parts (the canvas itself can't be driven by keyboard).
- * Single-select listbox: arrows move and select, Enter/Space select, Escape clears.
+ * Single-select listbox: arrows move and select, Enter/Space or a tap pick the part (closing the
+ * menu), Escape closes without changing anything, Delete clears the selection.
  */
-export function PartsList() {
+export function PartsList({ autoFocus, onPick, onEscape }: { autoFocus?: boolean; onPick?: () => void; onEscape?: () => void }) {
   const selectedId = useScene((s) => s.selectedId);
   const select = useScene((s) => s.select);
   const options = useRef(new Map<string, HTMLDivElement>());
   const tabbable = selectedId ?? PART_IDS[0];
+
+  useEffect(() => {
+    if (autoFocus) options.current.get(tabbable!)?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const go = (id: string) => {
     select(id);
@@ -40,8 +46,13 @@ export function PartsList() {
       case "Enter":
       case " ":
         if (focused) select(focused);
+        onPick?.();
         break;
       case "Escape":
+        onEscape?.();
+        break;
+      case "Delete":
+      case "Backspace":
         select(null);
         break;
       default:
@@ -52,8 +63,7 @@ export function PartsList() {
   };
 
   return (
-    <>
-      <div role="listbox" aria-label="Parts" aria-orientation="horizontal" className={styles.parts} onKeyDown={onKeyDown}>
+    <div role="listbox" aria-label="Parts" aria-orientation="vertical" className={styles.parts} onKeyDown={onKeyDown}>
         {PLACEHOLDER_MODEL.parts.map((p) => (
           <div
             key={p.id}
@@ -66,17 +76,16 @@ export function PartsList() {
             aria-selected={selectedId === p.id}
             tabIndex={tabbable === p.id ? 0 : -1}
             className={styles.partOption}
-            onClick={() => select(p.id)}
+            onClick={() => {
+              select(p.id);
+              onPick?.();
+            }}
           >
             {selectedId === p.id && <CheckIcon />}
             {p.name}
           </div>
         ))}
       </div>
-      <p className={styles.srOnly} aria-live="polite" data-testid="part-announcer">
-        {selectedId ? `Selected: ${partName(selectedId)}` : ""}
-      </p>
-    </>
   );
 }
 

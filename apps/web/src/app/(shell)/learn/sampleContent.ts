@@ -12,5 +12,3 @@ export const SAMPLE_READINGS = [
   { id: "sample-1", title: "Sample reading card", purpose: "Shows where a verified reading will appear: its source, section, time and purpose." },
   { id: "sample-2", title: "Sample reading card", purpose: "Each real reading comes with a human-written guide and teach-back prompts." },
 ];
-
-export const SAMPLE_CHIPS = ["Show me inside", "Why?", "Use another example"];

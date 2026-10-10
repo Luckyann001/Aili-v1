@@ -58,7 +58,7 @@
   pointer-events: none;
 }
 
-.stageTop :is(button, a, [role="option"]),
+.stageTop :is(button, a, [role="option"], [role="note"]),
 .stageBottom :is(button, a) {
   pointer-events: auto;
 }
@@ -76,26 +76,180 @@
   gap: var(--aili-space-2);
 }
 
-.sceneTools {
+.topLeft {
   display: flex;
+  align-items: center;
   gap: var(--aili-space-2);
+  min-width: 0;
 }
 
-/* Parts list (listbox) */
-.parts {
+.sceneTools {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--aili-space-1);
 }
 
-.partOption {
+/* 44 px icon tools; the tooltip shows on keyboard focus (and on hover with a mouse). */
+.iconTool {
+  position: relative;
+  width: var(--aili-touch-target);
+  padding: 0;
+}
+
+.tip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  padding: 2px var(--aili-space-2);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-text);
+  color: var(--aili-bg);
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.iconTool:focus-visible .tip {
+  visibility: visible;
+}
+
+@media (hover: hover) {
+  .iconTool:hover .tip {
+    visibility: visible;
+  }
+}
+
+/* "Prepared · placeholder" badge with its full wording on tap or focus */
+.badgeWrap {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+}
+
+.badgeButton {
   display: inline-flex;
   align-items: center;
   gap: var(--aili-space-1);
   min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--aili-text);
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.badgeButton > svg {
+  flex: none;
+}
+
+/* The visible pill sits inside the 44 px target. */
+.badgeButton::before {
+  content: "";
+  position: absolute;
+  inset: 9px 0;
+  z-index: -1;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+}
+
+.badgeDetail {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  width: min(280px, 80vw);
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+.badgeDetail[hidden] {
+  display: none;
+}
+
+/* Parts menu */
+.partsMenu {
+  position: relative;
+}
+
+.partsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  min-height: var(--aili-touch-target);
+  max-width: 46vw;
   padding: 0 var(--aili-space-3);
   border: 1px solid var(--aili-border-strong);
   border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.9rem var(--aili-font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.partsCurrent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.partsPopover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  padding: var(--aili-space-1);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+.clearSelection {
+  width: 100%;
+  min-height: var(--aili-touch-target);
+  margin-top: var(--aili-space-1);
+  padding: 0 var(--aili-space-3);
+  border: 0;
+  border-top: 1px solid var(--aili-border);
+  border-radius: 0 0 var(--aili-radius-sm) var(--aili-radius-sm);
+  background: transparent;
+  color: var(--aili-link);
+  font: 500 0.9rem var(--aili-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.clearSelection:disabled {
+  color: var(--aili-text-muted);
+  cursor: default;
+}
+
+/* Parts list (listbox, inside the Parts menu) */
+.parts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.partOption {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--aili-radius-sm);
   background: var(--aili-surface);
   color: var(--aili-text);
   font: 500 0.9rem var(--aili-font-ui);
@@ -184,19 +338,6 @@
   min-height: 140px;
   overflow: hidden;
   pointer-events: none;
-}
-
-.placeholderNote {
-  position: absolute;
-  left: var(--aili-space-3);
-  top: 0;
-  margin: 0;
-  max-width: calc(100% - 24px);
-  padding: 2px var(--aili-space-2);
-  border-radius: var(--aili-radius-sm);
-  background: var(--aili-surface);
-  color: var(--aili-text-muted);
-  font-size: 0.8rem;
 }
 
 .sceneLoading {
@@ -691,6 +832,11 @@
 
 @media (max-width: 899px) {
   .learn {
+    padding: var(--aili-space-2);
+  }
+
+  .stageTop,
+  .stageBottom {
     padding: var(--aili-space-2);
   }
 

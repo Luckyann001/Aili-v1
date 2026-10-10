@@ -38,6 +38,11 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       camera={{ position: DEFAULT_VIEW.position, fov: 40, near: 0.01, far: 5 }}
       role="img"
       aria-label="3D view of the placeholder model. Use the parts list to select parts."
+      // A tap or click on empty space clears the selection. React Three Fiber only reports a miss
+      // for a click that barely moved, so orbit drags never clear it.
+      onPointerMissed={(e) => {
+        if (e.type === "click") useScene.getState().select(null);
+      }}
       onCreated={({ gl }) => {
         gl.domElement.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();

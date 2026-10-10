@@ -2,11 +2,11 @@
 
 import { useId, type RefObject } from "react";
 import { Button } from "@/components/Button";
-import { SAMPLE_CHIPS } from "./sampleContent";
+import { useVoice } from "@/voice/store";
 import { VoiceButton } from "./VoiceButton";
 import styles from "./learn.module.css";
 
-/** Bottom command area: quick replies, text box, and the voice button on phones. */
+/** Bottom command area: quick replies (only after Aili asks a question), text box, and the voice button on phones. */
 export function CommandBar({
   text,
   onText,
@@ -21,16 +21,19 @@ export function CommandBar({
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   const inputId = useId();
+  const chips = useVoice((s) => s.prompt?.chips ?? null);
 
   return (
     <div className={styles.command}>
-      <div className={styles.chips} role="group" aria-label="Suggested replies">
-        {SAMPLE_CHIPS.map((c) => (
-          <button key={c} type="button" className={styles.chip} onClick={() => onText(c)}>
-            {c}
-          </button>
-        ))}
-      </div>
+      {chips && (
+        <div className={styles.chips} role="group" aria-label="Suggested replies">
+          {chips.map((c) => (
+            <button key={c} type="button" className={styles.chip} onClick={() => onText(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form
         className={styles.commandRow}
