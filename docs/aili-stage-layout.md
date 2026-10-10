@@ -74,4 +74,16 @@ Stage/viewport on Deep canvas (#EBE4DA), panels on Surface (#FFFDFA), Ink text, 
 ## 5. Build notes for Claude Code
 - Shell and tokens first, then Learn stage (placeholder scene), voice states, text panel, Library drawer.
 - One state store: scene state, revision number, request IDs (for interrupts). Workbench adds `design.json` with undo/redo history.
-- Performance budget for mid-range Android: assets low-poly, size limits, lazy loading, a fallback viewer. Test on a real mid-range phone.
+- Performance budget for a low-end Android phone (Itel A667L, Android 14): assets low-poly, size limits, lazy loading, a fallback viewer. Test on that real phone.
+
+### Learn stage 3D budget [set in M1 slice 4a, Oct 10 2026]
+Measured on a production build; enforced by `apps/web/e2e/scene.spec.ts` (the test fails if exceeded).
+| Item | Budget | Measured (slice 4a) |
+|---|---|---|
+| 3D code loaded after the page (three.js, React Three Fiber, drei orbit controls, scene components) | **≤ 300 KB gzip** | 244.8 KB gzip (920 KB raw), 2 chunks |
+| Placeholder scene geometry | **≤ 2,000 triangles** | 132 |
+| 3D asset files | none yet (the placeholder is built in code); real assets get a per-asset size budget in M4 | 0 |
+- The 3D code is lazy-loaded: the rest of the stage (text box, voice, panels) works while it downloads (tested).
+- Rendering is on demand only (no continuous frames); device pixel ratio capped at 1.5.
+- If WebGL is unavailable or the context is lost, a still SVG picture of the parts replaces the 3D view; the parts list keeps working.
+- These are lab measurements in headless Chrome. Real speed is judged on the low-end test phone (CLAUDE.md), slice 6.
