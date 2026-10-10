@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { PART_IDS } from "./placeholderModel";
 
+/** loading: 3D code still downloading · ready: rendering · fallback: still picture (no WebGL or it failed). */
+export type ViewerStatus = "loading" | "ready" | "fallback";
+
 export interface SceneState {
+  viewer: ViewerStatus;
+  setViewer: (v: ViewerStatus) => void;
   selectedId: string | null;
   labelsOn: boolean;
   /** Increments on "Reset view"; the scene animates (or cuts) back to the default camera. */
@@ -12,6 +17,8 @@ export interface SceneState {
 }
 
 export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState>) => void): SceneState => ({
+  viewer: "loading",
+  setViewer: (viewer) => set(() => ({ viewer })),
   selectedId: null,
   labelsOn: true,
   resetToken: 0,

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContentBadge } from "@/components/ContentBadge";
 import { Button } from "@/components/Button";
+import { PLACEHOLDER_MODEL } from "@/scene/placeholderModel";
+import { useScene } from "@/scene/sceneStore";
 import { useLearnUi, type SideView } from "@/state/learnUi";
 import { saveConsent, setMuted, useMuted } from "@/voice/consent";
 import { isBusy } from "@/voice/machine";
@@ -13,13 +15,17 @@ import { useVoiceController } from "@/voice/useVoiceController";
 import { CommandBar } from "./CommandBar";
 import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
+import { PartsList } from "./scene/PartsList";
+import { SceneFallback } from "./scene/SceneFallback";
+import { SceneLabels } from "./scene/SceneLabels";
+import { SceneViewport } from "./scene/SceneViewport";
 import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
 import styles from "./learn.module.css";
 
 // Focus targets where Space already means something (typing, pressing, switching tabs).
 const SPACE_OWNERS =
-  'input, textarea, select, button, a[href], summary, [contenteditable=""], [contenteditable="true"], [role="tab"], [role="button"], [role="textbox"], [role="checkbox"], [role="switch"]';
+  'input, textarea, select, button, a[href], summary, [contenteditable=""], [contenteditable="true"], [role="tab"], [role="button"], [role="textbox"], [role="checkbox"], [role="switch"], [role="option"], [role="listbox"]';
 
 // Learn stage (M1). No AI yet: replies are a prepared demo line, badged "Prepared".
 export function LearnStage() {
@@ -32,6 +38,12 @@ export function LearnStage() {
   const error = useVoice((s) => s.error);
   const muted = useMuted();
   const demo = useDemoMode();
+  const viewer = useScene((s) => s.viewer);
+  const labelsOn = useScene((s) => s.labelsOn);
+  const toggleLabels = useScene((s) => s.toggleLabels);
+  const resetView = useScene((s) => s.resetView);
+  const safeArea = useRef<HTMLDivElement | null>(null);
+  const labelEls = useRef(new Map<string, HTMLElement>());
 
   const [text, setText] = useState("");
   const [consentMode, setConsentMode] = useState<RecognitionMode | null>(null);
@@ -83,25 +95,42 @@ export function LearnStage() {
     <div className={styles.learn} data-side={side ?? "closed"}>
       <h1 className={styles.srOnly}>Learn stage</h1>
       <section className={styles.stage} aria-label="Stage">
+        <SceneViewport safeArea={safeArea} labels={labelEls} />
+
         <div className={styles.stageTop}>
-          <ContentBadge kind="prepared" />
-          <Button
-            variant="secondary"
-            aria-expanded={side === "explanation"}
-            aria-controls="learn-side"
-            onClick={(e) => open("explanation", e.currentTarget)}
-          >
-            <TextIcon /> Explanation
-          </Button>
+          <div className={styles.topRow}>
+            <ContentBadge kind="prepared" />
+            <Button
+              variant="secondary"
+              aria-expanded={side === "explanation"}
+              aria-controls="learn-side"
+              onClick={(e) => open("explanation", e.currentTarget)}
+            >
+              <TextIcon /> Explanation
+            </Button>
+          </div>
+          <div className={styles.topRow}>
+            <PartsList />
+            <div className={styles.sceneTools}>
+              <Button variant="secondary" aria-pressed={labelsOn} onClick={toggleLabels}>
+                <LabelIcon />
+                <span className={styles.btnLabel}>Labels</span>
+              </Button>
+              <Button variant="secondary" onClick={resetView}>
+                <ResetIcon />
+                <span className={styles.btnLabel}>Reset view</span>
+              </Button>
+            </div>
+          </div>
         </div>
 
         {demo && <DemoControls onPlay={() => voice.submit("demo")} />}
 
-        <div className={styles.scene} role="img" aria-label="Scene placeholder. The 3D scene arrives in a later build.">
-          <span className={styles.orb} aria-hidden="true" />
-          <p className={styles.sceneNote} aria-hidden="true">
-            Scene placeholder
-          </p>
+        {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
+        <div ref={safeArea} className={styles.scene}>
+          <p className={styles.placeholderNote}>{PLACEHOLDER_MODEL.note}</p>
+          {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
+          {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
         </div>
 
         <div className={styles.overlay}>
@@ -214,6 +243,23 @@ function MuteIcon({ muted }: { muted: boolean }) {
     <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 7.5h3l4-3.5v12l-4-3.5H3z" />
       {muted ? <path d="M13.5 7.5l4 5M17.5 7.5l-4 5" /> : <path d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5a7 7 0 0 1 0 10" />}
+    </svg>
+  );
+}
+
+function LabelIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <path d="M3 4.5h9l5 5.5-5 5.5H3z" />
+      <circle cx="7" cy="10" r="1.3" />
+    </svg>
+  );
+}
+
+function ResetIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 10a6 6 0 1 0 2-4.5M4 3.5v3h3" />
     </svg>
   );
 }

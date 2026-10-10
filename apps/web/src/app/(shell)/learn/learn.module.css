@@ -35,26 +35,83 @@
   overflow: hidden;
 }
 
-/* The stage's control rows only catch pointer events on their buttons, so the 3D scene
-   (slice 4) can still be orbited through the gaps. */
+/* The 3D view fills the whole stage behind everything else. */
+.canvasHost {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Control rows sit over the 3D view. Only actual controls catch the pointer; every gap
+   (between buttons, around the voice orb and its label) passes through to orbit and select. */
 .stageTop,
 .stageBottom {
   position: relative;
   z-index: 2;
   padding: var(--aili-space-3);
+}
+
+.stageTop,
+.stageTop *,
+.stageBottom,
+.stageBottom * {
   pointer-events: none;
 }
 
-.stageTop > *,
-.stageBottom > * {
+.stageTop :is(button, a, [role="option"]),
+.stageBottom :is(button, a) {
   pointer-events: auto;
 }
 
 .stageTop {
+  display: grid;
+  gap: var(--aili-space-2);
+}
+
+.topRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--aili-space-2);
+}
+
+.sceneTools {
+  display: flex;
+  gap: var(--aili-space-2);
+}
+
+/* Parts list (listbox) */
+.parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1);
+}
+
+.partOption {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.9rem var(--aili-font-ui);
+  cursor: pointer;
+  user-select: none;
+}
+
+.partOption[aria-selected="true"] {
+  border-width: 2px;
+  border-color: var(--aili-text);
+  font-weight: 700;
+}
+
+.partOption:focus-visible {
+  outline: var(--aili-focus-width) solid var(--aili-focus-ring);
+  outline-offset: 2px;
 }
 
 /* [Captions, Mute] | voice + status (centre) | Library */
@@ -119,26 +176,124 @@
   justify-self: end;
 }
 
+/* Safe area between the top and bottom controls: the model is framed here, labels stay inside. */
 .scene {
+  position: relative;
+  z-index: 1;
   flex: 1;
+  min-height: 140px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.placeholderNote {
+  position: absolute;
+  left: var(--aili-space-3);
+  top: 0;
+  margin: 0;
+  max-width: calc(100% - 24px);
+  padding: 2px var(--aili-space-2);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-surface);
+  color: var(--aili-text-muted);
+  font-size: 0.8rem;
+}
+
+.sceneLoading {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  align-content: center;
-  gap: var(--aili-space-3);
-  min-height: 0;
-}
-
-.orb {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--aili-accent) 55%, white), var(--aili-accent));
-}
-
-.sceneNote {
   margin: 0;
   color: var(--aili-text-muted);
-  font-size: 0.875rem;
+}
+
+.labelLayer {
+  position: absolute;
+  inset: 0;
+}
+
+.partLabel,
+.partLabelSelected {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  padding: 2px var(--aili-space-2);
+  border-radius: 999px;
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.partLabel {
+  border: 1px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+}
+
+.partLabelSelected {
+  z-index: 1;
+  border: 2px solid var(--aili-text);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-weight: 700;
+}
+
+.partLabel[hidden],
+.partLabelSelected[hidden] {
+  display: none;
+}
+
+/* Still picture when WebGL isn't available */
+.fallback {
+  position: absolute;
+  inset: 28px var(--aili-space-3) 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--aili-space-2);
+}
+
+.fallbackNote {
+  margin: 0;
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 1.5px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.9rem;
+}
+
+.fallbackSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.fallbackSvg rect {
+  stroke: var(--aili-text);
+}
+
+.fill_explore {
+  fill: var(--aili-fill-explore);
+}
+
+.fill_technical {
+  fill: var(--aili-fill-technical);
+}
+
+.fill_discovery {
+  fill: var(--aili-fill-discovery);
+}
+
+.fill_expressive {
+  fill: var(--aili-fill-expressive);
+}
+
+.fallbackText {
+  fill: var(--aili-text);
+  font: 11px var(--aili-font-ui);
 }
 
 /* Messages and captions sit in the stage's flow, between the scene and the bottom controls,
