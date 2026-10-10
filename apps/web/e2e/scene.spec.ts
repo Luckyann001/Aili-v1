@@ -15,6 +15,12 @@ const host = (p: Page) => p.locator("[data-viewer]");
 const ready = (p: Page) => p.locator('[data-viewer="ready"]');
 const canvas = (p: Page) => p.locator("[data-viewer] canvas");
 const option = (p: Page, name: string) => p.getByRole("option", { name });
+const partsButton = (p: Page) => p.getByRole("button", { name: /^Parts/ });
+/** Opens the Parts menu and picks a part (the menu closes on pick). */
+async function pickPart(p: Page, name: string) {
+  await partsButton(p).click();
+  await option(p, name).click();
+}
 const label = (p: Page, id: string) => p.locator(`span[data-part-id="${id}"]`);
 const camera = async (p: Page) => (await host(p).getAttribute("data-camera"))!.split(",").map(Number);
 const dist = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
@@ -157,10 +163,11 @@ test.describe("orbit, zoom, pan and reset", () => {
     const c = await rect(canvas(page));
     await drag(page, { x: c.x + c.width / 2, y: c.y + c.height / 2 }, 150, 40);
     expect(dist(home, await camera(page))).toBeGreaterThan(0.02);
+    const t0 = Date.now();
     await page.getByRole("button", { name: "Reset view" }).click();
-    await page.waitForTimeout(120);
-    expect(dist(home, await camera(page))).toBeGreaterThan(0.001); // still moving
-    await expect.poll(async () => dist(home, await camera(page)), { timeout: 2000 }).toBeLessThan(0.002);
+    await expect.poll(async () => dist(home, await camera(page)), { timeout: 3000, intervals: [20] }).toBeLessThan(0.002);
+    // A tween takes about the spatial duration (600 ms); a cut would arrive at once. Load only adds time.
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(450);
   });
 
   test("Reset view cuts straight back under reduced motion", async ({ page }, info) => {
@@ -184,52 +191,110 @@ test.describe("selection", () => {
     const y = Number(await arm.getAttribute("data-y"));
     if (page.viewportSize()!.width >= 900) await page.mouse.click(c.x + x, c.y + y + 3);
     else await page.touchscreen.tap(c.x + x, c.y + y + 3);
-    await expect(option(page, "Arm")).toHaveAttribute("aria-selected", "true");
+    await expect(partsButton(page)).toHaveText("Parts: Arm");
     await expect(arm).toHaveText("Selected: Arm");
+    await expect(arm).toBeVisible(); // labels are off, but the selected part keeps its label
     await expect(page.getByTestId("part-announcer")).toHaveText("Selected: Arm");
   });
 
-  test("keyboard: Tab into the parts list, arrows select, Enter selects, Escape clears", async ({ page }) => {
+  test("keyboard: the Parts menu opens on Enter, arrows select, Enter picks, Escape closes, Delete clears", async ({ page }) => {
     await openScene(page);
-    await option(page, "Base").focus();
-    await page.keyboard.press("ArrowRight");
+    await partsButton(page).focus();
+    await page.keyboard.press("Enter");
+    await expect(partsButton(page)).toHaveAttribute("aria-expanded", "true");
+    await expect(option(page, "Base")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
     await expect(option(page, "Servo body")).toBeFocused();
     await expect(option(page, "Servo body")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("part-announcer")).toHaveText("Selected: Servo body");
     await page.keyboard.press("End");
     await expect(option(page, "End weight")).toHaveAttribute("aria-selected", "true");
-    await page.keyboard.press("ArrowRight"); // wraps
+    await page.keyboard.press("ArrowDown"); // wraps
     await expect(option(page, "Base")).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("Enter");
+    await expect(partsButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(partsButton(page)).toBeFocused();
     await expect(label(page, "base")).toHaveText("Selected: Base");
+    await page.keyboard.press("Enter");
     await page.keyboard.press("Escape");
+    await expect(partsButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(partsButton(page)).toBeFocused();
+    await expect(partsButton(page)).toHaveText("Parts: Base"); // Escape changed nothing
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Delete");
     await expect(page.locator('[role="option"][aria-selected="true"]')).toHaveCount(0);
     await expect(page.getByTestId("part-announcer")).toHaveText("");
   });
 
+
   test("Space in the parts list selects; it does not start voice", async ({ page }) => {
     await installVoiceFakes(page, { consent: { choice: "voice", mode: "online" } });
     await openScene(page);
+    await partsButton(page).click();
     await option(page, "Arm").focus();
     await page.keyboard.press("Space");
-    await expect(option(page, "Arm")).toHaveAttribute("aria-selected", "true");
+    await expect(partsButton(page)).toHaveText("Parts: Arm");
     await expect(page.locator('p[role="status"][data-state]')).toHaveText("Ready");
   });
 });
 
+test.describe("clearing the selection", () => {
+  /** A point in empty stage space: centred, just under the top controls, above the model. */
+  async function emptyPoint(page: Page) {
+    const top = await rect(page.getByRole("group", { name: "View" }));
+    const c = await rect(canvas(page));
+    return { x: c.x + c.width / 2, y: top.y + top.height + 30 };
+  }
+
+  test("'Clear selection' in the Parts list clears it and closes the list", async ({ page }) => {
+    await openScene(page);
+    await partsButton(page).click();
+    await expect(page.getByRole("button", { name: "Clear selection" })).toBeDisabled(); // nothing selected yet
+    await option(page, "Arm").click();
+    await expect(partsButton(page)).toHaveText("Parts: Arm");
+    await partsButton(page).click();
+    await page.getByRole("button", { name: "Clear selection" }).click();
+    await expect(partsButton(page)).toHaveText("Parts");
+    await expect(partsButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(partsButton(page)).toBeFocused();
+    await expect(page.getByTestId("part-announcer")).toHaveText("");
+    await expect(label(page, "arm")).toBeHidden();
+  });
+
+  test("tapping empty stage space clears it; an orbit drag from empty space does not", async ({ page }, info) => {
+    await openScene(page);
+    const touch = info.project.name !== "desktop";
+    await pickPart(page, "Arm");
+    const empty = await emptyPoint(page);
+    if (touch) await page.touchscreen.tap(empty.x, empty.y);
+    else await page.mouse.click(empty.x, empty.y);
+    await expect(partsButton(page)).toHaveText("Parts");
+    await expect(page.getByTestId("part-announcer")).toHaveText("");
+
+    await pickPart(page, "Arm");
+    const start = await camera(page);
+    if (touch) await touchDrag(page, [empty], [{ dx: 80, dy: 0 }]);
+    else await drag(page, empty, 80, 0);
+    await expect.poll(async () => dist(start, await camera(page))).toBeGreaterThan(0.01);
+    await expect(partsButton(page)).toHaveText("Parts: Arm"); // still selected
+  });
+});
+
 test.describe("labels", () => {
-  test("Labels toggles part labels; the selected part keeps its label", async ({ page }) => {
+  test("labels are off by default; Labels shows them; the selected part always keeps its label", async ({ page }) => {
     await openScene(page);
     const btn = page.getByRole("button", { name: "Labels" });
-    await expect(btn).toHaveAttribute("aria-pressed", "true");
-    for (const id of ["base", "servo", "arm", "end-weight"]) await expect(label(page, id)).toBeVisible();
-    await option(page, "Arm").click();
-    await btn.click();
     await expect(btn).toHaveAttribute("aria-pressed", "false");
-    for (const id of ["base", "servo", "end-weight"]) await expect(label(page, id)).toBeHidden();
+    for (const id of ["base", "servo", "arm", "end-weight"]) await expect(label(page, id)).toBeHidden();
+    await pickPart(page, "Arm");
     await expect(label(page, "arm")).toBeVisible();
     await expect(label(page, "arm")).toHaveText("Selected: Arm");
+    for (const id of ["base", "servo", "end-weight"]) await expect(label(page, id)).toBeHidden();
+    await btn.click();
+    await expect(btn).toHaveAttribute("aria-pressed", "true");
+    for (const id of ["base", "servo", "arm", "end-weight"]) await expect(label(page, id)).toBeVisible();
   });
+
 
   test("labels never overlap the voice orb, captions or controls, even zoomed in", async ({ page }) => {
     await installVoiceFakes(page, { speakMs: 8000 });
@@ -237,13 +302,14 @@ test.describe("labels", () => {
     await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("hi");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByText("This is a prepared demo line, not a live answer.")).toBeVisible();
+    await page.getByRole("button", { name: "Labels" }).click();
     const check = async () => {
       const blockers = [
         page.getByText("This is a prepared demo line, not a live answer.").locator(".."),
         page.locator('p[role="status"][data-state]'),
         page.locator("main [data-state]:visible").filter({ has: page.locator("svg") }),
         page.locator('main section[aria-label="Stage"] button:visible'),
-        page.locator('[role="option"]'),
+        page.getByRole("button", { name: /^Parts/ }),
       ];
       const boxes = [];
       for (const b of blockers) for (const el of await b.all()) boxes.push(await rect(el));
@@ -278,7 +344,7 @@ test.describe("fallback", () => {
     await expect(page.getByText("3D view isn't available on this device, so here is a still picture of the parts.")).toBeVisible();
     await expect(page.locator("canvas")).toHaveCount(0);
     await expect(page.getByRole("img", { name: /Still side view of the placeholder model/ })).toBeVisible();
-    await option(page, "Arm").click();
+    await pickPart(page, "Arm");
     await expect(page.locator('g[data-part-id="arm"] text')).toHaveText("Selected: Arm");
     expect(await axe(page)).toEqual([]);
   });
@@ -301,7 +367,7 @@ test.describe("fallback", () => {
     await expect(ready(page)).toBeVisible({ timeout: 20000 });
     await expect(canvas(page)).toHaveCount(1);
     // Still rendering and interactive: selecting re-labels the part and the camera still orbits.
-    await option(page, "Arm").click();
+    await pickPart(page, "Arm");
     await expect(label(page, "arm")).toHaveText("Selected: Arm");
     await expect(label(page, "arm")).toBeVisible();
     const c = await rect(canvas(page));
@@ -314,21 +380,38 @@ test.describe("fallback", () => {
 test.describe("phones", () => {
   test("touching outside the stage still scrolls a short phone screen", async ({ page }, info) => {
     test.skip(info.project.name !== "phone", "phone only");
-    await page.setViewportSize({ width: 360, height: 560 });
+    await page.setViewportSize({ width: 360, height: 440 });
     await openScene(page);
+    // Only meaningful if the page is taller than the screen.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight)).toBe(true);
     // The orbit controls listen on React Three Fiber's wrapper (the canvas's grandparent).
     expect(await page.locator("[data-viewer] > div").evaluate((d) => getComputedStyle(d).touchAction)).toBe("none");
-    const chips = await rect(page.getByRole("group", { name: "Suggested replies" }));
-    await touchDrag(page, [{ x: chips.x + 10, y: chips.y + chips.height / 2 }], [{ dx: 0, dy: -200 }]);
+    const box = await rect(page.getByRole("textbox", { name: "Ask Aili or answer" }));
+    await touchDrag(page, [{ x: box.x + 20, y: box.y + box.height / 2 }], [{ dx: 0, dy: -200 }]);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   });
 });
 
 test.describe("honesty and accessibility", () => {
-  test("placeholder note and Prepared badge are visible; no engineering numbers on the stage", async ({ page }) => {
+  test("the badge says Prepared · placeholder; the full wording shows on tap and on keyboard focus", async ({ page }) => {
     await openScene(page);
-    await expect(page.getByText("Placeholder model for layout testing. Not a real product.")).toBeVisible();
-    await expect(page.locator('section[aria-label="Stage"]').getByText("Prepared", { exact: true }).first()).toBeVisible();
+    const badge = page.getByRole("button", { name: /Prepared · placeholder/ });
+    const note = page.getByText("Prepared content, written in advance. Not a live AI response. Placeholder model for layout testing. Not a real product.");
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveAccessibleDescription(/Placeholder model for layout testing\. Not a real product\./);
+    await expect(note).toBeHidden();
+    await badge.click();
+    await expect(note).toBeVisible();
+    await badge.click();
+    await expect(note).toBeHidden();
+    await page.locator("main").focus();
+    await page.keyboard.press("Tab");
+    await expect(badge).toBeFocused();
+    await expect(note).toBeVisible();
+  });
+
+  test("no engineering numbers on the stage", async ({ page }) => {
+    await openScene(page);
     const text = await page.locator('section[aria-label="Stage"]').innerText();
     expect(text).not.toMatch(/\d+(\.\d+)?\s?(kg|g|N|N·m|Nm|mm|cm|m|kgf)\b/);
   });
@@ -337,7 +420,7 @@ test.describe("honesty and accessibility", () => {
     test(`axe and screenshot with a part selected, ${scheme}`, async ({ page }, info) => {
       await page.emulateMedia({ colorScheme: scheme });
       await openScene(page);
-      await option(page, "Servo body").click();
+      await pickPart(page, "Servo body");
       await page.mouse.move(0, 0);
       await page.waitForTimeout(400);
       expect(await axe(page)).toEqual([]);

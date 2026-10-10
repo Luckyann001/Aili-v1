@@ -14,7 +14,8 @@ test.beforeEach(async ({ page }) => {
 
 test("starts with the stage, command bar and captions; text panel closed", async ({ page }) => {
   await expect(stage(page)).toBeVisible();
-  await expect(page.getByText("Prepared", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Prepared · placeholder/ })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Suggested replies" })).toHaveCount(0); // no question yet
   await expect(page.locator('p[role="status"][data-state]')).toHaveText("Ready");
   await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toBeVisible();
   await expect(side(page)).toHaveCount(0);
@@ -91,8 +92,12 @@ test("typing a space in the text box types a space", async ({ page }) => {
   await expect(box).toHaveValue("why not ");
 });
 
-test("quick-reply chips fill the text box", async ({ page }) => {
-  await page.getByRole("group", { name: "Suggested replies" }).getByRole("button", { name: "Why?" }).click();
+test("quick-reply chips appear after Aili's question and fill the text box", async ({ page }) => {
+  await installVoiceFakes(page, { speakMs: 200 });
+  await page.reload();
+  await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("hi");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("group", { name: "Suggested replies" }).getByRole("button", { name: "Why?" }).click({ timeout: 15000 });
   await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toHaveValue("Why?");
 });
 
@@ -148,7 +153,7 @@ test("captions never overlap the stage's bottom controls", async ({ page }) => {
 });
 
 test("hover styles: work with a mouse, never stick after a tap", async ({ page }, info) => {
-  const chip = page.getByRole("group", { name: "Suggested replies" }).getByRole("button", { name: "Why?" });
+  const chip = stage(page).getByRole("button", { name: "Captions" });
   const bg = () => chip.evaluate((el) => getComputedStyle(el).backgroundColor);
   const resting = await bg();
   if (info.project.name === "desktop") {

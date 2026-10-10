@@ -8,13 +8,14 @@ import { fakeLog, installVoiceFakes } from "./voiceFakes";
 const status = (p: Page) => p.locator('p[role="status"][data-state]');
 const voiceBtn = (p: Page) => p.locator('button[data-state]:visible');
 const textbox = (p: Page) => p.getByRole("textbox", { name: "Ask Aili or answer" });
-const caption = (p: Page) => p.locator("main").getByText(/prepared demo line|Live replies|stop me at any time|Demo caption/);
+const caption = (p: Page) => p.locator("main").getByText(/prepared demo line|Live replies|stop me at any time|look at first|Demo caption/);
 const dialog = (p: Page) => p.getByRole("dialog", { name: "Before you use voice" });
 
 const REPLY = [
   "This is a prepared demo line, not a live answer.",
   "Live replies from Aili arrive in a later build.",
   "You can stop me at any time with the stop button or the Escape key.",
+  "What would you like to look at first?",
 ];
 
 const ask = async (p: Page, q = "What is a servo?") => {
@@ -98,9 +99,20 @@ test.describe("prepared reply, captions and interrupt", () => {
     await expect(status(page)).toHaveText("Thinking");
     for (const line of REPLY) await expect(page.getByText(line)).toBeVisible();
     await expect(status(page)).toHaveText("Ready");
-    const captionBox = page.locator("main").getByText(REPLY[2]!).locator("..");
+    const captionBox = page.locator("main").getByText(REPLY[3]!).locator("..");
     await expect(captionBox.getByText("Prepared", { exact: true })).toBeVisible();
     expect((await fakeLog(page)).spoken).toEqual(REPLY);
+  });
+
+  test("quick replies appear only after Aili's closing question, and go when the learner acts", async ({ page }) => {
+    const chips = page.getByRole("group", { name: "Suggested replies" });
+    await expect(chips).toHaveCount(0);
+    await ask(page);
+    await expect(page.getByText(REPLY[3]!)).toBeVisible({ timeout: 15000 });
+    await expect(chips).toBeVisible();
+    await expect(chips.getByRole("button")).toHaveText(["Show me inside", "Why?", "Use another example"]);
+    await ask(page, "next");
+    await expect(chips).toHaveCount(0);
   });
 
   test("interrupt: the voice button stops speech and drops queued captions immediately", async ({ page }) => {
@@ -131,8 +143,8 @@ test.describe("prepared reply, captions and interrupt", () => {
     await ask(page, "second");
     await expect(status(page)).toHaveText("Thinking");
     await expect(caption(page)).toHaveCount(0);
-    await expect(status(page)).toHaveText("Ready", { timeout: 15000 });
-    expect((await fakeLog(page)).spoken.slice(-3)).toEqual(REPLY);
+    await expect(status(page)).toHaveText("Ready", { timeout: 30000 });
+    expect((await fakeLog(page)).spoken.slice(-REPLY.length)).toEqual(REPLY);
   });
 
   test("mute silences Aili's voice; captions keep running", async ({ page }) => {
