@@ -144,6 +144,14 @@ Bounds below come from the reference prototype. Static model: `tau = (m_p * l + 
 }
 ```
 
+
+### Solver: relative effort to hold a lever level [added M1 slice 4c, Oct 2026]
+Used by the beginner lever analogy to drive an illustrative, unitless effort gauge (`packages/solvers/src/leverEffort.ts`; details in `packages/solvers/README.md`).
+- **Assumptions:** rigid, uniform lever (its own mass acts at its middle); static case (held still and level); the hand grips one end, which is the pivot; the weight is a point mass; gravity straight down; friction and bending ignored.
+- **Model:** moment about the hand `M(d) = g · (m_weight · d + m_lever · L / 2)`; relative effort `= M(d) / M(L)`, so 1 with the weight at the far end. The lever's own mass is always included, so effort never reaches zero.
+- **Does not cover:** endurance, fatigue, heat, dynamic loads or any rating. It compares positions; it is not a sizing calculation.
+- **Worked example (in the test):** lever 0.30 m and 0.05 kg, weight 0.20 kg at 0.10 m → 0.0275 / 0.0675 = 0.407.
+
 ---
 
 ## 5. Per-turn request flow
