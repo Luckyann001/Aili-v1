@@ -6,8 +6,9 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
-import { BackSide, PerspectiveCamera, Vector3 } from "three";
-import { DEFAULT_VIEW, PLACEHOLDER_MODEL, type Part } from "@/scene/placeholderModel";
+import { BackSide, PerspectiveCamera, Vector3, type Mesh } from "three";
+import { layoutParts, modelBounds } from "@/scene/layout";
+import { DEFAULT_VIEW, PLACEHOLDER_MODEL, type FillRole } from "@/scene/placeholderModel";
 import { useScene } from "@/scene/sceneStore";
 import type { SceneColors } from "./useSceneTheme";
 
@@ -55,7 +56,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       <directionalLight position={[0.6, 1, 0.8]} intensity={1.5} />
       <directionalLight position={[-0.6, 0.4, -0.5]} intensity={0.4} />
       {PLACEHOLDER_MODEL.parts.map((p) => (
-        <PartMesh key={p.id} part={p} colors={props.colors} />
+        <PartMesh key={p.id} id={p.id} fill={p.fill} colors={props.colors} />
       ))}
       <OrbitControls
         makeDefault
@@ -70,7 +71,8 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       />
       <Framing safeArea={props.safeArea} />
       <LabelTracker safeArea={props.safeArea} labels={props.labels} />
-      <CameraReset spatialMs={props.spatialMs} host={props.host} />
+      <ExplodeDriver spatialMs={props.spatialMs} host={props.host} />
+      <CameraRig spatialMs={props.spatialMs} host={props.host} />
       <ReadyProbe onReady={props.onReady} />
     </Canvas>
   );
@@ -78,27 +80,38 @@ export default function SceneCanvas(props: SceneCanvasProps) {
 
 const OUTLINE_M = 0.003;
 
-function PartMesh({ part, colors }: { part: Part; colors: SceneColors }) {
-  const selected = useScene((s) => s.selectedId === part.id);
+/** Animated state shared by the parts, labels and camera: 0 = assembled, 1 = fully exploded. */
+const anim = { explode: 0 };
+
+function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: SceneColors }) {
+  const selected = useScene((s) => s.selectedId === id);
   const select = useScene((s) => s.select);
+  const params = useScene((s) => s.params);
   const invalidate = useThree((s) => s.invalidate);
+  const ref = useRef<Mesh>(null);
 
-  useEffect(() => invalidate(), [selected, colors, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, invalidate]);
 
-  const { kind, size } = part.shape;
+  // Size depends on the inspector settings; position also on the explode amount (set per frame).
+  const { kind, size } = layoutParts(params)[id]!;
+  useFrame(() => {
+    ref.current?.position.set(...layoutParts(params, anim.explode)[id]!.position);
+  });
+
   const geometry = (inflate: number) =>
     kind === "box" ? (
-      <boxGeometry args={(size as [number, number, number]).map((d) => d + 2 * inflate) as [number, number, number]} />
+      <boxGeometry args={size.map((d) => d + 2 * inflate) as [number, number, number]} />
     ) : (
       <cylinderGeometry args={[size[0] + inflate, size[0] + inflate, size[1] + 2 * inflate, 24]} />
     );
   return (
     <mesh
-      position={part.position}
-      name={part.id}
+      ref={ref}
+      position={layoutParts(params, anim.explode)[id]!.position}
+      name={id}
       onClick={(e) => {
         e.stopPropagation();
-        select(part.id);
+        select(id);
       }}
       onPointerOver={(e) => {
         e.stopPropagation();
@@ -107,7 +120,7 @@ function PartMesh({ part, colors }: { part: Part; colors: SceneColors }) {
       onPointerOut={(e) => setCursor(e.nativeEvent.target, "")}
     >
       {geometry(0)}
-      <meshStandardMaterial color={colors.fills[part.fill]} roughness={0.7} metalness={0.05} />
+      <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} />
       {selected && (
         // Selection outline: an inverted shell OUTLINE_M larger on every side, drawn from inside.
         <mesh raycast={() => null}>
@@ -123,57 +136,77 @@ function setCursor(target: EventTarget | null, cursor: string) {
   if (target instanceof HTMLElement) target.style.cursor = cursor;
 }
 
-// Model extent for framing (metres), seen from the default view: the model is wide and flat,
-// so width and height are fitted separately rather than with one bounding sphere.
-const HALF_WIDTH_M = 0.13;
-const HALF_HEIGHT_M = 0.075;
+// Camera framing: fit the model's current bounds (they change with the arm length and the
+// explode) inside the safe area, width and height separately (the model is wide and flat).
 const MARGIN = 1.12;
-const target = new Vector3(...DEFAULT_VIEW.target);
-const viewDir = new Vector3(...DEFAULT_VIEW.position).sub(target).normalize();
+const defaultDir = new Vector3(...DEFAULT_VIEW.position).sub(new Vector3(...DEFAULT_VIEW.target)).normalize();
+/** Last known screen shape, kept by Framing. */
+const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1 };
 
-/** Default camera position that fits the whole model inside the safe area at this screen shape. */
-const fitted = { position: new Vector3(...DEFAULT_VIEW.position) };
-function fitCamera(fovDeg: number, canvasH: number, areaW: number, areaH: number) {
-  const tanHalf = Math.tan((fovDeg * Math.PI) / 360);
-  const tanV = tanHalf * (areaH / canvasH);
-  const tanH = tanHalf * (areaW / canvasH);
-  const distance = Math.max(HALF_WIDTH_M / tanH, HALF_HEIGHT_M / tanV) * MARGIN;
-  fitted.position.copy(target).addScaledVector(viewDir, distance);
+/** Where the camera and orbit target should go to frame the model from direction `dir`. */
+function fitGoal(dir: Vector3, explode: number) {
+  const b = modelBounds(useScene.getState().params, explode);
+  const tanHalf = Math.tan((frame.fov * Math.PI) / 360);
+  const tanV = tanHalf * (frame.areaH / frame.canvasH);
+  const tanH = tanHalf * (frame.areaW / frame.canvasH);
+  const distance = Math.max(b.halfWidth / tanH, b.halfHeight / tanV) * MARGIN;
+  const target = new Vector3(...b.center);
+  return { target, position: target.clone().addScaledVector(dir, distance) };
 }
 
 /**
- * Centres the model in the safe area (not the whole stage) by shifting the projection, and fits
- * the default camera distance to the safe area. The first fit also places the camera.
+ * Centres the model in the free part of the safe area (not the whole stage, and not under the
+ * inspector) by shifting the projection, and records the free area for camera fitting. The first
+ * pass also places the camera. The inspector sits to the right from 768 px, at the bottom below.
  */
 function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
   const invalidate = useThree((s) => s.invalidate);
+  const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
+  const inspectorShown = useScene((s) => s.inspectorOpen && s.selectedId !== null);
   const placed = useRef(false);
 
   useLayoutEffect(() => {
     const el = safeArea.current;
     if (!el || !(camera instanceof PerspectiveCamera)) return;
+    const inspector = () => el.querySelector<HTMLElement>("[data-inspector]");
     const apply = () => {
-      const centre = el.offsetTop + el.offsetHeight / 2;
-      const shift = centre - size.height / 2;
-      camera.setViewOffset(size.width, size.height, 0, -shift, size.width, size.height);
-      fitCamera(camera.fov, size.height, el.clientWidth, el.clientHeight);
+      const insp = inspector();
+      const side = window.matchMedia("(min-width: 768px)").matches;
+      const takeW = insp && side ? insp.offsetWidth + 16 : 0;
+      const takeH = insp && !side ? insp.offsetHeight + 16 : 0;
+      const freeW = el.clientWidth - takeW;
+      const freeH = el.clientHeight - takeH;
+      const shiftX = el.offsetLeft + freeW / 2 - size.width / 2;
+      const shiftY = el.offsetTop + freeH / 2 - size.height / 2;
+      camera.setViewOffset(size.width, size.height, -shiftX, -shiftY, size.width, size.height);
+      Object.assign(frame, { fov: camera.fov, canvasH: size.height, areaW: freeW, areaH: freeH });
       if (!placed.current) {
         placed.current = true;
-        camera.position.copy(fitted.position);
-        camera.lookAt(target);
+        const g = fitGoal(defaultDir, anim.explode);
+        camera.position.copy(g.position);
+        camera.lookAt(g.target);
+        controls?.target.copy(g.target);
+        controls?.update();
       }
       invalidate();
     };
     apply();
     const ro = new ResizeObserver(apply);
     ro.observe(el);
+    // The inspector is rendered by the page, outside this 3D tree: re-measure on the next frame.
+    const raf = requestAnimationFrame(() => {
+      const insp = inspector();
+      if (insp) ro.observe(insp);
+      apply();
+    });
     return () => {
+      cancelAnimationFrame(raf);
       ro.disconnect();
       camera.clearViewOffset();
     };
-  }, [camera, size, safeArea, invalidate]);
+  }, [camera, size, safeArea, invalidate, controls, inspectorShown]);
   return null;
 }
 
@@ -196,19 +229,21 @@ function LabelTracker({
   const invalidate = useThree((s) => s.invalidate);
   const labelsOn = useScene((s) => s.labelsOn);
   const selectedId = useScene((s) => s.selectedId);
+  const params = useScene((s) => s.params);
 
-  // Shown or renamed labels change size: render a frame so they are placed again.
-  useEffect(() => invalidate(), [labelsOn, selectedId, invalidate]);
+  // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
     if (!area) return;
     const w = area.clientWidth;
     const h = area.clientHeight;
+    const layout = layoutParts(params, anim.explode);
     for (const part of PLACEHOLDER_MODEL.parts) {
       const el = labels.current.get(part.id);
       if (!el) continue;
-      v.set(...part.labelAnchor).project(camera);
+      v.set(...layout[part.id]!.labelAnchor).project(camera);
       const sx = ((v.x + 1) / 2) * size.width;
       const sy = ((1 - v.y) / 2) * size.height;
       // For tests: where the part's anchor is on the canvas, before clamping.
@@ -234,26 +269,69 @@ function writeCamera(host: RefObject<HTMLDivElement | null>, camera: { position:
   if (host.current) host.current.dataset.camera = camera.position.toArray().map((n) => n.toFixed(3)).join(",");
 }
 
-const start = { pos: new Vector3(), target: new Vector3() };
-const goal = { pos: fitted.position, target };
+function writeData(host: RefObject<HTMLDivElement | null>, key: string, value: string) {
+  if (host.current) host.current.dataset[key] = value;
+}
 
-/** "Reset view": tweens back over the spatial duration, or cuts when it is 0 (reduced motion). */
-function CameraReset({ spatialMs, host }: { spatialMs: number; host: RefObject<HTMLDivElement | null> }) {
+/** Moves parts apart (or back) over the spatial duration; cuts when it is 0 (reduced motion). */
+function ExplodeDriver({ spatialMs, host }: { spatialMs: number; host: RefObject<HTMLDivElement | null> }) {
+  const exploded = useScene((s) => s.exploded);
+  const invalidate = useThree((s) => s.invalidate);
+  const tween = useRef<{ from: number; to: number; t0: number; ms: number } | null>(null);
+
+  useEffect(() => {
+    const to = exploded ? 1 : 0;
+    if (spatialMs <= 0) {
+      tween.current = null;
+      anim.explode = to;
+      writeData(host, "explode", to.toFixed(3));
+    } else {
+      tween.current = { from: anim.explode, to, t0: performance.now(), ms: spatialMs };
+    }
+    invalidate();
+  }, [exploded, spatialMs, host, invalidate]);
+
+  useFrame(() => {
+    const tw = tween.current;
+    if (!tw) return;
+    const k = Math.min(1, (performance.now() - tw.t0) / tw.ms);
+    anim.explode = tw.from + (tw.to - tw.from) * (1 - Math.pow(1 - k, 3));
+    writeData(host, "explode", anim.explode.toFixed(3));
+    if (k < 1) invalidate();
+    else tween.current = null;
+  });
+  return null;
+}
+
+const start = { pos: new Vector3(), target: new Vector3() };
+const goal = { pos: new Vector3(), target: new Vector3() };
+const dir = new Vector3();
+
+/**
+ * Camera moves: "Reset view" returns to the default direction; exploding or assembling keeps the
+ * current direction but re-frames the model so nothing leaves the view. Tweens over the spatial
+ * duration, or cuts when it is 0 (reduced motion).
+ */
+function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTMLDivElement | null> }) {
   const resetToken = useScene((s) => s.resetToken);
+  const exploded = useScene((s) => s.exploded);
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const invalidate = useThree((s) => s.invalidate);
   const tween = useRef<{ t0: number; ms: number } | null>(null);
-  const first = useRef(true);
+  const seen = useRef({ resetToken, exploded });
 
   useEffect(() => writeCamera(host, camera), [camera, host]);
 
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    if (!controls) return;
+    const prev = seen.current;
+    seen.current = { resetToken, exploded };
+    if (!controls || (prev.resetToken === resetToken && prev.exploded === exploded)) return;
+    const reset = prev.resetToken !== resetToken;
+    const d = reset ? defaultDir : dir.copy(camera.position).sub(controls.target).normalize();
+    const g = fitGoal(d, exploded ? 1 : 0);
+    goal.pos.copy(g.position);
+    goal.target.copy(g.target);
     if (spatialMs <= 0) {
       camera.position.copy(goal.pos);
       controls.target.copy(goal.target);
@@ -266,7 +344,7 @@ function CameraReset({ spatialMs, host }: { spatialMs: number; host: RefObject<H
     start.target.copy(controls.target);
     tween.current = { t0: performance.now(), ms: spatialMs };
     invalidate();
-  }, [resetToken, spatialMs, camera, controls, host, invalidate]);
+  }, [resetToken, exploded, spatialMs, camera, controls, host, invalidate]);
 
   useFrame(() => {
     const tw = tween.current;

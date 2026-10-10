@@ -349,6 +349,92 @@
   color: var(--aili-text-muted);
 }
 
+/* Temporary inspector: inside the safe area, so it never covers the voice orb or captions. */
+.inspector {
+  position: absolute;
+  z-index: 3;
+  top: var(--aili-space-2);
+  right: var(--aili-space-2);
+  width: min(300px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: var(--aili-space-2) var(--aili-space-3) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  pointer-events: auto;
+}
+
+.inspectorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+}
+
+.inspectorTitle {
+  margin: 0;
+  font: 600 1rem var(--aili-font-ui);
+}
+
+.inspectorClose {
+  display: grid;
+  place-items: center;
+  width: var(--aili-touch-target);
+  height: var(--aili-touch-target);
+  margin-right: calc(-1 * var(--aili-space-2));
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--aili-text);
+  cursor: pointer;
+}
+
+.inspectorNote {
+  margin: 0 0 var(--aili-space-2);
+  color: var(--aili-text-muted);
+  font-size: 0.8rem;
+}
+
+.setting {
+  margin-top: var(--aili-space-2);
+}
+
+.settingTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.settingValue {
+  font-family: var(--aili-font-mono);
+}
+
+.slider {
+  width: 100%;
+  min-height: var(--aili-touch-target);
+  margin: 0;
+  accent-color: var(--aili-action-bg);
+}
+
+.settingBounds {
+  margin: 0;
+  color: var(--aili-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Phones: along the bottom of the safe area (the model is re-framed above it). */
+@media (max-width: 767px) {
+  .inspector {
+    top: auto;
+    bottom: var(--aili-space-2);
+    left: var(--aili-space-2);
+    width: auto;
+  }
+}
+
 .labelLayer {
   position: absolute;
   inset: 0;

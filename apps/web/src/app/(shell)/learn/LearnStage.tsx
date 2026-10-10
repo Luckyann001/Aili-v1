@@ -16,6 +16,7 @@ import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
 import { IconTool } from "./IconTool";
 import { PlaceholderBadge } from "./PlaceholderBadge";
+import { Inspector } from "./scene/Inspector";
 import { PartsMenu } from "./scene/PartsMenu";
 import { SceneFallback } from "./scene/SceneFallback";
 import { SceneLabels } from "./scene/SceneLabels";
@@ -43,6 +44,12 @@ export function LearnStage() {
   const labelsOn = useScene((s) => s.labelsOn);
   const toggleLabels = useScene((s) => s.toggleLabels);
   const resetView = useScene((s) => s.resetView);
+  const exploded = useScene((s) => s.exploded);
+  const toggleExploded = useScene((s) => s.toggleExploded);
+  const focusParts = useCallback(
+    () => document.querySelector<HTMLButtonElement>('section[aria-label="Stage"] button[aria-haspopup="listbox"]')?.focus(),
+    [],
+  );
   const safeArea = useRef<HTMLDivElement | null>(null);
   const labelEls = useRef(new Map<string, HTMLElement>());
 
@@ -83,6 +90,9 @@ export function LearnStage() {
         void voice.press();
       } else if (e.key === "Escape" && isBusy(useVoice.getState().status) && !t?.closest("aside")) {
         voice.interrupt();
+      } else if (e.key === "Escape" && useScene.getState().inspectorOpen && !t?.closest("aside")) {
+        // Escape closes the inspector (after interrupting Aili, which takes priority).
+        useScene.getState().closeInspector();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -106,6 +116,7 @@ export function LearnStage() {
             </div>
             <div className={styles.sceneTools} role="group" aria-label="View">
               <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />
+              <IconTool label="Exploded view" icon={<ExplodeIcon />} aria-pressed={exploded} onClick={toggleExploded} />
               <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />
               <IconTool
                 label="Explanation"
@@ -124,6 +135,7 @@ export function LearnStage() {
         <div ref={safeArea} className={styles.scene}>
           {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
           {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
+          <Inspector onClosed={focusParts} />
         </div>
 
         <div className={styles.overlay}>
@@ -253,6 +265,17 @@ function ResetIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 10a6 6 0 1 0 2-4.5M4 3.5v3h3" />
+    </svg>
+  );
+}
+
+function ExplodeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="6" y="2" width="8" height="3.5" rx="1" />
+      <rect x="6" y="8.25" width="8" height="3.5" rx="1" />
+      <rect x="6" y="14.5" width="8" height="3.5" rx="1" />
+      <path d="M3 6.5v7M17 6.5v7" />
     </svg>
   );
 }
