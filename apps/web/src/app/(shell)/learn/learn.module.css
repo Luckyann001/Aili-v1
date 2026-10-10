@@ -6,7 +6,9 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* The stage row is never shorter than its content, so on short or zoomed screens the page
+     scrolls instead of the stage spilling over the command bar. */
+  grid-template-rows: minmax(auto, 1fr) auto;
   gap: var(--aili-space-3);
   padding: var(--aili-space-3);
 }
@@ -86,6 +88,7 @@
 
 .sceneTools {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--aili-space-1);
 }
 
@@ -131,30 +134,29 @@
 .badgeButton {
   display: inline-flex;
   align-items: center;
-  gap: var(--aili-space-1);
   min-height: var(--aili-touch-target);
-  padding: 0 var(--aili-space-2);
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--aili-text);
   font: 500 0.8rem var(--aili-font-ui);
-  white-space: nowrap;
+  text-align: left;
   cursor: pointer;
 }
 
-.badgeButton > svg {
-  flex: none;
+/* The visible pill sits inside the 44 px target. */
+.badgePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  padding: 2px var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 14px;
+  background: var(--aili-surface);
 }
 
-/* The visible pill sits inside the 44 px target. */
-.badgeButton::before {
-  content: "";
-  position: absolute;
-  inset: 9px 0;
-  z-index: -1;
-  border: 1px solid var(--aili-border-strong);
-  border-radius: 999px;
-  background: var(--aili-surface);
+.badgePill > svg {
+  flex: none;
 }
 
 .badgeDetail {
@@ -187,20 +189,19 @@
   align-items: center;
   gap: var(--aili-space-1);
   min-height: var(--aili-touch-target);
-  max-width: 46vw;
+  max-width: 100%;
   padding: 0 var(--aili-space-3);
   border: 1px solid var(--aili-border-strong);
   border-radius: 999px;
   background: var(--aili-surface);
   color: var(--aili-text);
   font: 500 0.9rem var(--aili-font-ui);
-  white-space: nowrap;
+  text-align: left;
   cursor: pointer;
 }
 
 .partsCurrent {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .partsPopover {
@@ -298,7 +299,6 @@
   background: var(--aili-surface);
   color: var(--aili-text);
   font: 500 0.8rem var(--aili-font-ui);
-  white-space: nowrap;
 }
 
 /* Icon-only on phones (the name stays for screen readers); icon + word from 768 px. */
@@ -336,7 +336,8 @@
   position: relative;
   z-index: 1;
   flex: 1;
-  min-height: 140px;
+  /* Never squeezed to a sliver (zoom, large text): the page scrolls instead. */
+  min-height: 200px;
   overflow: hidden;
   pointer-events: none;
 }
@@ -603,6 +604,7 @@
 
 .caption {
   display: flex;
+  flex-wrap: wrap; /* on narrow screens or with large text the badge sits above the words */
   align-items: flex-start;
   gap: var(--aili-space-2);
   width: min(100%, 640px);
@@ -614,7 +616,7 @@
 }
 
 .caption p {
-  flex: 1;
+  flex: 1 1 12rem;
   margin: 0;
   font-size: 1rem;
   line-height: 1.4;
@@ -671,6 +673,7 @@
 .commandRow {
   min-width: 0;
   display: flex;
+  flex-wrap: wrap; /* with large text, Send moves below rather than squeezing the text box */
   align-items: center;
   gap: var(--aili-space-2);
 }
@@ -849,7 +852,7 @@
 }
 
 .input {
-  flex: 1;
+  flex: 1 1 10rem;
   min-width: 0;
   min-height: 48px;
   padding: 0 var(--aili-space-4);
@@ -1005,5 +1008,15 @@
   from {
     transform: translateY(24px);
     opacity: 0;
+  }
+}
+
+/* Very narrow screens (e.g. 200% zoom on a phone): the bottom row wraps instead of overflowing,
+   and the caption's Prepared badge sits above the text instead of squeezing it. */
+@media (max-width: 320px) {
+  .stageBottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
   }
 }

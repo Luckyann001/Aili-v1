@@ -222,6 +222,9 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
       const shiftY = el.offsetTop + freeH / 2 - size.height / 2;
       camera.setViewOffset(size.width, size.height, -shiftX, -shiftY, size.width, size.height);
       Object.assign(frame, { fov: camera.fov, canvasH: size.height, areaW: freeW, areaH: freeH });
+      // If the free area shrank (a caption appeared, the screen is zoomed) and the model no longer
+      // fits in it, refit from the current direction. A model that still fits is left alone.
+      if (placed.current && !modelFits(camera, size, { x: el.offsetLeft, y: el.offsetTop, w: freeW, h: freeH })) refitCamera.current?.();
       if (!placed.current) {
         placed.current = true;
         const g = fitGoal(defaultDir, anim.explode);
@@ -321,6 +324,18 @@ function LabelTracker({
     }
   });
   return null;
+}
+
+/** True when every framing corner of the model, on screen, lies inside the free area (canvas px). */
+function modelFits(camera: Camera, size: { width: number; height: number }, area: { x: number; y: number; w: number; h: number }) {
+  camera.updateMatrixWorld();
+  for (const c of framingCorners(anim.explode)) {
+    v.set(...c).project(camera);
+    const x = ((v.x + 1) / 2) * size.width;
+    const y = ((1 - v.y) / 2) * size.height;
+    if (x < area.x - 1 || x > area.x + area.w + 1 || y < area.y - 1 || y > area.y + area.h + 1) return false;
+  }
+  return true;
 }
 
 /** On-screen box (canvas pixels) around every part's corners: "x0,y0,x1,y1". For tests. */

@@ -33,6 +33,11 @@ export const ALLOWED_PAIRS: Pair[] = [
   ...on("--aili-focus-ring", "non-text"),
   ...on("--aili-border-strong", "non-text"),
   ...on("--aili-safety-border", "non-text", ["--aili-safety-bg", ...BACKGROUNDS]),
+  // Added in M1 slice 5 for controls built since: tooltips use reversed colours; slider fills and
+  // the voice orb's error/fail borders sit on panels.
+  { fg: "--aili-bg", bg: "--aili-text", req: "text" },
+  ...on("--aili-action-bg", "non-text", ["--aili-surface", "--aili-bg"]),
+  ...on("--aili-status-fail-border", "non-text", ["--aili-surface", "--aili-bg-recessed"]),
 ];
 
 function channel(v: number): number {

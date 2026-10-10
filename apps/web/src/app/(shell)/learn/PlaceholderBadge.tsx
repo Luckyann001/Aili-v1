@@ -35,11 +35,14 @@ export function PlaceholderBadge() {
           }
         }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-          <rect x="2" y="2" width="10" height="10" rx="1.5" />
-          <path d="M4.5 5.5h5M4.5 8.5h3.5" />
-        </svg>
-        Prepared · {status}
+        {/* The visible outline hugs the text, so it grows with large text; the button stays 44 px. */}
+        <span className={styles.badgePill}>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <rect x="2" y="2" width="10" height="10" rx="1.5" />
+            <path d="M4.5 5.5h5M4.5 8.5h3.5" />
+          </svg>
+          Prepared · {status}
+        </span>
       </button>
       <span id={id} role="note" className={styles.badgeDetail} hidden={!open}>
         {full}

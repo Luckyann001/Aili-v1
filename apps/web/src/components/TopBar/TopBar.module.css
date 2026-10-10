@@ -116,3 +116,21 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Very narrow screens (e.g. 200% zoom on a phone): smaller logo, icon-only Menu button.
+   The word "Menu" stays in the accessibility tree (visually hidden, not display:none). */
+@media (max-width: 320px) {
+  .logo img {
+    width: 100px;
+    height: auto;
+  }
+
+  .menuRoot > button > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
