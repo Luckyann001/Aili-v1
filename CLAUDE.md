@@ -33,7 +33,9 @@ If docs conflict, follow the lower number and tell me.
 - `npm install` · `npm run dev` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build` (all from the repo root).
 - `npm run test:e2e`: Playwright with the installed Google Chrome against a production build on port 3200 (desktop and phone viewports, axe accessibility scans).
 - `npm run dev:lan`: dev server reachable from a phone on the same Wi-Fi at `http://<laptop IP>:3000` (`hostname -I`, first address). The laptop firewall (ufw) must allow it, for the home network only: `sudo ufw allow from 192.168.100.0/24 to any port 3000 proto tcp` (remove with `sudo ufw delete allow from 192.168.100.0/24 to any port 3000 proto tcp`).
-- `/preview` is the design check page (tokens, type, logos, 3D renderer).
+- `npm run test:e2e:nodrafts`: a real production build **without** the drafts flag (its own folder `.next-nodrafts`, port 3300, flag pinned to 0). Checks draft scenes stay hidden, the lesson says it isn't available yet, and `/preview` is not in production.
+- `AILI_PERF=1 npm run test:e2e -- perf`: emulated performance run (6× CPU slowdown, Slow 4G, phone viewport) and JS size per route. An emulation on the laptop, not a real phone.
+- `/preview` is the design check page (tokens, type, logos, 3D renderer). Development only: production builds return "not found" unless `AILI_ENABLE_PREVIEW=1` is set at build time (the main e2e build sets it).
 - Next 16 allows only **one dev server per project** at a time.
 - Next 16 differs from older versions: read `node_modules/next/dist/docs/` before writing Next.js code (see `apps/web/AGENTS.md`).
 
