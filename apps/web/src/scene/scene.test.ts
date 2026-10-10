@@ -57,6 +57,26 @@ describe("scene selection state", () => {
     expect(store.getState()).toMatchObject({ labelsOn: true, resetToken: 2 });
   });
 
+  it("selecting opens the inspector; closing it keeps the selection; clearing closes it", () => {
+    store.getState().select("arm");
+    expect(store.getState()).toMatchObject({ selectedId: "arm", inspectorOpen: true });
+    store.getState().closeInspector();
+    expect(store.getState()).toMatchObject({ selectedId: "arm", inspectorOpen: false });
+    store.getState().select("arm");
+    expect(store.getState().inspectorOpen).toBe(true);
+    store.getState().select(null);
+    expect(store.getState().inspectorOpen).toBe(false);
+  });
+
+  it("settings stay inside their bounds; explode toggles", () => {
+    store.getState().setParam("arm_length_m", 9);
+    expect(store.getState().params.arm_length_m).toBe(0.3);
+    store.getState().setParam("arm_length_m", 0.2);
+    expect(store.getState().params.arm_length_m).toBe(0.2);
+    store.getState().toggleExploded();
+    expect(store.getState().exploded).toBe(true);
+  });
+
   it("arrow-key stepping wraps at both ends", () => {
     expect(stepPart(PART_IDS, null, 1)).toBe("base");
     expect(stepPart(PART_IDS, null, -1)).toBe("end-weight");
