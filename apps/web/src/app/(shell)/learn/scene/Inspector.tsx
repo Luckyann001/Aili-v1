@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { paramsFor, type ParamDef } from "@/scene/layout";
-import { partName } from "@/scene/placeholderModel";
+import { partNameIn } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import styles from "../learn.module.css";
 
@@ -17,6 +17,7 @@ const fmt = (d: ParamDef, v: number) => v.toFixed(decimals(d));
  */
 export function Inspector({ onClosed }: { onClosed: () => void }) {
   const selectedId = useScene((s) => s.selectedId);
+  const activeScene = useScene((s) => s.activeScene);
   const open = useScene((s) => s.inspectorOpen);
   const params = useScene((s) => s.params);
   const setParam = useScene((s) => s.setParam);
@@ -28,11 +29,12 @@ export function Inspector({ onClosed }: { onClosed: () => void }) {
     closeInspector();
     onClosed();
   };
-  const defs = paramsFor(selectedId);
+  // Settings belong to the arm scene for now; the lever's weight is moved by the lesson.
+  const defs = activeScene === "base-joint-arm" ? paramsFor(selectedId) : [];
 
   return (
     <section
-      data-inspector=""
+      data-reserve="auto"
       className={styles.inspector}
       aria-labelledby={titleId}
       onKeyDown={(e) => {
@@ -44,7 +46,7 @@ export function Inspector({ onClosed }: { onClosed: () => void }) {
     >
       <div className={styles.inspectorHeader}>
         <h2 id={titleId} className={styles.inspectorTitle}>
-          Inspector: {partName(selectedId)}
+          Inspector: {partNameIn(activeScene, selectedId)}
         </h2>
         <button type="button" className={styles.inspectorClose} aria-label="Close inspector" onClick={close}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

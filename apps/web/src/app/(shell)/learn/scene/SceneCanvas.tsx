@@ -7,8 +7,10 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { BackSide, PerspectiveCamera, Vector3, type Camera, type Mesh } from "three";
-import { layoutParts, modelBounds, modelCorners } from "@/scene/layout";
-import { DEFAULT_VIEW, PLACEHOLDER_MODEL, type FillRole } from "@/scene/placeholderModel";
+import { cornersOf, type PartLayout } from "@/scene/layout";
+import { MODELS } from "@/scene/models";
+import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
+import { useLesson } from "@/lesson/store";
 import { useScene } from "@/scene/sceneStore";
 import type { SceneColors } from "./useSceneTheme";
 
@@ -30,7 +32,14 @@ interface ControlsLike {
   update: () => void;
 }
 
+/** Every corner the camera must keep in view for the active scene (read outside React renders). */
+function framingCorners(explode: number) {
+  const s = useScene.getState();
+  return MODELS[s.activeScene].framing(s, explode).flatMap((l) => cornersOf(l));
+}
+
 export default function SceneCanvas(props: SceneCanvasProps) {
+  const activeScene = useScene((s) => s.activeScene);
   return (
     <Canvas
       frameloop="demand"
@@ -55,8 +64,8 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       <ambientLight intensity={0.7} />
       <directionalLight position={[0.6, 1, 0.8]} intensity={1.5} />
       <directionalLight position={[-0.6, 0.4, -0.5]} intensity={0.4} />
-      {PLACEHOLDER_MODEL.parts.map((p) => (
-        <PartMesh key={p.id} id={p.id} fill={p.fill} colors={props.colors} />
+      {MODELS[activeScene].parts.map((p) => (
+        <PartMesh key={`${activeScene}:${p.id}`} id={p.id} fill={p.fill} colors={props.colors} />
       ))}
       <OrbitControls
         makeDefault
@@ -86,16 +95,19 @@ const anim = { explode: 0 };
 function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: SceneColors }) {
   const selected = useScene((s) => s.selectedId === id);
   const select = useScene((s) => s.select);
+  const activeScene = useScene((s) => s.activeScene);
   const params = useScene((s) => s.params);
+  const leverDistance_m = useScene((s) => s.leverDistance_m);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
 
-  useEffect(() => invalidate(), [selected, colors, params, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, invalidate]);
 
-  // Size depends on the inspector settings; position also on the explode amount (set per frame).
-  const { kind, size } = layoutParts(params)[id]!;
+  // Size depends on the scene settings; position also on the explode amount (set per frame).
+  const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m }, k)[id]!;
+  const { kind, size } = layoutAt(0);
   useFrame(() => {
-    ref.current?.position.set(...layoutParts(params, anim.explode)[id]!.position);
+    ref.current?.position.set(...layoutAt(anim.explode).position);
   });
 
   const geometry = (inflate: number) =>
@@ -107,7 +119,7 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   return (
     <mesh
       ref={ref}
-      position={layoutParts(params, anim.explode)[id]!.position}
+      position={layoutAt(anim.explode).position}
       name={id}
       onClick={(e) => {
         e.stopPropagation();
@@ -154,15 +166,17 @@ const offset = new Vector3();
  * area (exact for a pinhole camera aimed at the model's centre), plus a small margin.
  */
 function fitGoal(dir: Vector3, explode: number) {
-  const params = useScene.getState().params;
-  const target = new Vector3(...modelBounds(params, explode).center);
+  const corners = framingCorners(explode);
+  const lo = [0, 1, 2].map((i) => Math.min(...corners.map((c) => c[i]!)));
+  const hi = [0, 1, 2].map((i) => Math.max(...corners.map((c) => c[i]!)));
+  const target = new Vector3((lo[0]! + hi[0]!) / 2, (lo[1]! + hi[1]!) / 2, (lo[2]! + hi[2]!) / 2);
   const tanHalf = Math.tan((frame.fov * Math.PI) / 360);
   const tanV = tanHalf * (frame.areaH / frame.canvasH);
   const tanH = tanHalf * (frame.areaW / frame.canvasH);
   right.crossVectors(worldUp, dir).normalize(); // camera's right, seen from `dir`
   up.crossVectors(dir, right).normalize();
   let distance = 0;
-  for (const c of modelCorners(params, explode)) {
+  for (const c of corners) {
     offset.set(...c).sub(target);
     const towardCamera = offset.dot(dir);
     distance = Math.max(distance, towardCamera + Math.abs(offset.dot(right)) / tanH, towardCamera + Math.abs(offset.dot(up)) / tanV);
@@ -181,18 +195,25 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const invalidate = useThree((s) => s.invalidate);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const inspectorShown = useScene((s) => s.inspectorOpen && s.selectedId !== null);
+  const gaugeShown = useLesson((s) => s.gauge);
+  const reserveKey = `${inspectorShown}|${gaugeShown}`;
   const placed = useRef(false);
-  const lastInspector = useRef(inspectorShown);
+  const lastReserve = useRef(reserveKey);
 
   useLayoutEffect(() => {
     const el = safeArea.current;
     if (!el || !(camera instanceof PerspectiveCamera)) return;
-    const inspector = () => el.querySelector<HTMLElement>("[data-inspector]");
+    // Panels inside the safe area that the model must stay clear of: the inspector (right from
+    // 900 px, bottom below; data-reserve="auto") and the effort gauge (bottom; data-reserve="bottom").
+    const reserved = () => Array.from(el.querySelectorAll<HTMLElement>("[data-reserve]"));
     const apply = () => {
-      const insp = inspector();
       const side = window.matchMedia("(min-width: 900px)").matches; // matches learn.module.css
-      const takeW = insp && side ? insp.offsetWidth + 16 : 0;
-      const takeH = insp && !side ? insp.offsetHeight + 16 : 0;
+      let takeW = 0;
+      let takeH = 0;
+      for (const r of reserved()) {
+        if (r.dataset.reserve === "auto" && side) takeW = Math.max(takeW, r.offsetWidth + 16);
+        else takeH = Math.max(takeH, r.offsetHeight + 16);
+      }
       const freeW = el.clientWidth - takeW;
       const freeH = el.clientHeight - takeH;
       const shiftX = el.offsetLeft + freeW / 2 - size.width / 2;
@@ -214,19 +235,18 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
     ro.observe(el);
     // The inspector is rendered by the page, outside this 3D tree: re-measure on the next frame.
     const raf = requestAnimationFrame(() => {
-      const insp = inspector();
-      if (insp) ro.observe(insp);
+      for (const r of reserved()) ro.observe(r);
       apply();
       // The free area changed size: refit the camera to it, keeping the viewing direction.
-      if (placed.current && lastInspector.current !== inspectorShown) refitCamera.current?.();
-      lastInspector.current = inspectorShown;
+      if (placed.current && lastReserve.current !== reserveKey) refitCamera.current?.();
+      lastReserve.current = reserveKey;
     });
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
       camera.clearViewOffset();
     };
-  }, [camera, size, safeArea, invalidate, controls, inspectorShown]);
+  }, [camera, size, safeArea, invalidate, controls, reserveKey]);
   return null;
 }
 
@@ -251,19 +271,21 @@ function LabelTracker({
   const invalidate = useThree((s) => s.invalidate);
   const labelsOn = useScene((s) => s.labelsOn);
   const selectedId = useScene((s) => s.selectedId);
+  const activeScene = useScene((s) => s.activeScene);
   const params = useScene((s) => s.params);
+  const leverDistance_m = useScene((s) => s.leverDistance_m);
 
   // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, invalidate]);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, activeScene, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
     if (!area) return;
     const w = area.clientWidth;
     const h = area.clientHeight;
-    const layout = layoutParts(params, anim.explode);
+    const layout = MODELS[activeScene].layout({ params, leverDistance_m }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
-    for (const part of PLACEHOLDER_MODEL.parts) {
+    for (const part of MODELS[activeScene].parts) {
       const el = labels.current.get(part.id);
       if (!el) continue;
       v.set(...layout[part.id]!.labelAnchor).project(camera);
@@ -288,7 +310,7 @@ function LabelTracker({
 }
 
 /** On-screen box (canvas pixels) around every part's corners: "x0,y0,x1,y1". For tests. */
-function projectedBox(layout: ReturnType<typeof layoutParts>, camera: Camera, size: { width: number; height: number }) {
+function projectedBox(layout: Record<string, PartLayout>, camera: Camera, size: { width: number; height: number }) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const p of Object.values(layout)) {
     const h = p.kind === "cylinder" ? [p.size[0], p.size[1] / 2, p.size[0]] : p.size.map((d) => d / 2);
@@ -355,11 +377,12 @@ const refitCamera: { current: (() => void) | null } = { current: null };
 function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTMLDivElement | null> }) {
   const resetToken = useScene((s) => s.resetToken);
   const exploded = useScene((s) => s.exploded);
+  const activeScene = useScene((s) => s.activeScene);
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const invalidate = useThree((s) => s.invalidate);
   const tween = useRef<{ t0: number; ms: number } | null>(null);
-  const seen = useRef({ resetToken, exploded });
+  const seen = useRef({ resetToken, exploded, activeScene });
 
   useEffect(() => writeCamera(host, camera), [camera, host]);
 
@@ -386,12 +409,14 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
     refitCamera.current = () => moveTo(false);
 
     const prev = seen.current;
-    seen.current = { resetToken, exploded };
-    if (prev.resetToken !== resetToken || prev.exploded !== exploded) moveTo(prev.resetToken !== resetToken);
+    seen.current = { resetToken, exploded, activeScene };
+    // Reset or a new scene: frame from the default direction. Explode: keep the current direction.
+    const fromDefault = prev.resetToken !== resetToken || prev.activeScene !== activeScene;
+    if (fromDefault || prev.exploded !== exploded) moveTo(fromDefault);
     return () => {
       refitCamera.current = null;
     };
-  }, [resetToken, exploded, spatialMs, camera, controls, host, invalidate]);
+  }, [resetToken, exploded, activeScene, spatialMs, camera, controls, host, invalidate]);
 
   useFrame(() => {
     const tw = tween.current;

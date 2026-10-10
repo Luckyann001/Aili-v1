@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { PLACEHOLDER_MODEL } from "@/scene/placeholderModel";
+import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { CheckIcon } from "./PartsList";
 import styles from "../learn.module.css";
@@ -13,9 +13,13 @@ import styles from "../learn.module.css";
 export function SceneLabels({ labels }: { labels: RefObject<Map<string, HTMLElement>> }) {
   const selectedId = useScene((s) => s.selectedId);
   const labelsOn = useScene((s) => s.labelsOn);
+  const activeScene = useScene((s) => s.activeScene);
+  const parts = MODELS[activeScene].parts;
+  // The lever's hand end is always labelled (it anchors the analogy).
+  const always = activeScene === "lever-analogy" ? ["hand"] : [];
   return (
     <div className={styles.labelLayer} aria-hidden="true">
-      {PLACEHOLDER_MODEL.parts.map((p) => {
+      {parts.map((p) => {
         const selected = selectedId === p.id;
         return (
           <span
@@ -26,7 +30,7 @@ export function SceneLabels({ labels }: { labels: RefObject<Map<string, HTMLElem
             }}
             className={selected ? styles.partLabelSelected : styles.partLabel}
             data-part-id={p.id}
-            hidden={!labelsOn && !selected}
+            hidden={!labelsOn && !selected && !always.includes(p.id)}
             style={{ visibility: "hidden" }}
           >
             {selected && <CheckIcon />}

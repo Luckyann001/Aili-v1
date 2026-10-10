@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { partName } from "@/scene/placeholderModel";
+import { partNameIn } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { PartsList } from "./PartsList";
 import styles from "../learn.module.css";
@@ -13,6 +13,8 @@ import styles from "../learn.module.css";
 export function PartsMenu() {
   const [open, setOpen] = useState(false);
   const selectedId = useScene((s) => s.selectedId);
+  const activeScene = useScene((s) => s.activeScene);
+  const partName = (id: string) => partNameIn(activeScene, id);
   const select = useScene((s) => s.select);
   const button = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLDivElement>(null);

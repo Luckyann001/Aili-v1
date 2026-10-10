@@ -4,6 +4,8 @@ import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
 import { Button } from "@/components/Button";
 import { ContentBadge } from "@/components/ContentBadge";
 import { useLearnUi, type SideView } from "@/state/learnUi";
+import { explanationAt } from "@/lesson/runner";
+import { useLesson } from "@/lesson/store";
 import { SAMPLE_EXPLANATION, SAMPLE_READINGS } from "./sampleContent";
 import styles from "./learn.module.css";
 
@@ -88,13 +90,29 @@ export function SidePanel({ view, returnFocusTo }: { view: SideView; returnFocus
 }
 
 function ExplanationView() {
-  const e = SAMPLE_EXPLANATION;
+  const beats = useLesson((s) => s.beats);
+  const status = useLesson((s) => s.status);
+  const beatIndex = useLesson((s) => s.beatIndex);
+  const lesson = beats && status !== "idle" ? explanationAt(beats, beatIndex) : null;
+  if (beats && status !== "idle" && !lesson) {
+    return (
+      <>
+        <p>
+          <ContentBadge kind="prepared" />
+        </p>
+        <p className={styles.sampleNote}>Aili explains after you answer the question on the stage.</p>
+      </>
+    );
+  }
+  const e = lesson ?? SAMPLE_EXPLANATION;
   return (
     <>
       <p>
         <ContentBadge kind="prepared" />
       </p>
-      <p className={styles.sampleNote}>Sample text for the layout. Not reviewed teaching content.</p>
+      <p className={styles.sampleNote}>
+        {lesson ? "Prepared lesson text. Draft (not expert-reviewed)." : "Sample text for the layout. Not reviewed teaching content."}
+      </p>
       <h3 className={styles.stepTitle}>{e.title}</h3>
       <p>{e.body}</p>
       <h4 className={styles.listTitle}>Assumptions</h4>

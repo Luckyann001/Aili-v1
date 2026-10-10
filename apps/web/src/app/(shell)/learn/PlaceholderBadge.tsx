@@ -1,15 +1,21 @@
 "use client";
 
 import { useId, useState } from "react";
-import { PLACEHOLDER_MODEL } from "@/scene/placeholderModel";
+import { isDraft, reviewLabelOf } from "@/scene/manifests";
+import { MODELS } from "@/scene/models";
+import { useScene } from "@/scene/sceneStore";
 import styles from "./learn.module.css";
 
-const FULL = `Prepared content, written in advance. Not a live AI response. ${PLACEHOLDER_MODEL.note}`;
-
-/** "Prepared · placeholder" badge. Tap to show the full wording; keyboard focus shows it too. */
+/**
+ * "Prepared · …" badge for the scene on the stage. A draft scene always says
+ * "Draft (not expert-reviewed)". Tap for the full wording; keyboard focus shows it too.
+ */
 export function PlaceholderBadge() {
   const [open, setOpen] = useState(false);
   const id = useId();
+  const activeScene = useScene((s) => s.activeScene);
+  const status = isDraft(activeScene) ? reviewLabelOf(activeScene) : "placeholder";
+  const full = `Prepared content, written in advance. Not a live AI response. ${isDraft(activeScene) ? `${reviewLabelOf(activeScene)}. ` : ""}${MODELS[activeScene].note}`;
   return (
     <span className={styles.badgeWrap}>
       <button
@@ -33,10 +39,10 @@ export function PlaceholderBadge() {
           <rect x="2" y="2" width="10" height="10" rx="1.5" />
           <path d="M4.5 5.5h5M4.5 8.5h3.5" />
         </svg>
-        Prepared · placeholder
+        Prepared · {status}
       </button>
       <span id={id} role="note" className={styles.badgeDetail} hidden={!open}>
-        {FULL}
+        {full}
       </span>
     </span>
   );

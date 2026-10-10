@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import { PART_IDS, PLACEHOLDER_MODEL } from "@/scene/placeholderModel";
+import { MODELS } from "@/scene/models";
 import { stepPart, useScene } from "@/scene/sceneStore";
 import styles from "../learn.module.css";
 
@@ -13,6 +13,8 @@ import styles from "../learn.module.css";
 export function PartsList({ autoFocus, onPick, onEscape }: { autoFocus?: boolean; onPick?: () => void; onEscape?: () => void }) {
   const selectedId = useScene((s) => s.selectedId);
   const select = useScene((s) => s.select);
+  const parts = MODELS[useScene((s) => s.activeScene)].parts;
+  const PART_IDS = parts.map((p) => p.id);
   const options = useRef(new Map<string, HTMLDivElement>());
   const tabbable = selectedId ?? PART_IDS[0];
 
@@ -64,7 +66,7 @@ export function PartsList({ autoFocus, onPick, onEscape }: { autoFocus?: boolean
 
   return (
     <div role="listbox" aria-label="Parts" aria-orientation="vertical" className={styles.parts} onKeyDown={onKeyDown}>
-        {PLACEHOLDER_MODEL.parts.map((p) => (
+        {parts.map((p) => (
           <div
             key={p.id}
             ref={(el) => {

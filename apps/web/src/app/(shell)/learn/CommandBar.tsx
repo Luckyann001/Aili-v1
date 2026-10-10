@@ -6,30 +6,45 @@ import { useVoice } from "@/voice/store";
 import { VoiceButton } from "./VoiceButton";
 import styles from "./learn.module.css";
 
-/** Bottom command area: quick replies (only after Aili asks a question), text box, and the voice button on phones. */
+export interface ChipOffer {
+  /** Accessible name of the chip group. */
+  group: string;
+  items: Array<{ id: string; label: string }>;
+  onPick: (id: string) => void;
+}
+
+/**
+ * Bottom command area: chips, text box, and the voice button on phones. Chips are either an
+ * `offer` from the page (a lesson's choices, or starting a lesson) or the quick replies Aili
+ * offers after asking a question (they fill the text box).
+ */
 export function CommandBar({
   text,
   onText,
   onSubmit,
   onVoice,
   inputRef,
+  offer,
 }: {
   text: string;
   onText: (text: string) => void;
   onSubmit: (text: string) => void;
   onVoice: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
+  offer?: ChipOffer | null;
 }) {
   const inputId = useId();
-  const chips = useVoice((s) => s.prompt?.chips ?? null);
+  const replies = useVoice((s) => s.prompt?.chips ?? null);
+  const chips: ChipOffer | null =
+    offer ?? (replies ? { group: "Suggested replies", items: replies.map((r) => ({ id: r, label: r })), onPick: (id) => onText(id) } : null);
 
   return (
     <div className={styles.command}>
       {chips && (
-        <div className={styles.chips} role="group" aria-label="Suggested replies">
-          {chips.map((c) => (
-            <button key={c} type="button" className={styles.chip} onClick={() => onText(c)}>
-              {c}
+        <div className={styles.chips} role="group" aria-label={chips.group}>
+          {chips.items.map((c) => (
+            <button key={c.id} type="button" className={styles.chip} onClick={() => chips.onPick(c.id)}>
+              {c.label}
             </button>
           ))}
         </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContentBadge } from "@/components/ContentBadge";
 import { Button } from "@/components/Button";
+import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { useLearnUi, type SideView } from "@/state/learnUi";
 import { saveConsent, setMuted, useMuted } from "@/voice/consent";
@@ -11,7 +12,10 @@ import type { RecognitionMode } from "@/voice/recognition";
 import { cancelSpeech, isSpeechOutputSupported } from "@/voice/speech";
 import { useVoice } from "@/voice/store";
 import { useVoiceController } from "@/voice/useVoiceController";
-import { CommandBar } from "./CommandBar";
+import { useLesson } from "@/lesson/store";
+import { useLessonPlayer } from "@/lesson/useLessonPlayer";
+import { CommandBar, type ChipOffer } from "./CommandBar";
+import { EffortGauge } from "./scene/EffortGauge";
 import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
 import { IconTool } from "./IconTool";
@@ -45,6 +49,7 @@ export function LearnStage() {
   const toggleLabels = useScene((s) => s.toggleLabels);
   const resetView = useScene((s) => s.resetView);
   const exploded = useScene((s) => s.exploded);
+  const activeScene = useScene((s) => s.activeScene);
   const toggleExploded = useScene((s) => s.toggleExploded);
   const focusParts = useCallback(
     () => document.querySelector<HTMLButtonElement>('section[aria-label="Stage"] button[aria-haspopup="listbox"]')?.focus(),
@@ -73,6 +78,43 @@ export function LearnStage() {
     setConsentMode(mode);
   }, []);
   const voice = useVoiceController({ onTranscript, onUnsupported: focusInput, askConsent });
+  useLessonPlayer(voice);
+  const lessonStatus = useLesson((s) => s.status);
+  const lessonChoices = useLesson((s) => s.choices);
+  const lessonRev = useLesson((s) => s.rev);
+  const voicePrompt = useVoice((s) => s.prompt);
+  const busy = isBusy(useVoice((s) => s.status));
+
+  // Loads (and validates) the lesson on first use, then starts or continues it.
+  const runLesson = useCallback(async (how: "start" | "resume") => {
+    const l = useLesson.getState();
+    if (!l.beats) {
+      const { loadBeginnerLever } = await import("@/lesson/loadLesson");
+      const loaded = loadBeginnerLever();
+      if ("errors" in loaded) {
+        const drafts = process.env.NEXT_PUBLIC_AILI_INCLUDE_DRAFTS !== "1";
+        const text = drafts
+          ? "This lesson isn't available yet: its scenes are drafts that haven't been expert-reviewed."
+          : "This lesson couldn't load because its content didn't pass the checks.";
+        useLesson.getState().setUnavailable(text);
+        useVoice.getState().setHint({ text, kind: "info" });
+        return;
+      }
+      useLesson.getState().setScript(loaded.beats, loaded.title);
+    }
+    useLesson.getState().dispatch({ type: how });
+  }, []);
+
+  // One open question at a time: the lesson's choices while it waits; otherwise Aili's quick
+  // replies; otherwise an offer to start or continue the lesson.
+  const offer: ChipOffer | null =
+    lessonStatus === "awaiting" && lessonChoices
+      ? { group: "Suggested replies", items: lessonChoices, onPick: (id) => useLesson.getState().dispatch({ type: "choose", rev: lessonRev, choice: id }) }
+      : voicePrompt || busy || lessonStatus === "playing"
+        ? null
+        : lessonStatus === "stopped"
+          ? { group: "Lesson", items: [{ id: "resume", label: "Continue the lesson" }], onPick: () => void runLesson("resume") }
+          : { group: "Lesson", items: [{ id: "start", label: lessonStatus === "done" ? "Start the lesson again" : "Start: why reach makes holding harder" }], onPick: () => void runLesson("start") };
 
   const open = (view: SideView, el: HTMLButtonElement) => {
     lastTrigger.current = el;
@@ -116,7 +158,9 @@ export function LearnStage() {
             </div>
             <div className={styles.sceneTools} role="group" aria-label="View">
               <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />
-              <IconTool label="Exploded view" icon={<ExplodeIcon />} aria-pressed={exploded} onClick={toggleExploded} />
+              {MODELS[activeScene].explodable && (
+                <IconTool label="Exploded view" icon={<ExplodeIcon />} aria-pressed={exploded} onClick={toggleExploded} />
+              )}
               <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />
               <IconTool
                 label="Explanation"
@@ -136,6 +180,7 @@ export function LearnStage() {
           {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
           {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
           <Inspector onClosed={focusParts} />
+          <EffortGauge />
         </div>
 
         <div className={styles.overlay}>
@@ -192,6 +237,7 @@ export function LearnStage() {
         onSubmit={voice.submit}
         onVoice={() => void voice.press()}
         inputRef={inputRef}
+        offer={offer}
       />
 
       {side && <SidePanel view={side} returnFocusTo={lastTrigger} />}

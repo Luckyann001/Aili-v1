@@ -78,6 +78,7 @@
 
 .topLeft {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--aili-space-2);
   min-width: 0;
@@ -434,6 +435,66 @@
     left: var(--aili-space-2);
     width: auto;
   }
+}
+
+/* Effort gauge (lever lesson): bottom of the safe area; the model is framed above it. */
+.gauge {
+  position: absolute;
+  z-index: 3;
+  left: var(--aili-space-2);
+  bottom: var(--aili-space-2);
+  width: min(320px, calc(100% - 16px));
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  pointer-events: auto;
+}
+
+.gaugeHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 600 0.85rem var(--aili-font-ui);
+}
+
+.gaugeTag {
+  padding: 0 var(--aili-space-2);
+  border: 1px dashed var(--aili-border-strong);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.gaugeTrack {
+  height: 14px;
+  margin: var(--aili-space-2) 0;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-bg);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  height: 100%;
+  background: var(--aili-accent);
+}
+
+.gaugeWord {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin: 0;
+  font: 700 1rem var(--aili-font-ui);
+}
+
+.gaugeLine {
+  margin: var(--aili-space-1) 0 0;
+  font-size: 0.85rem;
+}
+
+.gaugeLine:empty {
+  display: none;
 }
 
 .labelLayer {
