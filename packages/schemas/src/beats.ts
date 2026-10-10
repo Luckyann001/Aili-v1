@@ -22,9 +22,21 @@ export type Action = z.infer<typeof Action>;
 
 export const Narration = z.object({ id: KebabId, text: z.string().min(1) }).strict();
 
-/** Plain-words comparison of the learner's answer with the result (behavior spec A4: explain why). */
+/** Every choice list offers this, so nobody has to guess. */
+export const NOT_SURE = "not-sure";
+
+/**
+ * Plain-words comparison of the learner's answer with the result (behavior spec A4: explain why).
+ * Never flattery, never "failure": `incorrect` explains the mechanism; `unsure` is for "Not sure".
+ */
 export const Feedback = z
-  .object({ about: KebabId, correct_choice: ChoiceId, correct: z.string().min(1), incorrect: z.string().min(1) })
+  .object({
+    about: KebabId,
+    correct_choice: ChoiceId,
+    correct: z.string().min(1),
+    incorrect: z.string().min(1),
+    unsure: z.string().min(1).optional(),
+  })
   .strict();
 
 /** Text-panel content kept in step with the captions. */
@@ -32,12 +44,26 @@ export const Explanation = z
   .object({ title: z.string().min(1), body: z.string().min(1), assumptions: z.array(z.string().min(1)).default([]), limits: z.array(z.string().min(1)).default([]) })
   .strict();
 
-export const BeatKind = z.enum(["probe", "commit", "reveal", "link", "check"]);
+export const BeatKind = z.enum(["framing", "probe", "commit", "reveal", "link", "check"]);
+
+/** The behavior spec's move names (A3). Each beat says which move it is. */
+export const Move = z.enum(["probe", "explain", "challenge", "demand_evidence", "debate", "assign", "teach_back", "review", "answer", "hold"]);
+
+/** Which moves each beat kind may be. Framing explains the setup, not the concept. */
+export const MOVES_FOR_KIND: Record<z.infer<typeof BeatKind>, Array<z.infer<typeof Move>>> = {
+  framing: ["explain"],
+  probe: ["probe"],
+  commit: ["probe"], // the learner's half of the probe exchange
+  reveal: ["explain"],
+  link: ["explain"],
+  check: ["probe", "teach_back", "challenge"],
+};
 
 export const Beat = z
   .object({
     id: KebabId,
     kind: BeatKind,
+    move: Move,
     narration: z.array(Narration).min(1),
     actions: z.array(Action).default([]),
     feedback: Feedback.optional(),
