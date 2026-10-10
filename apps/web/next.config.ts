@@ -5,6 +5,8 @@ import type { NextConfig } from "next";
 const lanHost = process.env.AILI_LAN_HOST?.trim();
 
 const nextConfig: NextConfig = {
+  // A separate output folder lets the no-drafts production test build alongside the main one.
+  distDir: process.env.AILI_DIST_DIR || ".next",
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,

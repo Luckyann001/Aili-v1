@@ -9,6 +9,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-nodrafts/**", // the no-drafts production test's build output
     "out/**",
     "build/**",
     "next-env.d.ts",

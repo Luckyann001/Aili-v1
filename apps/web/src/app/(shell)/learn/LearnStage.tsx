@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ContentBadge } from "@/components/ContentBadge";
 import { Button } from "@/components/Button";
 import { MODELS } from "@/scene/models";
+import { INCLUDE_DRAFTS, sceneShown } from "@/scene/visibility";
 import { useScene } from "@/scene/sceneStore";
 import { useLearnUi, type SideView } from "@/state/learnUi";
 import { saveConsent, setMuted, useMuted } from "@/voice/consent";
@@ -50,6 +51,7 @@ export function LearnStage() {
   const resetView = useScene((s) => s.resetView);
   const exploded = useScene((s) => s.exploded);
   const activeScene = useScene((s) => s.activeScene);
+  const shown = sceneShown(activeScene);
   const toggleExploded = useScene((s) => s.toggleExploded);
   const focusParts = useCallback(
     () => document.querySelector<HTMLButtonElement>('section[aria-label="Stage"] button[aria-haspopup="listbox"]')?.focus(),
@@ -92,7 +94,7 @@ export function LearnStage() {
       const { loadBeginnerLever } = await import("@/lesson/loadLesson");
       const loaded = loadBeginnerLever();
       if ("errors" in loaded) {
-        const drafts = process.env.NEXT_PUBLIC_AILI_INCLUDE_DRAFTS !== "1";
+        const drafts = !INCLUDE_DRAFTS;
         const text = drafts
           ? "This lesson isn't available yet: its scenes are drafts that haven't been expert-reviewed."
           : "This lesson couldn't load because its content didn't pass the checks.";
@@ -148,20 +150,20 @@ export function LearnStage() {
     <div className={styles.learn} data-side={side ?? "closed"}>
       <h1 className={styles.srOnly}>Learn stage</h1>
       <section className={styles.stage} aria-label="Stage">
-        <SceneViewport safeArea={safeArea} labels={labelEls} />
+        {shown && <SceneViewport safeArea={safeArea} labels={labelEls} />}
 
         <div className={styles.stageTop}>
           <div className={styles.topRow}>
             <div className={styles.topLeft}>
-              <PlaceholderBadge />
-              <PartsMenu />
+              {shown && <PlaceholderBadge />}
+              {shown && <PartsMenu />}
             </div>
             <div className={styles.sceneTools} role="group" aria-label="View">
-              <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />
-              {MODELS[activeScene].explodable && (
+              {shown && <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />}
+              {shown && MODELS[activeScene].explodable && (
                 <IconTool label="Exploded view" icon={<ExplodeIcon />} aria-pressed={exploded} onClick={toggleExploded} />
               )}
-              <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />
+              {shown && <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />}
               <IconTool
                 label="Explanation"
                 icon={<TextIcon />}
@@ -177,10 +179,17 @@ export function LearnStage() {
 
         {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
         <div ref={safeArea} className={styles.scene}>
-          {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
-          {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
-          <Inspector onClosed={focusParts} />
-          <EffortGauge />
+          {!shown ? (
+            // Production without the dev flag: draft scenes are hidden, and we say so plainly.
+            <p className={styles.sceneLoading}>No expert-reviewed scene is available yet.</p>
+          ) : (
+            <>
+              {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
+              {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
+              <Inspector onClosed={focusParts} />
+              <EffortGauge />
+            </>
+          )}
         </div>
 
         <div className={styles.overlay}>
