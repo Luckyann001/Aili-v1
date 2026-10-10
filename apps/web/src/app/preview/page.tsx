@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import Image from "next/image";
 import { readBlock, SELECTORS } from "@/design/contrast";
 import { R3FCheck } from "./R3FCheck";
@@ -114,7 +115,14 @@ function ThemePanel({ theme, values }: { theme: "light" | "dark"; values: Record
   );
 }
 
+/**
+ * Development page only: in production builds it is "not found" unless AILI_ENABLE_PREVIEW=1 is
+ * set at build time (the main e2e build sets it). `next dev` always has it.
+ */
+const PREVIEW_ENABLED = process.env.NODE_ENV !== "production" || process.env.AILI_ENABLE_PREVIEW === "1";
+
 export default function PreviewPage() {
+  if (!PREVIEW_ENABLED) notFound();
   const tokens = loadTokens();
   return (
     <>

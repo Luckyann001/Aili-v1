@@ -16,7 +16,8 @@ export default defineConfig({
     { name: "phone", use: { ...devices["Pixel 7"], channel: "chrome" } },
   ],
   webServer: {
-    command: `NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 npm run build && NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 npx next start --port ${PORT}`,
+    // AILI_ENABLE_PREVIEW=1 keeps the dev-only /preview page in this test build (it is tested here).
+    command: `AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 npm run build && AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 npx next start --port ${PORT}`,
     url: `http://localhost:${PORT}/home`,
     timeout: 240_000,
     reuseExistingServer: false,
