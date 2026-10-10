@@ -1,0 +1,84 @@
+{
+  "id": "beginner-lever",
+  "title": "Why reach makes holding harder",
+  "prepared": true,
+  "beats": [
+    {
+      "id": "probe",
+      "kind": "probe",
+      "narration": [
+        { "id": "probe-1", "text": "Here is a ruler held at one end, with a weight on it." },
+        { "id": "probe-2", "text": "Which is harder to hold out: the weight close to you, or far from you?" }
+      ],
+      "actions": [
+        { "type": "select_scene", "scene": "lever-analogy" },
+        { "type": "set_parameter", "param": "weight_distance_m", "value": 0.05 },
+        { "type": "highlight_part", "part": "weight" },
+        { "type": "show_choices", "choices": [ { "id": "near", "label": "Close to you" }, { "id": "far", "label": "Far from you" } ] }
+      ]
+    },
+    {
+      "id": "commit",
+      "kind": "commit",
+      "narration": [ { "id": "commit-1", "text": "Got it. Let's test your guess." } ]
+    },
+    {
+      "id": "reveal",
+      "kind": "reveal",
+      "narration": [
+        { "id": "reveal-1", "text": "Watch the effort gauge as the weight slides away from your hand." },
+        { "id": "reveal-2", "text": "The farther the weight is from your grip, the more it twists the ruler around your hand, so your hand has to push back harder." },
+        { "id": "reveal-3", "text": "At the far end it takes about {{effort_far_vs_near}} times the effort of the near position." }
+      ],
+      "actions": [ { "type": "play_animation", "animation": "slide-weight-out" } ],
+      "feedback": {
+        "about": "probe",
+        "correct_choice": "far",
+        "correct": "You predicted far is harder, and that is what happened.",
+        "incorrect": "You expected close to be harder. It is the other way round, and here is why."
+      },
+      "explanation": {
+        "title": "Distance from the grip changes the effort",
+        "body": "A weight twists the ruler around your hand. The twist is the weight multiplied by its distance from your hand, so the same weight twists harder the farther out it sits.",
+        "assumptions": ["The ruler is held still and level", "The ruler is rigid and the same all along", "The weight is small enough to treat as a point"],
+        "limits": ["Says nothing about how long you can hold it or how tired your arm gets"]
+      }
+    },
+    {
+      "id": "link",
+      "kind": "link",
+      "narration": [
+        { "id": "link-1", "text": "A robot arm works the same way." },
+        { "id": "link-2", "text": "The servo is your hand, the arm is the ruler, and the end weight is the weight." },
+        { "id": "link-3", "text": "Where the comparison breaks down: a servo does not tire like a hand; its limit comes from its motor and gears." }
+      ],
+      "actions": [
+        { "type": "select_scene", "scene": "base-joint-arm" },
+        { "type": "highlight_part", "part": "arm" }
+      ],
+      "explanation": {
+        "title": "Same idea, robot arm",
+        "body": "The servo has to resist the twist from the arm and the end weight, including the arm's own weight. Moving weight farther from the servo makes that twist bigger.",
+        "assumptions": ["The arm is held still"],
+        "limits": ["This picture is a placeholder, not a real servo or a real arm"]
+      }
+    },
+    {
+      "id": "check",
+      "kind": "check",
+      "narration": [
+        { "id": "check-1", "text": "If the end weight moved closer to the servo, would holding the arm level get harder or easier for the servo?" }
+      ],
+      "actions": [
+        { "type": "highlight_part", "part": "end-weight" },
+        { "type": "show_choices", "choices": [ { "id": "harder", "label": "Harder" }, { "id": "easier", "label": "Easier" } ] }
+      ],
+      "feedback": {
+        "about": "check",
+        "correct_choice": "easier",
+        "correct": "Yes: closer to the servo means a shorter distance, so less twist to resist.",
+        "incorrect": "Not quite: closer to the servo means a shorter distance, so less twist to resist, which is easier."
+      }
+    }
+  ]
+}

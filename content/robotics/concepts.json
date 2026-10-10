@@ -1,0 +1,4 @@
+[
+  { "id": "mech.moment-arm", "title": "Moment arm: distance from the pivot", "review_status": "draft" },
+  { "id": "mech.torque.static", "title": "Static torque about a joint", "review_status": "draft" }
+]
