@@ -62,33 +62,49 @@ export function layoutParts(params: Params, explode = 0): Record<string, PartLay
   };
 }
 
-/** Axis-aligned bounds of the whole model, for camera framing. */
-export function modelBounds(params: Params, explode = 0) {
+/** Axis-aligned bounds of a laid-out model, for camera framing. */
+export function boundsOf(layout: Record<string, PartLayout>) {
   const lo = [Infinity, Infinity, Infinity];
   const hi = [-Infinity, -Infinity, -Infinity];
-  for (const p of Object.values(layoutParts(params, explode))) {
-    const half = p.kind === "cylinder" ? [p.size[0], p.size[1] / 2, p.size[0]] : p.size.map((d) => d / 2);
+  for (const c of cornersOf(layout)) {
     for (let i = 0; i < 3; i++) {
-      lo[i] = Math.min(lo[i]!, p.position[i]! - half[i]!);
-      hi[i] = Math.max(hi[i]!, p.position[i]! + half[i]!);
+      lo[i] = Math.min(lo[i]!, c[i]!);
+      hi[i] = Math.max(hi[i]!, c[i]!);
     }
   }
   const center = lo.map((v, i) => (v + hi[i]!) / 2) as Vec3;
-  return {
-    center,
-    halfWidth: Math.max(hi[0]! - lo[0]!, hi[2]! - lo[2]!) / 2,
-    halfHeight: (hi[1]! - lo[1]!) / 2,
-  };
+  return { center, halfWidth: Math.max(hi[0]! - lo[0]!, hi[2]! - lo[2]!) / 2, halfHeight: (hi[1]! - lo[1]!) / 2 };
 }
 
-/** Every corner of every part's box (cylinders as their bounding box), metres. For framing. */
-export function modelCorners(params: Params, explode = 0): Vec3[] {
+/** Every corner of every part's box (cylinders as their bounding box), metres. */
+export function cornersOf(layout: Record<string, PartLayout>): Vec3[] {
   const out: Vec3[] = [];
-  for (const p of Object.values(layoutParts(params, explode))) {
+  for (const p of Object.values(layout)) {
     const h = p.kind === "cylinder" ? [p.size[0], p.size[1] / 2, p.size[0]] : p.size.map((d) => d / 2);
     for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
       out.push([p.position[0] + sx * h[0]!, p.position[1] + sy * h[1]!, p.position[2] + sz * h[2]!]);
     }
   }
   return out;
+}
+
+export const modelBounds = (params: Params, explode = 0) => boundsOf(layoutParts(params, explode));
+export const modelCorners = (params: Params, explode = 0) => cornersOf(layoutParts(params, explode));
+
+// ── Lever analogy (content/robotics/scenes/lever-analogy.json) ──────────────────────────────
+// A ruler held out level by a hand grip at its left end, with a weight resting on it.
+// Drawing sizes only. The effort shown comes from the solver, never from this geometry.
+
+export const LEVER_LENGTH_M = 0.3;
+const LEVER_Y = 0.1;
+const RULER_T = 0.006;
+const WEIGHT_S = 0.03;
+
+export function layoutLever(weightDistance_m: number): Record<string, PartLayout> {
+  const d = Math.min(LEVER_LENGTH_M, Math.max(0, weightDistance_m));
+  return {
+    hand: { kind: "box", size: [0.04, 0.05, 0.045], position: [-0.02, LEVER_Y, 0], labelAnchor: [-0.02, LEVER_Y + 0.03, 0] },
+    ruler: { kind: "box", size: [LEVER_LENGTH_M, RULER_T, 0.03], position: [LEVER_LENGTH_M / 2, LEVER_Y, 0], labelAnchor: [LEVER_LENGTH_M * 0.75, LEVER_Y + RULER_T / 2, 0] },
+    weight: { kind: "box", size: [WEIGHT_S, WEIGHT_S, WEIGHT_S], position: [d, LEVER_Y + RULER_T / 2 + WEIGHT_S / 2, 0], labelAnchor: [d, LEVER_Y + RULER_T / 2 + WEIGHT_S, 0] },
+  };
 }

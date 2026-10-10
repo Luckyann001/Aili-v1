@@ -1,11 +1,17 @@
 import { create } from "zustand";
-import { DEFAULT_PARAMS, PARAMS, clampParam, type ParamId, type Params } from "./layout";
-import { PART_IDS } from "./placeholderModel";
+import { DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
+import { MODELS, type SceneId } from "./models";
 
 /** loading: 3D code still downloading · ready: rendering · fallback: still picture (no WebGL or it failed). */
 export type ViewerStatus = "loading" | "ready" | "fallback";
 
 export interface SceneState {
+  /** Which scene the stage shows. Switching clears the selection and the explode. */
+  activeScene: SceneId;
+  setScene: (id: SceneId) => void;
+  /** Lever analogy: distance of the weight from the hand, metres (drawing; effort comes from the solver). */
+  leverDistance_m: number;
+  setLeverDistance: (d: number) => void;
   viewer: ViewerStatus;
   setViewer: (v: ViewerStatus) => void;
   selectedId: string | null;
@@ -20,6 +26,8 @@ export interface SceneState {
   params: Params;
   toggleExploded: () => void;
   closeInspector: () => void;
+  /** Point at a part (outline + label) without opening the inspector; used by lessons. */
+  highlight: (id: string | null) => void;
   setParam: (id: ParamId, value: number) => void;
   select: (id: string | null) => void;
   toggleLabels: () => void;
@@ -27,6 +35,10 @@ export interface SceneState {
 }
 
 export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState>) => void): SceneState => ({
+  activeScene: "base-joint-arm",
+  setScene: (id) => set((s) => (s.activeScene === id ? {} : { activeScene: id, selectedId: null, inspectorOpen: false, exploded: false })),
+  leverDistance_m: 0.05,
+  setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
   viewer: "loading",
   setViewer: (viewer) => set(() => ({ viewer })),
   selectedId: null,
@@ -36,9 +48,11 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   inspectorOpen: false,
   params: DEFAULT_PARAMS,
   // Unknown IDs are ignored, so a stale or mistyped selection can never point at nothing.
-  select: (id) => set(() => (id === null || PART_IDS.includes(id) ? { selectedId: id, inspectorOpen: id !== null } : {})),
+  select: (id) =>
+    set((s) => (id === null || MODELS[s.activeScene].parts.some((p) => p.id === id) ? { selectedId: id, inspectorOpen: id !== null } : {})),
   toggleExploded: () => set((s) => ({ exploded: !s.exploded })),
   closeInspector: () => set(() => ({ inspectorOpen: false })),
+  highlight: (id) => set((s) => (id === null || MODELS[s.activeScene].parts.some((p) => p.id === id) ? { selectedId: id, inspectorOpen: false } : {})),
   // Values are always kept inside their bounds and on their step.
   setParam: (id, value) =>
     set((s) => {

@@ -77,6 +77,19 @@ describe("scene selection state", () => {
     expect(store.getState().exploded).toBe(true);
   });
 
+  it("switching scenes clears selection and explode; parts are checked against the active scene", () => {
+    store.getState().select("arm");
+    store.getState().toggleExploded();
+    store.getState().setScene("lever-analogy");
+    expect(store.getState()).toMatchObject({ activeScene: "lever-analogy", selectedId: null, exploded: false, inspectorOpen: false });
+    store.getState().select("arm"); // not a lever part
+    expect(store.getState().selectedId).toBeNull();
+    store.getState().select("weight");
+    expect(store.getState().selectedId).toBe("weight");
+    store.getState().setLeverDistance(9);
+    expect(store.getState().leverDistance_m).toBe(0.3);
+  });
+
   it("arrow-key stepping wraps at both ends", () => {
     expect(stepPart(PART_IDS, null, 1)).toBe("base");
     expect(stepPart(PART_IDS, null, -1)).toBe("end-weight");
