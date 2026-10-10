@@ -95,10 +95,20 @@ test.describe("prepared reply, captions and interrupt", () => {
 
   test("typing a question → thinking → speaking with captions in order → ready", async ({ page }) => {
     await expect(status(page)).toHaveText("Ready");
+    // Record every status change: "Thinking" lasts only 700 ms, too short to poll for reliably.
+    await page.evaluate(() => {
+      const el = document.querySelector('p[role="status"][data-state]')!;
+      const seen: string[] = [];
+      (window as unknown as { __states: string[] }).__states = seen;
+      new MutationObserver(() => {
+        const st = el.getAttribute("data-state")!;
+        if (seen[seen.length - 1] !== st) seen.push(st);
+      }).observe(el, { attributes: true, attributeFilter: ["data-state"] });
+    });
     await ask(page);
-    await expect(status(page)).toHaveText("Thinking");
     for (const line of REPLY) await expect(page.getByText(line)).toBeVisible();
     await expect(status(page)).toHaveText("Ready");
+    expect(await page.evaluate(() => (window as unknown as { __states: string[] }).__states)).toEqual(["thinking", "speaking", "idle"]);
     const captionBox = page.locator("main").getByText(REPLY[3]!).locator("..");
     await expect(captionBox.getByText("Prepared", { exact: true })).toBeVisible();
     expect((await fakeLog(page)).spoken).toEqual(REPLY);
