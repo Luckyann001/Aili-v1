@@ -57,6 +57,9 @@ export function AppMenu() {
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
       />
+      {/* While open, a transparent backdrop takes taps outside the menu, so they close it
+          instead of landing on whatever is underneath. */}
+      {open && <div className={styles.backdrop} aria-hidden="true" onClick={() => setOpen(false)} />}
       <ul id={id} className={styles.menuList} hidden={!open}>
         {ITEMS.map((item) => (
           <li key={item.label}>

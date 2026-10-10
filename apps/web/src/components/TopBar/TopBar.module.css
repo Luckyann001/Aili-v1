@@ -34,6 +34,12 @@
   position: relative;
 }
 
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+}
+
 .menuList {
   position: absolute;
   right: 0;
@@ -47,6 +53,20 @@
   border: 1px solid var(--aili-border-strong);
   border-radius: var(--aili-radius-md);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+/* Phones: the menu spans the screen width, so nothing beneath is left half-covered. */
+@media (max-width: 599px) {
+  .menuRoot {
+    position: static;
+  }
+
+  .menuList {
+    left: var(--aili-space-2);
+    right: var(--aili-space-2);
+    top: 64px;
+    min-width: 0;
+  }
 }
 
 .menuItem {
