@@ -1,0 +1,94 @@
+import { BeatScript, type SceneManifest } from "@aili/schemas";
+import { checkNarration } from "./narration";
+
+// Validates a scripted beat sequence against the scene registry, before anything plays:
+// - every scene, part, setting and animation ID exists (in the scene active at that point);
+// - every set_parameter value is inside the setting's bounds;
+// - narration has no hard-coded numbers (placeholders only, from the allowed list);
+// - pacing (behavior spec A5): at most one question per beat, and never two question beats in a
+//   row without a reveal or link beat that gives something back in between;
+// - a commit beat follows a beat that offered choices; feedback refers to real choices.
+
+export interface BeatContext {
+  scenes: SceneManifest[];
+  /** Placeholder names the solvers can fill, e.g. "effort_far_vs_near". */
+  placeholders: readonly string[];
+}
+
+export function validateBeats(raw: unknown, ctx: BeatContext): { script: BeatScript | null; errors: string[] } {
+  const parsed = BeatScript.safeParse(raw);
+  if (!parsed.success) {
+    return { script: null, errors: parsed.error.issues.map((i) => `${i.path.join(".") || "(script)"}: ${i.message}`) };
+  }
+  const script = parsed.data;
+  const errors: string[] = [];
+  const byId = new Map(ctx.scenes.map((s) => [s.id, s]));
+  let scene: SceneManifest | undefined;
+  let questionPending = false;
+  const choicesByBeat = new Map<string, string[]>();
+  const seen = new Set<string>();
+
+  script.beats.forEach((beat, bi) => {
+    const at = `beat ${beat.id}`;
+    if (seen.has(beat.id)) errors.push(`${at}: duplicate beat ID`);
+    seen.add(beat.id);
+
+    for (const a of beat.actions) {
+      if (a.type === "select_scene") {
+        scene = byId.get(a.scene);
+        if (!scene) errors.push(`${at}: unknown scene "${a.scene}"`);
+        continue;
+      }
+      if (a.type === "show_choices") {
+        const ids = a.choices.map((c) => c.id);
+        if (new Set(ids).size !== ids.length) errors.push(`${at}: duplicate choice IDs`);
+        choicesByBeat.set(beat.id, ids);
+        continue;
+      }
+      if (!scene) {
+        errors.push(`${at}: ${a.type} before any select_scene`);
+        continue;
+      }
+      if (a.type === "highlight_part" && !scene.parts.some((p) => p.id === a.part)) {
+        errors.push(`${at}: part "${a.part}" is not in scene "${scene.id}"`);
+      }
+      if (a.type === "play_animation" && !scene.animations.some((x) => x.id === a.animation)) {
+        errors.push(`${at}: animation "${a.animation}" is not in scene "${scene.id}"`);
+      }
+      if (a.type === "set_parameter") {
+        const p = scene.params.find((x) => x.id === a.param);
+        if (!p) errors.push(`${at}: setting "${a.param}" is not in scene "${scene.id}"`);
+        else if (a.value < p.min || a.value > p.max) errors.push(`${at}: ${a.param} = ${a.value} is outside ${p.min}–${p.max} ${p.unit}`);
+      }
+    }
+
+    const texts = [
+      ...beat.narration.map((n) => ({ where: `${at} ${n.id}`, text: n.text })),
+      ...(beat.feedback ? [{ where: `${at} feedback`, text: `${beat.feedback.correct} ${beat.feedback.incorrect}` }] : []),
+      ...(beat.explanation
+        ? [{ where: `${at} explanation`, text: [beat.explanation.title, beat.explanation.body, ...beat.explanation.assumptions, ...beat.explanation.limits].join(" ") }]
+        : []),
+    ];
+    for (const t of texts) errors.push(...checkNarration(t.text, ctx.placeholders, t.where));
+
+    const questions = beat.narration.reduce((n, x) => n + (x.text.match(/\?/g)?.length ?? 0), 0);
+    if (questions > 1) errors.push(`${at}: ${questions} questions in one beat (at most one open question)`);
+    if (questions === 1) {
+      if (questionPending) errors.push(`${at}: a second question before anything was given back (add a reveal or link beat first)`);
+      questionPending = true;
+    }
+    if (beat.kind === "reveal" || beat.kind === "link") questionPending = false;
+
+    if (beat.kind === "commit") {
+      const prev = script.beats[bi - 1];
+      if (!prev || !choicesByBeat.has(prev.id)) errors.push(`${at}: a commit beat must follow a beat that offers choices`);
+    }
+    if (beat.feedback) {
+      const choices = choicesByBeat.get(beat.feedback.about);
+      if (!choices) errors.push(`${at}: feedback refers to "${beat.feedback.about}", which offered no choices`);
+      else if (!choices.includes(beat.feedback.correct_choice)) errors.push(`${at}: correct_choice "${beat.feedback.correct_choice}" is not one of ${choices.join(", ")}`);
+    }
+  });
+
+  return { script: errors.length ? null : script, errors };
+}
