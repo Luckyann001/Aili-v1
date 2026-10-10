@@ -24,7 +24,8 @@ function lever(distance_m: number): Record<string, Shape> {
   };
 }
 
-export function SceneFallback() {
+/** `loading`: shown while the 3D code downloads, then replaced by the 3D view in the same place. */
+export function SceneFallback({ loading = false }: { loading?: boolean }) {
   const selectedId = useScene((s) => s.selectedId);
   const activeScene = useScene((s) => s.activeScene);
   const distance = useScene((s) => s.leverDistance_m);
@@ -32,8 +33,12 @@ export function SceneFallback() {
   const shapes = activeScene === "lever-analogy" ? lever(distance) : ARM;
   const names = model.parts.map((p) => p.name.toLowerCase()).join(", ");
   return (
-    <div className={styles.fallback}>
-      <p className={styles.fallbackNote}>3D view isn&apos;t available on this device, so here is a still picture of the parts.</p>
+    <div className={styles.fallback} data-fallback={loading ? "loading" : "no-webgl"}>
+      <p className={styles.fallbackNote}>
+        {loading
+          ? "Loading the 3D view… here is a still picture of the parts meanwhile."
+          : "3D view isn't available on this device, so here is a still picture of the parts."}
+      </p>
       <svg viewBox="0 0 320 200" className={styles.fallbackSvg} role="img" aria-label={`Still side view of the ${model.title.toLowerCase()}: ${names}.`}>
         {model.parts.map(({ id, name, fill }) => {
           const s = shapes[id]!;

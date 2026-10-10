@@ -178,14 +178,16 @@ export function LearnStage() {
         {demo && <DemoControls onPlay={() => voice.submit("demo")} />}
 
         {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
-        <div ref={safeArea} className={styles.scene}>
+        <div ref={safeArea} className={styles.scene} data-safe-area="">
           {!shown ? (
             // Production without the dev flag: draft scenes are hidden, and we say so plainly.
             <p className={styles.sceneLoading}>No expert-reviewed scene is available yet.</p>
           ) : (
             <>
-              {viewer === "loading" && <p className={styles.sceneLoading}>Loading 3D view…</p>}
-              {viewer === "fallback" ? <SceneFallback /> : <SceneLabels labels={labelEls} />}
+              {/* The still picture shows at once; the 3D view replaces it in the same place when ready. */}
+              {viewer === "loading" && <SceneFallback loading />}
+              {viewer === "fallback" && <SceneFallback />}
+              {viewer === "ready" && <SceneLabels labels={labelEls} />}
               <Inspector onClosed={focusParts} />
               <EffortGauge />
             </>
