@@ -2,6 +2,8 @@
 
 For Lucky to run by hand (slice 6). Judge speed on this **production build**, not the dev server.
 
+**Oct 11 2026:** run on the Itel A667L over USB; all steps fine (reported by Lucky; numbers not recorded here).
+
 ## Set up (once)
 1. **Phone:** Settings → About phone → tap **Build number** 7 times (on some Itel menus it is under About phone → Version). Then Settings → System → Developer options → turn on **USB debugging**.
 2. **Laptop:** build and start the app (keep the terminal open):
