@@ -1,0 +1,20 @@
+{
+  "_about": "Phrases Aili must never say (behavior spec A11, A12, A8). Matched case-insensitively as whole words, with curly and straight apostrophes treated alike. A phrase list catches only these exact wordings; it cannot judge intent. Add or remove entries only with review. See packages/engine/README.md.",
+  "flattery": [
+    "great question",
+    "excellent question",
+    "good question",
+    "brilliant answer",
+    "perfect answer",
+    "you're a natural",
+    "you are a natural"
+  ],
+  "mastery": [
+    "you've mastered",
+    "you have mastered",
+    "you now understand",
+    "you fully understand",
+    "you're an expert",
+    "you are an expert"
+  ]
+}
