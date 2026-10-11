@@ -366,6 +366,7 @@ Store two things.
 - **Only verified items can be assigned.** The AI may suggest candidates into a review queue. A person checks that the link works and the content matches the claim.
 - **Re-check regularly:** automated weekly link checks, and flags for items that look outdated.
 - **Learner-added sources** are accepted and marked "unverified".
+- **Readings carry a source-verification record (who checked the source exists and matches, and when) instead of `fidelity`**, since a reading is not a model. [Oct 11 2026, M2 slice 1]
 - **Teach-back uses the human-written guide, not the source text.** This keeps the system clear of copyright problems and keeps grading consistent.
 - **Seed candidates to verify before adding** (from memory, not checked): Lynch and Park, *Modern Robotics* (reported to have a free online version and a course); Craig, *Introduction to Robotics: Mechanics and Control*; Siegwart and colleagues on autonomous mobile robots; Thrun, Burgard and Fox, *Probabilistic Robotics*; the official ROS 2 documentation. For the beta, 30 to 40 well-guided items are enough.
 
