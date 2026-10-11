@@ -11,18 +11,46 @@
     "arm_length_m": { "unit": "m", "min": 0.05, "max": 0.5 },
     "payload_kg": { "unit": "kg", "min": 0.0, "max": 1.5 },
     "arm_kg_per_m": { "unit": "kg/m", "min": 0.1, "max": 1.0 },
-    "angle_deg": { "unit": "deg", "min": 0, "max": 90 }
+    "angle_deg": { "unit": "deg", "min": 0, "max": 90 },
+    "rated_stall_torque_nm": { "unit": "N·m", "min": 0, "max": 100, "optional": true },
+    "rated_continuous_torque_nm": { "unit": "N·m", "min": 0, "max": 100, "optional": true }
   },
   "outputs": {
     "torque_nm": { "unit": "N·m" },
-    "torque_kgf_cm": { "unit": "kgf·cm" }
+    "torque_kgf_cm": { "unit": "kgf·cm" },
+    "payload_torque_nm": { "unit": "N·m" },
+    "arm_torque_nm": { "unit": "N·m" },
+    "share_of_rating": { "unit": "ratio" }
   },
   "assumptions": [
     "static hold only",
     "uniform bar: the arm's own mass acts at its middle",
     "payload is a point mass at the tip",
-    "angle measured from horizontal: 0 degrees is level, 90 degrees is straight up"
+    "angle measured from horizontal: 0 degrees is level, 90 degrees is straight up",
+    "a torque rating is used only when the learner supplies one from a datasheet, and says whether it is a stall or continuous rating"
   ],
-  "excludes": ["acceleration", "friction", "gear play", "structural stress", "temperature and duty cycle", "control stability"],
-  "worked_examples": []
+  "excludes": [
+    "acceleration",
+    "friction",
+    "gear play",
+    "structural stress",
+    "temperature and duty cycle",
+    "control stability"
+  ],
+  "worked_examples": [
+    {
+      "kind": "textbook",
+      "source": "src.openstax-college-physics-2e",
+      "location": "§9.6 Forces and Torques in Muscles and Joints, Example 9.4 (horizontal forearm, its own weight included)"
+    },
+    {
+      "kind": "textbook",
+      "source": "src.openstax-university-physics-1",
+      "location": "§12.2 Examples of Static Equilibrium, Example 12.4 (forearm at 60° to the vertical, its weight neglected; checked on the payload share)"
+    },
+    {
+      "kind": "hand_derivation",
+      "location": "packages/solvers/src/staticTorque.test.ts: tilted servo arm at 30° from horizontal (hand derivation, not textbook)"
+    }
+  ]
 }

@@ -1,0 +1,14 @@
+{
+  "id": "src.openstax-university-physics-1",
+  "type": "source",
+  "kind": "book",
+  "title": "University Physics Volume 1",
+  "authors": ["William Moebs", "Samuel J. Ling", "Jeff Sanny"],
+  "edition": "2016 (OpenStax, published Sep 19, 2016)",
+  "url": "https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium",
+  "isbn": null,
+  "access": "free",
+  "rights": "CC BY-NC-SA 4.0. Page footer, quoted 2026-10-11: \"© 1999-2026, Rice University. Except where otherwise noted, textbooks on this site are licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 (CC BY NC-SA) license.\" Section URL: https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium. Link out; quote only short excerpts (data and results) with attribution, never a full example.",
+  "language": "en",
+  "verified": null
+}

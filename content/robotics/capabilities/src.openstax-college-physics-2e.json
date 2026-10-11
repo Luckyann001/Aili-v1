@@ -1,0 +1,14 @@
+{
+  "id": "src.openstax-college-physics-2e",
+  "type": "source",
+  "kind": "book",
+  "title": "College Physics 2e",
+  "authors": ["Paul Peter Urone", "Roger Hinrichs"],
+  "edition": "2e (OpenStax, published Jul 13, 2022)",
+  "url": "https://openstax.org/books/college-physics-2e/pages/9-6-forces-and-torques-in-muscles-and-joints",
+  "isbn": null,
+  "access": "free",
+  "rights": "CC BY-NC-SA 4.0. Page footer, quoted 2026-10-11: \"© 1999-2026, Rice University. Except where otherwise noted, textbooks on this site are licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 (CC BY NC-SA) license.\" Section URL: https://openstax.org/books/college-physics-2e/pages/9-6-forces-and-torques-in-muscles-and-joints. Link out; quote only short excerpts (data and results) with attribution, never a full example.",
+  "language": "en",
+  "verified": null
+}
