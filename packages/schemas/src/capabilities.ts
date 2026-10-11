@@ -44,10 +44,15 @@ export function unitNameProblem(name: string, unit: Unit): string | null {
   return name.endsWith(suffix) ? null : `${name}: unit "${unit}" needs a name ending in ${suffix}`;
 }
 
+/**
+ * A numeric input with its unit and bounds. `max: null` means no upper bound is declared (used for
+ * values the learner supplies from a datasheet, which we must not cap with an invented number).
+ * `optional: true` inputs may be left out (for example a torque rating nobody has supplied).
+ */
 export const BoundedInput = z
-  .object({ unit: Unit, min: z.number(), max: z.number() })
+  .object({ unit: Unit, min: z.number(), max: z.number().nullable(), optional: z.literal(true).optional() })
   .strict()
-  .refine((b) => b.min < b.max, { message: "min must be below max" });
+  .refine((b) => b.max === null || b.min < b.max, { message: "min must be below max" });
 export type BoundedInput = z.infer<typeof BoundedInput>;
 
 /** Fields every capability carries (CLAUDE.md: teaches, fidelity, version, review_status, provenance). */

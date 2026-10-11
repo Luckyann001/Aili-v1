@@ -100,14 +100,17 @@ describe("capability registry: the files in content/robotics", () => {
     expect(r.errors).toEqual([]);
     expect(r.registry.simulations.map((s) => s.id)).toEqual(["sim.servo-static-load"]);
     expect(r.registry.solvers.map((s) => s.id)).toEqual(["solver.static-torque-single-link"]);
+    expect(r.registry.sources.map((s) => s.id).sort()).toEqual(["src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
     expect(r.registry.scenes).toHaveLength(2);
   });
 
   it("are drafts written by the AI: no review record, not fixtures", () => {
-    for (const { data } of dir("capabilities")) {
-      expect(data.review_status).toBe("draft");
-      expect(data.review).toBeUndefined();
-      expect(data.test_fixture).toBeUndefined();
+    for (const { file, data } of dir("capabilities")) {
+      // Sources carry a person's verification record instead of a review status; none is filled in.
+      if (data.type === "source") expect(data.verified, file).toBeNull();
+      else expect(data.review_status, file).toBe("draft");
+      expect(data.review, file).toBeUndefined();
+      expect(data.test_fixture, file).toBeUndefined();
     }
   });
 
@@ -115,6 +118,9 @@ describe("capability registry: the files in content/robotics", () => {
     const s = loadRegistry(real(), PROD).registry.simulations[0]!;
     expect(s.inputs.arm_kg_per_m!.min).toBeGreaterThan(0);
     expect(s.assumptions.join(" ")).toMatch(/from horizontal/);
+    const solver = loadRegistry(real(), PROD).registry.solvers[0]!;
+    expect(solver.worked_examples.filter((w) => w.kind === "textbook").map((w) => w.source)).toEqual(["src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
+    expect(solver.worked_examples.some((w) => w.kind === "hand_derivation" && /not textbook/.test(w.location))).toBe(true);
   });
 });
 
@@ -181,6 +187,16 @@ describe("cross-references", () => {
     expect(errorsOf([solver(), sim({ inputs: { arm_length_m: { unit: "m", min: 0.01, max: 0.3 } } })])).toMatch(/goes outside the solver's 0\.05–0\.5/);
     expect(errorsOf([solver(), sim({ inputs: {} })])).toMatch(/leaves out the solver input "arm_length_m"/);
     expect(errorsOf([solver(), sim({ outputs: ["force_n"] })])).toMatch(/"force_n" is not an output/);
+  });
+
+  it("optional and open-ended inputs (a datasheet rating) follow the solver", () => {
+    const rating = { unit: "N·m", min: 0, max: null, optional: true };
+    const s = solver({ inputs: { arm_length_m: { unit: "m", min: 0.05, max: 0.5 }, rated_stall_torque_nm: rating } });
+    expect(withItems([s, sim()]).errors).toEqual([]); // an optional solver input may be left out
+    expect(errorsOf([s, sim({ inputs: { arm_length_m: { unit: "m", min: 0.1, max: 0.3 }, rated_stall_torque_nm: { ...rating, max: 5 } } })])).toBe("");
+    const capped = solver({ inputs: { arm_length_m: { unit: "m", min: 0.05, max: 0.5 }, rated_stall_torque_nm: { ...rating, max: 5 } } });
+    expect(errorsOf([capped, sim({ inputs: { arm_length_m: { unit: "m", min: 0.1, max: 0.3 }, rated_stall_torque_nm: rating } })])).toMatch(/0–no limit goes outside the solver's 0–5/);
+    expect(errorsOf([solver(), sim({ inputs: { arm_length_m: { unit: "m", min: 0.1, max: 0.3, optional: true } } })])).toMatch(/is optional, but the solver requires it/);
   });
 
   it("a published simulation cannot run on a draft solver", () => {

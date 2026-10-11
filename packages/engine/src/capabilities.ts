@@ -107,10 +107,12 @@ export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registr
       const s = solver.inputs[name];
       if (!s) errors.push(`${file}: ${sim.id} input "${name}" is not an input of ${solver.id}`);
       else if (s.unit !== b.unit) errors.push(`${file}: ${sim.id} input "${name}" is in ${b.unit}, the solver takes ${s.unit}`);
-      else if (b.min < s.min || b.max > s.max) errors.push(`${file}: ${sim.id} input "${name}" ${b.min}–${b.max} goes outside the solver's ${s.min}–${s.max}`);
+      else if (b.min < s.min || (s.max !== null && (b.max === null || b.max > s.max)))
+        errors.push(`${file}: ${sim.id} input "${name}" ${b.min}–${b.max ?? "no limit"} goes outside the solver's ${s.min}–${s.max ?? "no limit"}`);
+      else if (b.optional && !s.optional) errors.push(`${file}: ${sim.id} input "${name}" is optional, but the solver requires it`);
     }
-    for (const name of Object.keys(solver.inputs))
-      if (!(name in sim.inputs)) errors.push(`${file}: ${sim.id} leaves out the solver input "${name}"`);
+    for (const [name, s] of Object.entries(solver.inputs))
+      if (!s.optional && !(name in sim.inputs)) errors.push(`${file}: ${sim.id} leaves out the solver input "${name}"`);
     for (const o of sim.outputs) if (!(o in solver.outputs)) errors.push(`${file}: ${sim.id} output "${o}" is not an output of ${solver.id}`);
     if (sim.review_status !== "draft" && solver.review_status === "draft")
       errors.push(`${file}: ${sim.id} is ${sim.review_status} but its solver ${solver.id} is still a draft`);
