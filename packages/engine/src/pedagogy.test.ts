@@ -1,0 +1,133 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { DirectorResponse, SessionHistory } from "@aili/schemas";
+import { BANNED_PHRASES, findPhrases, openPrompt, validatePedagogy } from "./index";
+
+// Pedagogy validator (docs/m2-plan.md slice 4). One test per rule, each with a passing and a
+// failing case; errors name the rule and the turn.
+
+const C = "mech.torque.static";
+const resp = (o: object = {}) =>
+  DirectorResponse.parse({ request_id: "r", state_rev: 1, move: "explain", concepts: [C], narration: [{ id: "n1", text: "Reach makes holding harder." }], ...o });
+const hist = (entries: object[], o: object = {}) => SessionHistory.parse({ posture: "learning", learner_level: "some_knowledge", entries, ...o });
+const aili = (move: string, o: object = {}) => ({ kind: "aili", move, asked: false, gave_back: true, concepts: [C], ...o });
+const learner = (o: object = {}) => ({ kind: "learner", answered_prompt: true, ...o });
+const ask = { prompt: { text: "Where is it harder to hold?", chips: [] } };
+
+describe("rule 1: one open question at a time", () => {
+  it("a new prompt while one is open and unanswered is rejected; once answered, it is fine", () => {
+    const openH = hist([aili("probe", { asked: true }), learner({ answered_prompt: false })]);
+    expect(openPrompt(openH)).toEqual({ turn: 1 });
+    expect(validatePedagogy(resp(ask), openH)).toContain("rule one-open-question (turn 2): a prompt is still open from turn 1 and unanswered; answer or close it before asking another");
+    expect(validatePedagogy(resp(ask), hist([aili("probe", { asked: true }), learner()]))).toEqual([]);
+  });
+});
+
+describe("rule 2: never two questions in a row without giving something back", () => {
+  it("asking again with nothing given back is rejected; with narration, a result or a visual it passes", () => {
+    const h = hist([aili("probe", { asked: true }), learner()]);
+    const bare = resp({ ...ask, move: "challenge", narration: [] });
+    expect(validatePedagogy(bare, h)).toContain(
+      "rule give-before-asking-again (turn 2): turn 1 asked a question and this turn asks again without giving anything back (narration, a result or a visual)",
+    );
+    expect(validatePedagogy(resp({ ...ask, move: "challenge", narration: [], actions: [{ type: "highlight_part", part: "weight" }] }), h).join()).not.toMatch(/give-before-asking-again/);
+  });
+});
+
+describe("rule 3: after the learner answers a probe, the next move is explain", () => {
+  it("anything but explain is rejected; a safety turn is the exception", () => {
+    const h = hist([aili("probe", { asked: true }), learner()]);
+    expect(validatePedagogy(resp({ move: "challenge" }), h)).toContain(`rule explain-after-probe (turn 2): the learner answered the probe in turn 1; the next move must be "explain", not "challenge"`);
+    expect(validatePedagogy(resp({ move: "explain" }), h)).toEqual([]);
+    expect(validatePedagogy(resp({ move: "challenge", safety: true }), h)).toEqual([]);
+  });
+});
+
+describe("rule 4: a true beginner gets an explanation before the first probe on a concept", () => {
+  const beginner = (entries: object[]) => hist(entries, { learner_level: "true_beginner" });
+
+  it("probing an unexplained concept is rejected; after an explain turn on it, it passes", () => {
+    expect(validatePedagogy(resp({ move: "probe" }), beginner([]))).toContain(
+      `rule explain-first-for-beginners (turn 1): the learner is a true beginner and "${C}" has not been explained yet; explain before probing`,
+    );
+    expect(validatePedagogy(resp({ move: "probe" }), beginner([aili("explain")]))).toEqual([]);
+    expect(validatePedagogy(resp({ move: "probe", concepts: [] }), beginner([aili("explain")]))).toContain("rule explain-first-for-beginners (turn 2): a probe must name the concept it is about (concepts is empty)");
+    // A learner with some knowledge may be probed first (spec A1a: probe, briefly).
+    expect(validatePedagogy(resp({ move: "probe" }), hist([]))).toEqual([]);
+  });
+
+  it("the lever lesson: its framing beat counts only if it is taken to explain the concept", () => {
+    // content/robotics/beats/beginner-lever.json: framing (move explain) → probe → commit → reveal …
+    const beats = JSON.parse(readFileSync(new URL("../../../content/robotics/beats/beginner-lever.json", import.meta.url), "utf8")).beats;
+    expect(beats.slice(0, 2).map((b: { kind: string; move: string }) => `${b.kind}:${b.move}`)).toEqual(["framing:explain", "probe:probe"]);
+    // Its two framing lines describe the scene (a ruler held out, a sliding weight); they do not
+    // explain torque. Recorded as explaining the concept, the probe passes; recorded honestly as
+    // naming no concept, a true beginner's probe is rejected. See the slice 4 report.
+    expect(validatePedagogy(resp({ move: "probe" }), beginner([aili("explain", { concepts: [C] })]))).toEqual([]);
+    expect(validatePedagogy(resp({ move: "probe" }), beginner([aili("explain", { concepts: [] })])).join()).toMatch(/explain-first-for-beginners/);
+  });
+});
+
+describe("rule 5: at most one challenge in three turns, unless safety", () => {
+  it("a second challenge within three turns is rejected; outside the window, or with safety, it passes", () => {
+    const h = hist([aili("challenge"), learner(), aili("explain"), learner()]);
+    expect(validatePedagogy(resp({ move: "challenge" }), h)).toContain("rule challenge-budget (turn 3): turn 1 already challenged; at most one challenge in three turns unless safety is true");
+    expect(validatePedagogy(resp({ move: "challenge", safety: true }), h)).toEqual([]);
+    const later = hist([aili("challenge"), learner(), aili("explain"), learner(), aili("explain"), learner()]);
+    expect(validatePedagogy(resp({ move: "challenge" }), later)).toEqual([]);
+    // A safety challenge does not use up the budget.
+    expect(validatePedagogy(resp({ move: "challenge" }), hist([aili("challenge", { safety: true }), learner()]))).toEqual([]);
+  });
+});
+
+describe("rule 6: the Answer posture has no quiz and no challenge", () => {
+  it("probe, challenge, teach-back and the like are rejected; answer and explain pass; a safety challenge passes", () => {
+    const h = hist([], { posture: "answer" });
+    for (const move of ["probe", "challenge", "teach_back", "debate", "demand_evidence", "assign", "review"])
+      expect(validatePedagogy(resp({ move }), h).join(), move).toMatch(new RegExp(`rule answer-posture \\(turn 1\\): move "${move}"`));
+    expect(validatePedagogy(resp({ move: "answer" }), h)).toEqual([]);
+    expect(validatePedagogy(resp({ move: "explain" }), h)).toEqual([]);
+    expect(validatePedagogy(resp({ move: "challenge", safety: true }), h)).toEqual([]);
+  });
+});
+
+describe("rule 7: no flattery and no mastery claims (phrase list in config/pedagogy-phrases.json)", () => {
+  it("hits: exact phrases in any case, with straight or curly apostrophes, in narration, prompt or notes", () => {
+    const e = validatePedagogy(
+      resp({ narration: [{ id: "n1", text: "Great question! Reach matters." }, { id: "n2", text: "You’ve mastered torque." }], prompt: { text: "Since you now understand it, which arm is harder", chips: [] } }),
+      hist([]),
+    );
+    expect(e).toContain(`rule no-flattery (turn 1): narration[0].text says "great question"`);
+    expect(e).toContain(`rule no-mastery-claim (turn 1): narration[1].text says "you've mastered"; never declare mastery from one answer`);
+    expect(e).toContain(`rule no-mastery-claim (turn 1): prompt.text says "you now understand"; never declare mastery from one answer`);
+    expect(findPhrases("YOU ARE A NATURAL at this", BANNED_PHRASES.flattery)).toEqual(["you are a natural"]);
+  });
+
+  it("near-misses pass: the same words, not the phrase", () => {
+    for (const text of [
+      "There is a great deal of torque here.",
+      "The question is how far out the weight sits.",
+      "Once you understand the moment arm, the rest follows.",
+      "Mastery takes more than one answer.",
+      "A good questioner checks the units.",
+      "You've measured the arm; now the payload.",
+    ])
+      expect(validatePedagogy(resp({ narration: [{ id: "n1", text }] }), hist([])), text).toEqual([]);
+  });
+
+  it("a known limit: a list cannot read intent, so a check question using the phrase is flagged too", () => {
+    expect(findPhrases("Do you now understand why", BANNED_PHRASES.mastery)).toEqual(["you now understand"]);
+  });
+});
+
+describe("rule 8: hold under pushback without new evidence (structure only)", () => {
+  it("pushback with no new evidence requires the move hold; with new evidence, the move may change", () => {
+    const pushed = hist([aili("explain"), learner({ pushback: true, new_evidence: false })]);
+    expect(validatePedagogy(resp({ move: "explain" }), pushed)).toContain(`rule hold-under-pushback (turn 2): the learner pushed back without new evidence; the move must be "hold", not "explain"`);
+    expect(validatePedagogy(resp({ move: "hold" }), pushed)).toEqual([]);
+    expect(validatePedagogy(resp({ move: "explain" }), hist([aili("explain"), learner({ pushback: true, new_evidence: true })]))).toEqual([]);
+    // Not checked here, and left to the M3 professor tests (behavior spec test 5): whether the
+    // earlier position was correct, whether the reply really is pushback without evidence (a
+    // classification made outside the validator), and whether the narration keeps the position.
+  });
+});
