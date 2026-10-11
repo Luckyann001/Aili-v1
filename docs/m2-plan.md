@@ -100,7 +100,7 @@ Read with: `CLAUDE.md`, `docs/aili-architecture.md` (§4 registry, §5 per-turn 
 | 4 | Meriam & Kraige, *Engineering Mechanics: Statics* | Moments and equilibrium chapters | Not used in M2 |
 | 5 | Lynch & Park, *Modern Robotics* | §5.2 statics | Not used in M2 |
 
-Both OpenStax books are CC BY 4.0. Tests that quote them carry the attribution.
+Both OpenStax books are **CC BY-NC-SA 4.0** (as stated on their pages, checked Oct 11 2026; the earlier "CC BY 4.0" was from memory and wrong). Tests quote only the data and results they need, with attribution.
 
 ## 4. Per-turn flow
 
