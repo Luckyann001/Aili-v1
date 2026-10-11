@@ -61,6 +61,34 @@ describe("textbook: [CP2] Example 9.4 — a horizontal forearm, its own weight i
   });
 });
 
+describe("textbook: [CP2] Example 9.4 through the full solver — uniform forearm, load in the hand", () => {
+  // The same book data, as the solver's inputs (mapping approved by Lucky, 2026-10-11):
+  //   forearm 2.50 kg with its centre of gravity at r2 = 0.160 m → a uniform arm 0.32 m long
+  //     (its middle is at 0.160 m), arm_kg_per_m = 2.50 / 0.32 = 7.8125;
+  //   load 4.00 kg at r3 = 0.380 m → one extra mass, beyond the arm's 0.32 m end (held in the hand);
+  //   no payload at the tip; θ = 0 (forearm horizontal, as in the book).
+  // Gravity: the book uses g = 9.80 m/s²; the solver always uses standard gravity 9.80665 m/s²
+  // (about 0.07% apart). So the solver's force is close to the book's 470 N, not equal to it.
+  // Hand calculation with the book's g: (0.160 × 2.50 + 0.380 × 4.00) × 9.80 = 1.92 × 9.80 = 18.816 N·m.
+  const r = staticTorqueSingleLink({
+    arm_length_m: 0.32,
+    payload_kg: 0,
+    arm_kg_per_m: 7.8125,
+    angle_deg: 0,
+    extra_masses: [{ mass_kg: 4.0, distance_m: 0.38 }],
+  });
+
+  it("biceps force at r1 = 0.0400 m is within 0.2% of the book's 470 N", () => {
+    const FB_n = r.torque_nm / 0.04;
+    expect(Math.abs(FB_n - 470) / 470).toBeLessThan(0.002); // 470.72 N with standard gravity
+  });
+
+  it("torque equals the hand calculation with g = 9.80, scaled by 9.80665 / 9.80", () => {
+    expect(r.torque_nm).toBeCloseTo(18.816 * (STANDARD_GRAVITY_M_PER_S2 / 9.8), 10);
+    expect(r.arm_torque_nm).toBeCloseTo(STANDARD_GRAVITY_M_PER_S2 * 2.5 * 0.16, 10); // the forearm's own share
+  });
+});
+
 describe("textbook: [UP1] Example 12.4 — a tilted forearm, its own weight neglected", () => {
   // "A weightlifter is holding a 50.0-lb weight (equivalent to 222.4 N) with his forearm, as shown
   //  in Figure 12.11. His forearm is positioned at β=60° with respect to his upper arm."
@@ -167,6 +195,11 @@ describe("property tests (not worked examples)", () => {
     expect(() => staticTorqueSingleLink({ ...base, arm_kg_per_m: 0 })).toThrow(/own mass is always included/);
   });
 
+  it("extra masses may sit beyond the arm's end (a held object), and count at their own distance", () => {
+    const r = staticTorqueSingleLink({ ...base, extra_masses: [{ mass_kg: 0.2, distance_m: base.arm_length_m + 0.1 }] });
+    expect(r.extra_torque_nm).toBeCloseTo(STANDARD_GRAVITY_M_PER_S2 * 0.2 * 0.35, 12);
+  });
+
   it("extra masses add their own moment", () => {
     const r = staticTorqueSingleLink({ ...base, extra_masses: [{ mass_kg: 0.1, distance_m: 0.1 }] });
     expect(r.extra_torque_nm).toBeCloseTo(STANDARD_GRAVITY_M_PER_S2 * 0.1 * 0.1, 12);
@@ -187,7 +220,6 @@ describe("property tests (not worked examples)", () => {
     expect(() => staticTorqueSingleLink({ ...base, arm_length_m: 0 })).toThrow(/arm_length_m/);
     expect(() => staticTorqueSingleLink({ ...base, payload_kg: -0.1 })).toThrow(/payload_kg/);
     expect(() => staticTorqueSingleLink({ ...base, payload_kg: Number.NaN })).toThrow(/finite/);
-    expect(() => staticTorqueSingleLink({ ...base, extra_masses: [{ mass_kg: 0.1, distance_m: 0.3 }] })).toThrow(/beyond the arm/);
     expect(() => staticTorqueSingleLink({ ...base, rated_stall_torque_nm: 1, rated_continuous_torque_nm: 1 })).toThrow(/give one rating/);
     expect(() => staticTorqueSingleLink({ ...base, rated_stall_torque_nm: 0 })).toThrow(/greater than 0/);
   });
@@ -215,6 +247,8 @@ describe("input checks: negative, non-finite and above the sanity caps", () => {
     expect(over({ arm_kg_per_m: SANITY_CAPS.arm_kg_per_m + 1 })).toThrow(/sanity cap of 50 kg\/m/);
     expect(over({ rated_stall_torque_nm: SANITY_CAPS.rated_torque_nm + 1 })).toThrow(/sanity cap of 100 N·m/);
     expect(over({ extra_masses: [{ mass_kg: SANITY_CAPS.extra_mass_kg + 1, distance_m: 0.1 }] })).toThrow(/sanity cap of 100 kg/);
+    expect(over({ extra_masses: [{ mass_kg: 0.1, distance_m: SANITY_CAPS.extra_mass_distance_m + 0.01 }] })).toThrow(/distance_m is above the sanity cap of 5 m/);
+    expect(over({ extra_masses: [{ mass_kg: 0.1, distance_m: SANITY_CAPS.extra_mass_distance_m }] })).not.toThrow();
     expect(() => gravityMoment_nm([], 0, 98)).toThrow(/between 9\.7 and 9\.9/); // g typed ten times too big
     expect(over({ payload_kg: SANITY_CAPS.payload_kg, rated_continuous_torque_nm: SANITY_CAPS.rated_torque_nm })).not.toThrow();
   });

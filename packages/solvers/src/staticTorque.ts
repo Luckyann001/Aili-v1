@@ -5,7 +5,8 @@ import { STANDARD_GRAVITY_M_PER_S2, cosDeg, kgfCmFromNm } from "./units";
 // Model and assumptions (state these wherever the result is shown):
 // - Static hold only: the arm is held still. No acceleration, friction or gear play.
 // - The arm is a rigid, uniform bar: its own mass acts at its middle.
-// - The payload is a point mass at the tip; extra masses are points at stated distances.
+// - The payload is a point mass at the tip; extra masses are points at stated distances, and
+//   extra masses may sit beyond the arm's end (a held object, a gripper), up to the 5 m cap.
 // - θ is the arm's angle measured FROM HORIZONTAL: 0° is level (largest torque), 90° is
 //   straight up (no gravity torque). Gravity acts straight down.
 //
@@ -27,6 +28,8 @@ export const SANITY_CAPS = {
   payload_kg: 100,
   arm_kg_per_m: 50,
   extra_mass_kg: 100,
+  /** Extra masses may sit beyond the arm's end, but not further than this from the joint. */
+  extra_mass_distance_m: 5,
   /** About 1,020 kgf·cm: far above any hobby servo and above anything this model is used for. */
   rated_torque_nm: 100,
   /** Only textbook checks override g (for example 9.80); anything outside this is a mistake. */
@@ -95,7 +98,7 @@ export function staticTorqueSingleLink(input: SingleLinkInput): SingleLinkResult
   cap("payload_kg", payload_kg, SANITY_CAPS.payload_kg, "kg");
   cap("arm_kg_per_m", arm_kg_per_m, SANITY_CAPS.arm_kg_per_m, "kg/m");
   for (const [i, m] of extra_masses.entries())
-    if (m.distance_m > L) throw new RangeError(`extra_masses[${i}].distance_m must not be beyond the arm's length`);
+    cap(`extra_masses[${i}].distance_m`, m.distance_m, SANITY_CAPS.extra_mass_distance_m, "m");
 
   const payload_torque_nm = gravityMoment_nm([{ mass_kg: payload_kg, distance_m: L }], angle_deg);
   const arm_torque_nm = gravityMoment_nm([{ mass_kg: arm_kg_per_m * L, distance_m: L / 2 }], angle_deg);
