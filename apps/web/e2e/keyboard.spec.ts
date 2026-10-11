@@ -72,7 +72,7 @@ for (const scene of ["arm", "lever"] as const) {
     });
     await installVoiceFakes(page, { speakMs: 200 });
     await page.goto("/learn");
-    await expect(page.getByText("3D view isn't available on this device, so here is a still picture of the parts.")).toBeVisible();
+    await expect(page.getByText("3D view isn't available on this device, so here is a still picture of the parts.")).toBeVisible({ timeout: 15000 }); // the still loading picture shows first
     if (scene === "lever") {
       await tabTo(page, /^Start: why reach/);
       await page.keyboard.press("Enter");
@@ -82,6 +82,8 @@ for (const scene of ["arm", "lever"] as const) {
     await page.locator("main").focus();
     await tabTo(page, /^Parts/);
     await page.keyboard.press("Enter");
+    // Home first: the lesson may have left any part selected when it was stopped (timing-dependent).
+    await page.keyboard.press("Home");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
     const picked = scene === "arm" ? "Servo body" : "Ruler";
