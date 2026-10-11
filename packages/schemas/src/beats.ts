@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ConceptId } from "./base";
 import { KebabId } from "./scene";
 
 // Scripted beats (prepared demo, not live AI) and the validated actions they are made of.
@@ -44,7 +45,8 @@ export const Explanation = z
   .object({ title: z.string().min(1), body: z.string().min(1), assumptions: z.array(z.string().min(1)).default([]), limits: z.array(z.string().min(1)).default([]) })
   .strict();
 
-export const BeatKind = z.enum(["framing", "probe", "commit", "reveal", "link", "check"]);
+/** "explain": a short concept explanation, e.g. before a true beginner's first probe (spec A1a). */
+export const BeatKind = z.enum(["framing", "explain", "probe", "commit", "reveal", "link", "check"]);
 
 /** The behavior spec's move names (A3). Each beat says which move it is. */
 export const Move = z.enum(["probe", "explain", "challenge", "demand_evidence", "debate", "assign", "teach_back", "review", "answer", "hold"]);
@@ -52,6 +54,7 @@ export const Move = z.enum(["probe", "explain", "challenge", "demand_evidence", 
 /** Which moves each beat kind may be. Framing explains the setup, not the concept. */
 export const MOVES_FOR_KIND: Record<z.infer<typeof BeatKind>, Array<z.infer<typeof Move>>> = {
   framing: ["explain"],
+  explain: ["explain"],
   probe: ["probe"],
   commit: ["probe"], // the learner's half of the probe exchange
   reveal: ["explain"],
@@ -64,6 +67,8 @@ export const Beat = z
     id: KebabId,
     kind: BeatKind,
     move: Move,
+    /** The concepts the beat is about; an explain beat must name at least one. */
+    concepts: z.array(ConceptId).default([]),
     narration: z.array(Narration).min(1),
     actions: z.array(Action).default([]),
     feedback: Feedback.optional(),

@@ -79,12 +79,14 @@ export function validateBeats(raw: unknown, ctx: BeatContext): { script: BeatScr
 
     const questions = beat.narration.reduce((n, x) => n + (x.text.match(/\?/g)?.length ?? 0), 0);
     if (beat.kind === "framing" && questions > 0) errors.push(`${at}: a framing beat explains the setup and asks no question`);
+    if (beat.kind === "explain" && questions > 0) errors.push(`${at}: an explain beat explains and asks no question`);
+    if (beat.kind === "explain" && beat.concepts.length === 0) errors.push(`${at}: an explain beat names the concept it explains (concepts is empty)`);
     if (questions > 1) errors.push(`${at}: ${questions} questions in one beat (at most one open question)`);
     if (questions === 1) {
       if (questionPending) errors.push(`${at}: a second question before anything was given back (add a reveal or link beat first)`);
       questionPending = true;
     }
-    if (beat.kind === "reveal" || beat.kind === "link") questionPending = false;
+    if (beat.kind === "explain" || beat.kind === "reveal" || beat.kind === "link") questionPending = false;
 
     if (beat.kind === "commit") {
       const prev = script.beats[bi - 1];

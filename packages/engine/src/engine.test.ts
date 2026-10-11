@@ -108,8 +108,8 @@ describe("beats: the beginner lever script", () => {
   it("is valid: framing, probe, commit, reveal, link, check, each with a fitting move", () => {
     const r = validateBeats(script(), ctx());
     expect(r.errors).toEqual([]);
-    expect(r.script!.beats.map((b) => b.kind)).toEqual(["framing", "probe", "commit", "reveal", "link", "check"]);
-    expect(r.script!.beats.map((b) => b.move)).toEqual(["explain", "probe", "probe", "explain", "explain", "probe"]);
+    expect(r.script!.beats.map((b) => b.kind)).toEqual(["framing", "explain", "probe", "commit", "reveal", "link", "check"]);
+    expect(r.script!.beats.map((b) => b.move)).toEqual(["explain", "explain", "probe", "probe", "explain", "explain", "probe"]);
   });
 
   const broken = (mutate: (s: ReturnType<typeof script>) => void) => {
@@ -122,7 +122,7 @@ describe("beats: the beginner lever script", () => {
     expect(broken((s) => (s.beats[0].actions[0].scene = "no-such-scene"))).toMatch(/unknown scene "no-such-scene"/);
     expect(broken((s) => (s.beats[0].actions[2].part = "arm"))).toMatch(/part "arm" is not in scene "lever-analogy"/);
     expect(broken((s) => (s.beats[0].actions[1].param = "arm_length_m"))).toMatch(/setting "arm_length_m" is not in scene/);
-    expect(broken((s) => (s.beats[3].actions[0].animation = "explode"))).toMatch(/animation "explode" is not in scene "lever-analogy"/);
+    expect(broken((s) => (s.beats[4].actions[0].animation = "explode"))).toMatch(/animation "explode" is not in scene "lever-analogy"/);
   });
 
   it("rejects values out of bounds and actions before a scene is chosen", () => {
@@ -131,21 +131,23 @@ describe("beats: the beginner lever script", () => {
   });
 
   it("rejects hard-coded numbers in narration, feedback and the explanation panel", () => {
-    expect(broken((s) => (s.beats[3].narration[2].text = "About 4 times the effort."))).toMatch(/hard-coded number "4"/);
-    expect(broken((s) => (s.beats[3].explanation.body = "Twist = 0.2 × 0.3"))).toMatch(/explanation: hard-coded numbers "0.2", "0.3"/);
+    expect(broken((s) => (s.beats[4].narration[2].text = "About 4 times the effort."))).toMatch(/hard-coded number "4"/);
+    expect(broken((s) => (s.beats[4].explanation.body = "Twist = 0.2 × 0.3"))).toMatch(/explanation: hard-coded numbers "0.2", "0.3"/);
   });
 
   it("enforces pacing: one question per beat, none twice in a row", () => {
-    expect(broken((s) => (s.beats[1].narration[0].text = "Ready? Which is harder?"))).toMatch(/2 questions in one beat/);
-    expect(broken((s) => s.beats.splice(3, 2))).toMatch(/second question before anything was given back/);
+    expect(broken((s) => (s.beats[2].narration[0].text = "Ready? Which is harder?"))).toMatch(/2 questions in one beat/);
+    expect(broken((s) => s.beats.splice(4, 2))).toMatch(/second question before anything was given back/);
     expect(broken((s) => (s.beats[0].narration[0].text = "Ready for a ruler?"))).toMatch(/framing beat explains the setup and asks no question/);
+    expect(broken((s) => (s.beats[1].narration[1].text = "Can you feel it?"))).toMatch(/an explain beat explains and asks no question/);
+    expect(broken((s) => (s.beats[1].concepts = []))).toMatch(/an explain beat names the concept it explains/);
   });
 
   it("commit follows choices; feedback names a real choice; unknown fields rejected", () => {
-    expect(broken((s) => (s.beats[1].actions = s.beats[1].actions.filter((a: { type: string }) => a.type !== "show_choices")))).toMatch(
+    expect(broken((s) => (s.beats[2].actions = s.beats[2].actions.filter((a: { type: string }) => a.type !== "show_choices")))).toMatch(
       /commit beat must follow a beat that offers choices/,
     );
-    expect(broken((s) => (s.beats[3].feedback.correct_choice = "maybe"))).toMatch(/correct_choice "maybe" is not one of near, far, not-sure/);
+    expect(broken((s) => (s.beats[4].feedback.correct_choice = "maybe"))).toMatch(/correct_choice "maybe" is not one of near, far, not-sure/);
     expect(broken((s) => (s.beats[0].speed = "fast"))).toMatch(/speed|Unrecognized key/i);
   });
 });
@@ -159,13 +161,13 @@ describe("beats: moves and Not sure", () => {
   };
 
   it("each beat's move must fit its kind and be a behavior-spec move", () => {
-    expect(broken((s) => (s.beats[3].move = "probe"))).toMatch(/move "probe" does not fit a reveal beat \(allowed: explain\)/);
-    expect(broken((s) => (s.beats[1].move = "lecture"))).toMatch(/move/);
+    expect(broken((s) => (s.beats[4].move = "probe"))).toMatch(/move "probe" does not fit a reveal beat \(allowed: explain\)/);
+    expect(broken((s) => (s.beats[2].move = "lecture"))).toMatch(/move/);
   });
 
   it("every choice list offers Not sure, and feedback has wording for it", () => {
-    expect(broken((s) => s.beats[1].actions[1].choices.pop())).toMatch(/choices must include "not-sure"/);
-    expect(broken((s) => delete s.beats[3].feedback.unsure)).toMatch(/feedback needs "unsure" wording/);
+    expect(broken((s) => s.beats[2].actions[1].choices.pop())).toMatch(/choices must include "not-sure"/);
+    expect(broken((s) => delete s.beats[4].feedback.unsure)).toMatch(/feedback needs "unsure" wording/);
   });
 });
 
