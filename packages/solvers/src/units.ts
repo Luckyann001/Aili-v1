@@ -14,3 +14,16 @@ export function kgfCmFromNm(torque_nm: number): number {
 export function nmFromKgfCm(torque_kgf_cm: number): number {
   return torque_kgf_cm * NM_PER_KGF_CM;
 }
+
+// Edge conversions: what a learner types or a datasheet states → SI, used only at the edges.
+
+export const kgFromG = (mass_g: number): number => mass_g / 1000;
+export const mFromCm = (length_cm: number): number => length_cm / 100;
+export const radFromDeg = (angle_deg: number): number => (angle_deg * Math.PI) / 180;
+
+/** cos of an angle in degrees, exact at 0° and 90° (Math.cos(π/2) is 6e-17, not 0). */
+export function cosDeg(angle_deg: number): number {
+  if (angle_deg === 90) return 0;
+  if (angle_deg === 0) return 1;
+  return Math.cos(radFromDeg(angle_deg));
+}
