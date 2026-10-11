@@ -1,0 +1,232 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { itemLabel, loadRegistry, shortlist, validateRegistry, type RegistryInput } from "./index";
+
+// Real content comes from content/robotics. Everything "published" below is a test fixture
+// (docs/m2-plan.md, decision 5): no review record, so no reviewer name is ever invented.
+
+const CONTENT = new URL("../../../content/robotics/", import.meta.url);
+const readJson = (rel: string) => JSON.parse(readFileSync(new URL(rel, CONTENT), "utf8"));
+const dir = (d: string) => readdirSync(new URL(`${d}/`, CONTENT)).map((f) => ({ file: f, data: readJson(`${d}/${f}`) }));
+const real = (): RegistryInput => ({ concepts: readJson("concepts.json"), scenes: dir("scenes"), capabilities: dir("capabilities") });
+
+const DEV = { allowTestFixtures: true };
+const PROD = { allowTestFixtures: false };
+const C = "mech.torque.static";
+
+const fx = { review_status: "published", test_fixture: true } as const;
+const solver = (o: object = {}) => ({
+  id: "solver.fx-torque",
+  type: "solver",
+  title: "Fixture solver",
+  version: "0.1.0",
+  teaches: [C],
+  fidelity: "verified",
+  provenance: "authored",
+  ...fx,
+  inputs: { arm_length_m: { unit: "m", min: 0.05, max: 0.5 } },
+  outputs: { torque_nm: { unit: "N·m" } },
+  assumptions: ["static hold only"],
+  excludes: ["acceleration"],
+  ...o,
+});
+const sim = (o: object = {}) => ({
+  id: "sim.fx-load",
+  type: "simulation",
+  title: "Fixture simulation",
+  version: "0.1.0",
+  teaches: [C],
+  levels: ["L2"],
+  fidelity: "verified",
+  provenance: "authored",
+  ...fx,
+  solver: { id: "solver.fx-torque", version: "0.1.0" },
+  inputs: { arm_length_m: { unit: "m", min: 0.1, max: 0.3 } },
+  outputs: ["torque_nm"],
+  assumptions: ["static hold only"],
+  excludes: ["acceleration"],
+  ...o,
+});
+const analogy = (o: object = {}) => ({
+  id: "analogy.fx-bag",
+  type: "analogy",
+  title: "Fixture analogy",
+  version: "0.1.0",
+  teaches: [C],
+  levels: ["L1"],
+  fidelity: "illustrative",
+  provenance: "authored",
+  ...fx,
+  mapping: [{ source: "reach", target: "moment arm" }],
+  breaks_down: "A shoulder is not a gearbox.",
+  ...o,
+});
+const source = (o: object = {}) => ({
+  id: "src.fx-book",
+  type: "source",
+  kind: "book",
+  title: "Fixture book",
+  authors: ["Fixture"],
+  edition: null,
+  url: null,
+  access: "free",
+  rights: "link out only",
+  verified: null,
+  test_fixture: true,
+  ...o,
+});
+const reading = (o: object = {}) => ({
+  id: "read.fx-moments",
+  type: "reading",
+  version: "0.1.0",
+  teaches: [C],
+  ...fx,
+  source: "src.fx-book",
+  location: "Fixture section",
+  level: "L2",
+  purpose: "deepen",
+  est_minutes: 20,
+  guide: { key_claims: ["Moment is force times perpendicular distance"], misconceptions: [], teach_back_prompts: ["Explain the moment arm"], application_question: "What changes when the arm tilts?" },
+  ...o,
+});
+
+const withItems = (items: object[], opts = DEV) =>
+  loadRegistry({ ...real(), capabilities: [...dir("capabilities"), ...items.map((data, i) => ({ file: `fx${i}.json`, data }))] }, opts);
+const errorsOf = (items: object[], opts = DEV) => withItems(items, opts).errors.join("\n");
+
+describe("capability registry: the files in content/robotics", () => {
+  it("load and validate in production (no fixtures)", () => {
+    const r = loadRegistry(real(), PROD);
+    expect(r.errors).toEqual([]);
+    expect(r.registry.simulations.map((s) => s.id)).toEqual(["sim.servo-static-load"]);
+    expect(r.registry.solvers.map((s) => s.id)).toEqual(["solver.static-torque-single-link"]);
+    expect(r.registry.scenes).toHaveLength(2);
+  });
+
+  it("are drafts written by the AI: no review record, not fixtures", () => {
+    for (const { data } of dir("capabilities")) {
+      expect(data.review_status).toBe("draft");
+      expect(data.review).toBeUndefined();
+      expect(data.test_fixture).toBeUndefined();
+    }
+  });
+
+  it("the servo simulation keeps the arm's own mass: its lower bound is above zero", () => {
+    const s = loadRegistry(real(), PROD).registry.simulations[0]!;
+    expect(s.inputs.arm_kg_per_m!.min).toBeGreaterThan(0);
+    expect(s.assumptions.join(" ")).toMatch(/from horizontal/);
+  });
+});
+
+describe("capability schemas: strict, with units in names", () => {
+  it("rejects unknown fields and IDs with the wrong prefix", () => {
+    expect(errorsOf([solver({ colour: "red" })])).toMatch(/colour/);
+    expect(errorsOf([solver({ id: "sim.fx-torque" })])).toMatch(/solver\.some-name/);
+  });
+
+  it("rejects a field whose name does not carry its unit, and bad bounds", () => {
+    expect(errorsOf([solver({ inputs: { arm_length: { unit: "m", min: 0, max: 1 } } })])).toMatch(/arm_length: unit "m" needs a name ending in _m/);
+    expect(errorsOf([solver({ inputs: { arm_length_m: { unit: "kg", min: 0, max: 1 } } })])).toMatch(/needs a name ending in _kg/);
+    expect(errorsOf([solver({ outputs: { torque: { unit: "ratio" } } })])).toMatch(/dimensionless/);
+    expect(errorsOf([solver({ inputs: { arm_length_m: { unit: "m", min: 1, max: 1 } } })])).toMatch(/min must be below max/);
+  });
+
+  it("reviewed or published needs a named human reviewer (the AI never publishes)", () => {
+    expect(errorsOf([analogy({ test_fixture: undefined })])).toMatch(/needs a named human reviewer/);
+  });
+
+  it("a reviewed solver needs a textbook worked example", () => {
+    expect(errorsOf([solver({ test_fixture: undefined, review_status: "reviewed" })])).toMatch(/textbook worked example/);
+    expect(errorsOf([solver({ worked_examples: [{ kind: "textbook", location: "somewhere" }] })])).toMatch(/names its source/);
+  });
+
+  it("a test fixture never carries a review or verification record", () => {
+    expect(errorsOf([analogy({ review: { by: "Someone", on: "2026-10-11" } })])).toMatch(/never carries a review record/);
+    expect(errorsOf([source({ verified: { by: "Someone", on: "2026-10-11" } })])).toMatch(/never carries a verification record/);
+  });
+});
+
+describe("test fixtures: development only", () => {
+  it("the production loader refuses them", () => {
+    const r = withItems([solver(), sim()], PROD);
+    expect(r.errors.join("\n")).toMatch(/"solver\.fx-torque" is a test fixture and is refused outside development/);
+    expect(r.registry.solvers).toEqual([]);
+  });
+
+  it("the dev loader accepts them, and the UI label says Test fixture", () => {
+    const r = withItems([solver(), sim()], DEV);
+    expect(r.errors).toEqual([]);
+    expect(itemLabel(r.registry.simulations.find((s) => s.id === "sim.fx-load")!)).toBe("Test fixture");
+    expect(itemLabel(r.registry.simulations.find((s) => s.id === "sim.servo-static-load")!)).toBe("Draft (not expert-reviewed)");
+  });
+
+  it("real content may not refer to a fixture", () => {
+    const realSim = sim({ id: "sim.real-load", test_fixture: undefined, review_status: "draft" });
+    expect(errorsOf([solver(), realSim])).toMatch(/sim\.real-load refers to test fixture "solver\.fx-torque"/);
+  });
+
+  it("the scene loader used by the Learn stage refuses fixture scenes too", () => {
+    const scene = { ...readJson("scenes/lever-analogy.json"), id: "fx-scene", test_fixture: true, review_status: "published" };
+    expect(validateRegistry([{ file: "fx.json", data: scene }], readJson("concepts.json")).errors.join()).toMatch(/refused outside development/);
+    expect(validateRegistry([{ file: "fx.json", data: scene }], readJson("concepts.json"), DEV).errors).toEqual([]);
+  });
+});
+
+describe("cross-references", () => {
+  it("concepts, solver, version, inputs, units, bounds and outputs must match", () => {
+    expect(errorsOf([solver({ teaches: ["mech.nothing"] })])).toMatch(/teaches unknown concept "mech\.nothing"/);
+    expect(errorsOf([sim()])).toMatch(/unknown solver "solver\.fx-torque"/);
+    expect(errorsOf([solver(), sim({ solver: { id: "solver.fx-torque", version: "0.2.0" } })])).toMatch(/pins solver\.fx-torque 0\.2\.0/);
+    expect(errorsOf([solver(), sim({ inputs: { arm_length_m: { unit: "m", min: 0.1, max: 0.3 }, payload_kg: { unit: "kg", min: 0, max: 1 } } })])).toMatch(/"payload_kg" is not an input/);
+    expect(errorsOf([solver(), sim({ inputs: { arm_length_m: { unit: "m", min: 0.01, max: 0.3 } } })])).toMatch(/goes outside the solver's 0\.05–0\.5/);
+    expect(errorsOf([solver(), sim({ inputs: {} })])).toMatch(/leaves out the solver input "arm_length_m"/);
+    expect(errorsOf([solver(), sim({ outputs: ["force_n"] })])).toMatch(/"force_n" is not an output/);
+  });
+
+  it("a published simulation cannot run on a draft solver", () => {
+    expect(errorsOf([solver({ review_status: "draft" }), sim()])).toMatch(/its solver solver\.fx-torque is still a draft/);
+  });
+
+  it("analogy scene and follow-up, reading source and alternatives must exist", () => {
+    expect(errorsOf([analogy({ scene: "no-such-scene" })])).toMatch(/unknown scene "no-such-scene"/);
+    expect(errorsOf([analogy({ followed_by: "sim.nothing" })])).toMatch(/unknown item "sim\.nothing"/);
+    expect(errorsOf([reading()])).toMatch(/unknown source "src\.fx-book"/);
+    expect(errorsOf([source(), reading({ alternatives: ["read.nothing"] })])).toMatch(/unknown reading "read\.nothing"/);
+  });
+
+  it("IDs are unique across all item types; any error leaves no partial registry", () => {
+    const r = withItems([solver(), solver()]);
+    expect(r.errors.join()).toMatch(/duplicate ID "solver\.fx-torque"/);
+    expect(r.registry.solvers).toEqual([]);
+    expect(r.registry.scenes).toEqual([]);
+  });
+});
+
+describe("shortlist: published items only, by concept and level", () => {
+  const full = () => withItems([solver(), sim(), analogy(), source(), reading()]).registry;
+
+  it("real content is all draft, so the professor sees nothing from it", () => {
+    const s = shortlist(loadRegistry(real(), PROD).registry, { concepts: [C], level: "L2" });
+    expect(s.ids.size).toBe(0);
+  });
+
+  it("picks by level, includes the solvers the simulations run, and the readings' sources", () => {
+    const l2 = shortlist(full(), { concepts: [C], level: "L2" });
+    expect([...l2.ids].sort()).toEqual(["read.fx-moments", "sim.fx-load", "solver.fx-torque", "src.fx-book"]);
+    const l1 = shortlist(full(), { concepts: [C], level: "L1" });
+    expect([...l1.ids].sort()).toEqual(["analogy.fx-bag", "solver.fx-torque"]);
+  });
+
+  it("leaves out other concepts and drafts", () => {
+    expect(shortlist(full(), { concepts: ["mech.moment-arm"], level: "L2" }).ids.size).toBe(0);
+    const drafts = withItems([solver(), sim(), analogy({ review_status: "draft" })]).registry;
+    expect(shortlist(drafts, { concepts: [C], level: "L1" }).analogies).toEqual([]);
+  });
+
+  it("a simulation whose solver is not published is left out", () => {
+    const reg = withItems([solver({ review_status: "reviewed" }), sim()]).registry;
+    const s = shortlist(reg, { concepts: [C], level: "L2" });
+    expect(s.simulations).toEqual([]);
+    expect(s.ids.has("sim.fx-load")).toBe(false);
+  });
+});
