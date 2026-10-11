@@ -1,0 +1,28 @@
+{
+  "id": "solver.static-torque-single-link",
+  "type": "solver",
+  "title": "Static holding torque of a single arm link",
+  "version": "0.1.0",
+  "teaches": ["mech.torque.static"],
+  "fidelity": "verified",
+  "provenance": "authored",
+  "review_status": "draft",
+  "inputs": {
+    "arm_length_m": { "unit": "m", "min": 0.05, "max": 0.5 },
+    "payload_kg": { "unit": "kg", "min": 0.0, "max": 1.5 },
+    "arm_kg_per_m": { "unit": "kg/m", "min": 0.1, "max": 1.0 },
+    "angle_deg": { "unit": "deg", "min": 0, "max": 90 }
+  },
+  "outputs": {
+    "torque_nm": { "unit": "N·m" },
+    "torque_kgf_cm": { "unit": "kgf·cm" }
+  },
+  "assumptions": [
+    "static hold only",
+    "uniform bar: the arm's own mass acts at its middle",
+    "payload is a point mass at the tip",
+    "angle measured from horizontal: 0 degrees is level, 90 degrees is straight up"
+  ],
+  "excludes": ["acceleration", "friction", "gear play", "structural stress", "temperature and duty cycle", "control stability"],
+  "worked_examples": []
+}
