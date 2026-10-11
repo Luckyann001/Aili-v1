@@ -6,3 +6,5 @@ export * from "./gate";
 export * from "./capabilities";
 export * from "./director";
 export * from "./pedagogy";
+export * from "./turn";
+export * from "./fakeDirector";
