@@ -155,6 +155,7 @@ Every slice ends with lint, typecheck, unit tests and the e2e run, followed by s
 - Vercel's limit on how long a streaming function may run.
 - Real prices.
 - Textbook numbers until they have been transcribed from the actual pages.
+- Citations are checked per evidence ID, not per claim; M3 professor tests must probe this.
 
 ## 8. Risks and notes
 
