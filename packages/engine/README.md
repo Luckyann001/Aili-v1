@@ -14,6 +14,22 @@ production refuses them. `shortlist(concepts, level)` returns published items on
 fields, verified evidence, numbers only through `{{calc.output}}` placeholders from this turn, a
 question only in `prompt`, and narration caps. Errors name the exact field and value.
 
+## One turn (`src/turn.ts`, `src/fakeDirector.ts`)
+`TurnSession.run(input, emit)`: shortlist → director → structural validator → pedagogy validator →
+solvers → compile (placeholders filled, three significant figures) → events.
+- **Events**, in order: `turn.started`, `narration`, `action`, `calc.result`, `prompt`, `turn.done`;
+  or `turn.started` then `turn.error`. Each carries `turn_id`, `seq` and `rev`.
+- **No partial turns**: everything that can fail runs before any content event. A failure emits
+  `turn.error` (plain words for the learner, `details` for developers) and keeps the last valid state.
+- **Stale events**: a new turn or `interrupt()` bumps the revision and aborts the director; events
+  from an older revision are dropped before they reach `emit`. The client's gate (`admit`) drops
+  late ones again.
+- **Director**: an interface. M2 has only `createFakeDirector` (scripted cases: valid, invalid-id,
+  out-of-bounds, hard-coded-number, pedagogy-violation, solver-failure, slow). It answers from the
+  test-fixture shortlist, so it works only with the dev fixture registry. No provider, key or network.
+- **State** (`SessionState`: history and the scene on stage) is in memory; saving it waits for the
+  database (deferred stage).
+
 ## Pedagogy validator (`src/pedagogy.ts`)
 `validatePedagogy(response, history)` checks a response against the session history
 (`SessionHistory` in `@aili/schemas`). Errors read `rule <name> (turn N): …`.
