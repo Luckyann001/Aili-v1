@@ -4,3 +4,4 @@ export * from "./registry";
 export * from "./beats";
 export * from "./gate";
 export * from "./capabilities";
+export * from "./director";
