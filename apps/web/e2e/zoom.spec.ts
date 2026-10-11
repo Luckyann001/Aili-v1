@@ -46,3 +46,18 @@ for (const mode of ["zoom200", "largeText"] as const) {
     await page.screenshot({ path: info.outputPath(`${mode}-probe.png`), fullPage: true });
   });
 }
+
+// Landing, login and Home: simple pages, checked at both sizes on the phone project.
+for (const mode of ["zoom200", "largeText"] as const) {
+  test(`${mode}: public pages and Home`, async ({ page }, info) => {
+    test.skip(info.project.name !== "phone");
+    const w = mode === "zoom200" ? 206 : 360;
+    await page.setViewportSize(mode === "zoom200" ? { width: 206, height: 420 } : { width: 360, height: 740 });
+    if (mode === "largeText") await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => (document.documentElement.style.fontSize = "200%")));
+    for (const path of ["/", "/login", "/home"]) {
+      await page.goto(path);
+      await audit(page, `${mode} ${path}`, w);
+      await page.screenshot({ path: info.outputPath(`${mode}${path.replace(/\//g, "-") || "-root"}.png`), fullPage: true });
+    }
+  });
+}

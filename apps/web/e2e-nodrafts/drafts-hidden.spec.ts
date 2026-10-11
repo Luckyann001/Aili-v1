@@ -24,10 +24,33 @@ test("the lesson says plainly it isn't available yet, and asks nothing", async (
   await expect(page.locator("canvas")).toHaveCount(0);
 });
 
-test("the development /preview page is not in production, and / no longer links to it", async ({ page }) => {
+test("the development /preview page is not in production, and / does not link to it", async ({ page }) => {
   const res = await page.goto("/preview");
   expect(res!.status()).toBe(404);
   await page.goto("/");
   await expect(page.locator('a[href="/preview"]')).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Open the Learn stage" })).toHaveAttribute("href", "/learn");
+});
+
+// Landing and Home keep the button but say why the lesson can't run yet; /login stays a plain page.
+test("landing and Home say the demo lesson is waiting for expert review", async ({ page }) => {
+  for (const path of ["/", "/home"]) {
+    await page.goto(path);
+    await expect(page.getByText("The demo lesson is waiting for expert review."), path).toBeVisible();
+    await expect(page.locator('main a[href="/learn"]').first(), path).toBeVisible();
+  }
+});
+
+for (const path of ["/", "/login"]) {
+  test(`${path}: no form fields; axe clean`, async ({ page }) => {
+    await page.goto(path);
+    await expect(page.locator("form, input, textarea, select")).toHaveCount(0);
+    const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    expect(axe.violations.map((v) => v.id)).toEqual([]);
+  });
+}
+
+test("/login offers the demo lesson without an account", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.getByText("Sign-in opens with the beta. For now, you can try the demo lesson without an account.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Try the demo lesson" })).toHaveAttribute("href", "/learn");
 });

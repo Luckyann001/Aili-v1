@@ -94,7 +94,7 @@ test.describe("app shell", () => {
 });
 
 test.describe("accessibility (axe, WCAG 2.2 A/AA)", () => {
-  for (const path of ["/", "/home", "/learn", "/preview"]) {
+  for (const path of ["/", "/login", "/home", "/learn", "/preview"]) {
     for (const scheme of ["light", "dark"] as const) {
       test(`${path} ${scheme}`, async ({ page }) => {
         await page.emulateMedia({ colorScheme: scheme });
