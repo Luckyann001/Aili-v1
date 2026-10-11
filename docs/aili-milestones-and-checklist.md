@@ -13,19 +13,19 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] `design/tokens.css` (light + dark), self-hosted Newsreader + Inter, SVG logo set
 - [ ] Hosting, database and auth projects created by you; keys server-side only, `.env` ignored
 
-**M1 — App shell and Learn stage layout**
-- [ ] Landing, Home/Resume, top bar + menu
-- [ ] Learn stage layout: stage canvas, voice states, caption overlay, on-demand text panel, Library drawer
-- [ ] Auth, session create/resume
-- [ ] React Three Fiber scene: orbit, select, label, exploded view
-- [ ] Accessibility pass (contrast, keyboard, reduced motion); Prepared/Live badge
-- [ ] Check on a real mid-range Android phone
+**M1 — App shell and Learn stage layout (paused Oct 11 2026, not finished)**
+- [x] Landing v1, Home/Resume, top bar + menu (landing polish deferred, below)
+- [x] Learn stage layout: stage canvas, voice states, caption overlay, on-demand text panel, Library drawer
+- [ ] Auth, session create/resume (deferred, below)
+- [x] React Three Fiber scene: orbit, select, label, exploded view
+- [x] Accessibility pass (contrast, keyboard, reduced motion); Prepared/Live badge
+- [x] Check on a real low-end Android phone (Itel A667L, Android 14, Oct 11 2026)
 
 **M2 — Engine: registry, solver, validator**
-- [ ] Capability registry schema (JSON in git → DB)
+- [ ] Capability registry schema (validated JSON bundle in git; database sync deferred, below)
 - [ ] Solver package + tests against worked examples
 - [ ] Director-response schema + validator (no hard-coded engineering numbers, one question max)
-- [ ] Per-turn flow over WebSocket/SSE; interrupt + stale-action invalidation
+- [ ] Per-turn flow over SSE plus a POST interrupt; stale-action invalidation
 - [ ] Cost + token metering per session
 
 **M3 — Professor (live AI)**
@@ -51,6 +51,13 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 **M6 — Labs 2–3 and library**
 - [ ] Inside-the-servo/gearing lab; feedback-control lab
 - [ ] Reference library UI, 30–40 verified items
+
+**Deferred stage (after M6, before M7, and before any public deployment or real AI key)** — decided Oct 11 2026
+- [ ] Sign-in (M1 slice 8)
+- [ ] Saved sessions and migration (M1 slice 9)
+- [ ] Landing page polish
+- [ ] Waitlist
+- [ ] Registry database sync (JSON in git → Postgres)
 
 **M7 — Beta readiness**
 - [ ] Waitlist, invite codes, consent + data-deletion wording (check Kenya data-protection requirements)

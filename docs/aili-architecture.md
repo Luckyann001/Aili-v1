@@ -118,7 +118,7 @@ Bounds below come from the reference prototype. Static model: `tau = (m_p * l + 
   "outputs": ["torque_nm", "torque_kgcm", "share_of_rating"],
   "assumptions": ["static hold only", "uniform bar", "payload at the tip", "angle measured above horizontal"],
   "excludes": ["acceleration", "friction", "gear play", "structural stress", "temperature and duty cycle", "control stability"],
-  "fidelity": "verified_static_model",
+  "fidelity": "verified",
   "review_status": "draft"
 }
 ```
@@ -170,16 +170,18 @@ Used by the beginner lever analogy to drive an illustrative, unitless effort gau
   "state_rev": 14,
   "move": "challenge",
   "narration": [
-    { "id": "n1", "text": "You said a bigger servo will do. Bigger by which number, and at what voltage?" }
+    { "id": "n1", "text": "You said a bigger servo will do. Bigger needs a number: datasheets give torque at a stated supply voltage." }
   ],
   "actions": [ { "type": "focus", "object": "servo.horn" } ],
   "calc_requests": [],
   "evidence": ["ev.datasheet-stall-torque"],
-  "prompt": { "text": "Which datasheet figure are you comparing?", "chips": ["I have a datasheet", "Not sure where to look"] },
+  "prompt": { "text": "Which datasheet figure are you comparing, and at what voltage?", "chips": ["I have a datasheet", "Not sure where to look"] },
   "assumptions": [],
   "limitations": []
 }
 ```
+
+The only question is in `prompt`; narration explains and never asks (one open question, behavior spec A5). Fidelity uses the schema's values: `verified`, `simplified_teaching`, `illustrative`. [Example corrected Oct 11 2026.]
 
 Failure rule: on any validation, provider or solver failure, keep the last valid state and show a clear message. Never present prepared content as a live model response.
 
