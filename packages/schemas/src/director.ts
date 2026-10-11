@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Action, Move, Narration } from "./beats";
 import { ReadingId, SimulationId, SolverId } from "./capabilities";
+import { ConceptId } from "./base";
 
 // The director's structured response for one turn (architecture §5, docs/m2-plan.md §2).
 // The schema checks shape only; the engine's validator checks it against this turn's shortlist,
@@ -30,6 +31,8 @@ export const DirectorResponse = z
     request_id: z.string().min(1).max(64),
     state_rev: z.number().int().nonnegative(),
     move: Move,
+    /** The concepts this turn is about (a probe must name one; see the pedagogy validator). */
+    concepts: z.array(ConceptId).default([]),
     /** Safety-relevant turns may exceed the challenge budget (checked in the pedagogy validator). */
     safety: z.boolean().default(false),
     narration: z.array(Narration).default([]),
