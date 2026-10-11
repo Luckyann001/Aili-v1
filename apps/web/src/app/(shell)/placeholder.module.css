@@ -1,9 +1,0 @@
-.wrap {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--aili-space-8) var(--aili-space-4);
-}
-
-.note {
-  color: var(--aili-text-muted);
-}
