@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import styles from "../placeholder.module.css";
+import { StatusNote } from "@/components/StatusNote";
+import { HomeResume } from "./HomeResume";
+import styles from "./home.module.css";
 
 export const metadata: Metadata = { title: "Home · AILI" };
 
-// Placeholder. Home/Resume is M1 slice 7.
+// Home/Resume: resume and start a new goal. Not a dashboard.
 export default function HomePage() {
   return (
     <div className={styles.wrap}>
       <h1>Home</h1>
-      <p className={styles.note}>Resume and start-a-goal arrive in a later M1 slice.</p>
+      <StatusNote>Early beta. Lessons are prepared demos; the live professor is not connected yet.</StatusNote>
+      <HomeResume />
     </div>
   );
 }

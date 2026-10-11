@@ -15,6 +15,7 @@ import { useVoice } from "@/voice/store";
 import { useVoiceController } from "@/voice/useVoiceController";
 import { useLesson } from "@/lesson/store";
 import { useLessonPlayer } from "@/lesson/useLessonPlayer";
+import { markLearnVisited } from "@/learn/visited";
 import { CommandBar, type ChipOffer } from "./CommandBar";
 import { EffortGauge } from "./scene/EffortGauge";
 import { ConsentDialog } from "./ConsentDialog";
@@ -58,6 +59,9 @@ export function LearnStage() {
     [],
   );
   const safeArea = useRef<HTMLDivElement | null>(null);
+
+  // Lets Home offer "Pick up where you left off" (a flag in this browser only).
+  useEffect(markLearnVisited, []);
   const labelEls = useRef(new Map<string, HTMLElement>());
 
   const [text, setText] = useState("");
