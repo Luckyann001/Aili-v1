@@ -43,6 +43,14 @@ test.describe("beginner lever lesson", () => {
   test("plays the whole path: framing, explanation, probe, commit, reveal, link, check", async ({ page }, info) => {
     await openLearn(page);
     await expect(replies(page)).toHaveCount(0); // no question open before the lesson asks one
+    await page.evaluate(() => {
+      const w = window as unknown as { __aili: { spoken: string[] }; __order: { repliesAt: number | null; panelOpened: boolean } };
+      w.__order = { repliesAt: null, panelOpened: false };
+      new MutationObserver(() => {
+        if (w.__order.repliesAt === null && document.querySelector('[role="group"][aria-label="Suggested replies"]')) w.__order.repliesAt = w.__aili.spoken.length;
+        if (document.querySelector("aside#learn-side")) w.__order.panelOpened = true;
+      }).observe(document.body, { childList: true, subtree: true });
+    });
     await startLesson(page);
 
     // Framing: the lever scene, a draft, hand end labelled.
@@ -52,18 +60,16 @@ test.describe("beginner lever lesson", () => {
     await shot(page, "beat-1-framing", info);
 
     // Explanation before any question (behavior spec A1a): intuition and an analogy, no question,
-    // no extra panel text, short captions.
-    await saidLine(page, "The weight tries to turn the ruler around your hand.");
-    await expect(replies(page)).toHaveCount(0);
-    await saidLine(page, "It is like a door turning on its hinges.");
-    await expect(replies(page)).toHaveCount(0);
-    await expect(page.getByRole("complementary")).toHaveCount(0); // the text panel stays closed
-    await saidLine(page, "To keep the ruler level, your hand twists back just as hard.");
+    // no extra panel text, short captions. Checked by order, not timing: a page-side observer
+    // records how many lines had been spoken when the choices first appeared, and if the panel opened.
+    const EXPLAIN = [
+      "The weight tries to turn the ruler around your hand.",
+      "It is like a door turning on its hinges.",
+      "To keep the ruler level, your hand twists back just as hard.",
+    ];
+    const PROBE = "Which is harder to hold out: the weight close to you, or far from you?";
+    await saidLine(page, EXPLAIN[2]!);
     await shot(page, "beat-2-explain", info);
-    const order = await spoken(page);
-    expect(order.indexOf("To keep the ruler level, your hand twists back just as hard.")).toBeLessThan(
-      order.indexOf("Which is harder to hold out: the weight close to you, or far from you?") === -1 ? Infinity : order.indexOf("Which is harder to hold out: the weight close to you, or far from you?"),
-    );
 
     // Probe: exactly one open question, with Not sure.
     await expect(replies(page)).toBeVisible({ timeout: 15000 });
@@ -71,6 +77,12 @@ test.describe("beginner lever lesson", () => {
     await expect(caption(page, "Which is harder to hold out: the weight close to you, or far from you?")).toBeVisible();
     await expect(gauge(page)).toHaveCount(0); // the gauge would give the answer away
     await shot(page, "beat-3-probe", info);
+    const order = await page.evaluate(() => (window as unknown as { __order: { repliesAt: number | null; panelOpened: boolean } }).__order);
+    const said = await spoken(page);
+    const before = said.slice(0, order.repliesAt ?? 0);
+    for (const line of EXPLAIN) expect(before, "explained before the choices appeared").toContain(line);
+    expect(before.indexOf(EXPLAIN[2]!)).toBeLessThan(before.indexOf(PROBE)); // explanation, then the question
+    expect(order.panelOpened).toBe(false); // the text panel never opened by itself
 
     // Commit.
     await replies(page).getByRole("button", { name: "Far from you" }).click();
