@@ -8,3 +8,6 @@ import type { SceneId } from "./models";
 export const INCLUDE_DRAFTS = process.env.NEXT_PUBLIC_AILI_INCLUDE_DRAFTS === "1";
 
 export const sceneShown = (id: SceneId) => INCLUDE_DRAFTS || !isDraft(id);
+
+/** The demo lesson uses both scenes; it can run only when both are shown. */
+export const demoLessonShown = () => sceneShown("base-joint-arm") && sceneShown("lever-analogy");

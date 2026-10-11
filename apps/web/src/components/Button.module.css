@@ -59,3 +59,7 @@
     background: var(--aili-bg-recessed);
   }
 }
+
+.link {
+  text-decoration: none;
+}

@@ -1,0 +1,15 @@
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--aili-space-3);
+  margin: var(--aili-space-6) 0;
+  padding: var(--aili-space-3) var(--aili-space-4);
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+}
+
+.status svg {
+  flex: none;
+  margin-top: 2px;
+}
