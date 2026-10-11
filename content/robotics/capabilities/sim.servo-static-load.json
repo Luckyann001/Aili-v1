@@ -22,6 +22,7 @@
     "static hold only",
     "uniform bar: the arm's own mass acts at its middle",
     "payload is a point mass at the tip",
+    "extra masses may sit beyond the arm's end",
     "angle measured from horizontal: 0 degrees is level, 90 degrees is straight up",
     "a torque rating is used only when the learner supplies one from a datasheet, and says whether it is a stall or continuous rating"
   ],
