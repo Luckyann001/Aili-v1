@@ -19,7 +19,7 @@ export interface FeedbackDef {
 
 export interface BeatDef {
   id: string;
-  kind: "framing" | "probe" | "commit" | "reveal" | "link" | "check";
+  kind: "framing" | "explain" | "probe" | "commit" | "reveal" | "link" | "check";
   narration: Array<{ id: string; text: string }>;
   /** May be absent in raw JSON (the schema defaults it to []); treat absent as none. */
   actions?: Array<{ type: string; [k: string]: unknown }>;

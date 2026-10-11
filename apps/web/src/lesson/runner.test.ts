@@ -7,11 +7,14 @@ const run = (events: LessonEvent[], from: LessonState = initialLesson) => events
 const ended = (s: LessonState): LessonEvent => ({ type: "beatEnded", rev: s.rev, beatIndex: s.beatIndex });
 
 describe("lesson runner", () => {
-  it("plays framing, then asks the probe and waits with exactly one open question", () => {
+  it("plays framing and the explanation, then asks the probe and waits with exactly one open question", () => {
     let s = run([{ type: "start" }]);
     expect(s).toMatchObject({ status: "playing", beatIndex: 0, choices: null });
     s = run([ended(s)], s); // framing done
-    expect(s.beatIndex).toBe(1);
+    expect(s).toMatchObject({ status: "playing", beatIndex: 1, choices: null });
+    expect(beats[1]!.kind).toBe("explain"); // explained before any question (behavior spec A1a)
+    s = run([ended(s)], s); // explanation done, no question asked
+    expect(s.beatIndex).toBe(2);
     s = run([ended(s)], s); // probe narration done
     expect(s.status).toBe("awaiting");
     expect(s.choices!.map((c) => c.id)).toEqual(["near", "far", "not-sure"]);
@@ -21,19 +24,20 @@ describe("lesson runner", () => {
     let s = run([{ type: "start" }]);
     s = run([ended(s)], s);
     s = run([ended(s)], s);
+    s = run([ended(s)], s);
     s = run([{ type: "choose", rev: s.rev, choice: "near" }], s);
-    expect(s).toMatchObject({ status: "playing", beatIndex: 2, answers: { probe: "near" }, choices: null });
+    expect(s).toMatchObject({ status: "playing", beatIndex: 3, answers: { probe: "near" }, choices: null });
     for (const kind of ["commit", "reveal", "link"]) {
       expect(beats[s.beatIndex]!.kind).toBe(kind);
       s = run([ended(s)], s);
     }
-    expect(s).toMatchObject({ status: "playing", beatIndex: 5 }); // the check beat speaks its question…
+    expect(s).toMatchObject({ status: "playing", beatIndex: 6 }); // the check beat speaks its question…
     s = run([ended(s)], s);
-    expect(s).toMatchObject({ status: "awaiting", beatIndex: 5 }); // …then waits for the answer
+    expect(s).toMatchObject({ status: "awaiting", beatIndex: 6 }); // …then waits for the answer
   });
 
   it("records the check answer with its own feedback and finishes; no mastery claim in any feedback", () => {
-    let s: LessonState = { ...initialLesson, status: "awaiting", beatIndex: 5, rev: 7, choices: [{ id: "easier", label: "Easier" }, { id: "harder", label: "Harder" }, { id: "not-sure", label: "Not sure" }] };
+    let s: LessonState = { ...initialLesson, status: "awaiting", beatIndex: 6, rev: 7, choices: [{ id: "easier", label: "Easier" }, { id: "harder", label: "Harder" }, { id: "not-sure", label: "Not sure" }] };
     s = run([{ type: "choose", rev: 7, choice: "harder" }], s);
     expect(s.status).toBe("done");
     expect(s.answers.check).toBe("harder");
@@ -47,7 +51,7 @@ describe("lesson runner", () => {
   });
 
   it("feedback covers right, wrong and Not sure, in plain words", () => {
-    const fb = beats[3]!.feedback!;
+    const fb = beats[4]!.feedback!;
     expect(feedbackText(fb, "far")).toBe(fb.correct);
     expect(feedbackText(fb, "near")).toBe(fb.incorrect);
     expect(feedbackText(fb, "not-sure")).toBe(fb.unsure);
@@ -74,8 +78,9 @@ describe("lesson runner", () => {
 
   it("the text panel follows the latest explanation; placeholders are filled from solver values", () => {
     expect(explanationAt(beats, 1)).toBeNull();
-    expect(explanationAt(beats, 3)!.title).toBe("Distance from the grip changes the effort");
-    expect(explanationAt(beats, 5)!.title).toBe("Same idea, robot arm");
+    expect(explanationAt(beats, 2)).toBeNull(); // the explain beat adds no panel text
+    expect(explanationAt(beats, 4)!.title).toBe("Distance from the grip changes the effort");
+    expect(explanationAt(beats, 6)!.title).toBe("Same idea, robot arm");
     expect(fill("about {{effort_far_vs_near}} times", { effort_far_vs_near: "4" })).toBe("about 4 times");
     expect(fill("{{nope}}", {})).toBe("[missing nope]");
   });

@@ -34,9 +34,40 @@
       ]
     },
     {
+      "id": "intuition",
+      "kind": "explain",
+      "move": "explain",
+      "concepts": [
+        "mech.torque.static"
+      ],
+      "narration": [
+        {
+          "id": "intuition-1",
+          "text": "The weight tries to turn the ruler around your hand."
+        },
+        {
+          "id": "intuition-2",
+          "text": "It is like a door turning on its hinges."
+        },
+        {
+          "id": "intuition-3",
+          "text": "To keep the ruler level, your hand twists back just as hard."
+        }
+      ],
+      "actions": [
+        {
+          "type": "highlight_part",
+          "part": "ruler"
+        }
+      ]
+    },
+    {
       "id": "probe",
       "kind": "probe",
       "move": "probe",
+      "concepts": [
+        "mech.torque.static"
+      ],
       "narration": [
         {
           "id": "probe-1",

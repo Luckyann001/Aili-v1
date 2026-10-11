@@ -40,7 +40,7 @@ const shot = async (page: Page, name: string, info: { outputPath: (n: string) =>
 test.describe("beginner lever lesson", () => {
   test.setTimeout(150_000);
 
-  test("plays the whole path: framing, probe, commit, reveal, link, check", async ({ page }, info) => {
+  test("plays the whole path: framing, explanation, probe, commit, reveal, link, check", async ({ page }, info) => {
     await openLearn(page);
     await expect(replies(page)).toHaveCount(0); // no question open before the lesson asks one
     await startLesson(page);
@@ -51,18 +51,32 @@ test.describe("beginner lever lesson", () => {
     await expect(page.locator('span[data-part-id="hand"]')).toBeVisible();
     await shot(page, "beat-1-framing", info);
 
+    // Explanation before any question (behavior spec A1a): intuition and an analogy, no question,
+    // no extra panel text, short captions.
+    await saidLine(page, "The weight tries to turn the ruler around your hand.");
+    await expect(replies(page)).toHaveCount(0);
+    await saidLine(page, "It is like a door turning on its hinges.");
+    await expect(replies(page)).toHaveCount(0);
+    await expect(page.getByRole("complementary")).toHaveCount(0); // the text panel stays closed
+    await saidLine(page, "To keep the ruler level, your hand twists back just as hard.");
+    await shot(page, "beat-2-explain", info);
+    const order = await spoken(page);
+    expect(order.indexOf("To keep the ruler level, your hand twists back just as hard.")).toBeLessThan(
+      order.indexOf("Which is harder to hold out: the weight close to you, or far from you?") === -1 ? Infinity : order.indexOf("Which is harder to hold out: the weight close to you, or far from you?"),
+    );
+
     // Probe: exactly one open question, with Not sure.
     await expect(replies(page)).toBeVisible({ timeout: 15000 });
     await expect(replies(page).getByRole("button")).toHaveText(["Close to you", "Far from you", "Not sure"]);
     await expect(caption(page, "Which is harder to hold out: the weight close to you, or far from you?")).toBeVisible();
     await expect(gauge(page)).toHaveCount(0); // the gauge would give the answer away
-    await shot(page, "beat-2-probe", info);
+    await shot(page, "beat-3-probe", info);
 
     // Commit.
     await replies(page).getByRole("button", { name: "Far from you" }).click();
     await expect(replies(page)).toHaveCount(0);
     await saidLine(page, "Got it. Let's test your guess.");
-    await shot(page, "beat-3-commit", info);
+    await shot(page, "beat-4-commit", info);
 
     // Reveal: the gauge rises; prediction next to result; no numbers in the gauge.
     await expect(gauge(page)).toBeVisible({ timeout: 15000 });
@@ -72,24 +86,24 @@ test.describe("beginner lever lesson", () => {
     await expect(gauge(page).getByText("Harder", { exact: true })).toBeVisible();
     expect(await gauge(page).innerText()).not.toMatch(/\d/);
     await saidLine(page, "You predicted far is harder, and that is what happened.");
-    await shot(page, "beat-4-reveal", info);
+    await shot(page, "beat-5-reveal", info);
 
     // Link: the arm scene, same idea.
     await saidLine(page, "A robot arm works the same way.");
     await expect(partsButton(page)).toHaveText(/^Parts: (Arm|End weight)$/); // arm scene (the check moves on to the end weight)
     await expect(gauge(page)).toHaveCount(0);
-    await shot(page, "beat-5-link", info);
+    await shot(page, "beat-6-link", info);
 
     // Check: one question about the arm; the answer is recorded; no mastery claim.
     await expect(replies(page).getByRole("button")).toHaveText(["Harder", "Easier", "Not sure"], { timeout: 20000 });
-    await shot(page, "beat-6-check", info);
+    await shot(page, "beat-7-check", info);
     await replies(page).getByRole("button", { name: "Easier" }).click();
     await saidLine(page, /^Yes: closer to the servo means a shorter distance/);
     await saidLine(page, "That's one answer, not a test result. We'll come back to this idea in another way later.");
     await expect(caption(page, "That's one answer, not a test result. We'll come back to this idea in another way later.")).toBeVisible();
     await expect(lessonChip(page)).toHaveText("Start the lesson again", { timeout: 10000 });
     for (const word of [/master/i, /expert now/i, /great job/i, /perfect/i]) await expect(page.locator("main")).not.toContainText(word);
-    await shot(page, "beat-7-done", info);
+    await shot(page, "beat-8-done", info);
   });
 
   test("'Not sure' gets an honest, plain answer", async ({ page }) => {

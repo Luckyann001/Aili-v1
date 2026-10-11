@@ -56,15 +56,36 @@ describe("rule 4: a true beginner gets an explanation before the first probe on 
     expect(validatePedagogy(resp({ move: "probe" }), hist([]))).toEqual([]);
   });
 
-  it("the lever lesson: its framing beat counts only if it is taken to explain the concept", () => {
-    // content/robotics/beats/beginner-lever.json: framing (move explain) → probe → commit → reveal …
+  it("the lever lesson passes for a true beginner: its explain beat comes before the probe", () => {
+    // content/robotics/beats/beginner-lever.json, replayed as a session history up to the probe.
+    type B = { kind: string; move: string; concepts?: string[]; narration: Array<{ text: string }> };
+    const beats: B[] = JSON.parse(readFileSync(new URL("../../../content/robotics/beats/beginner-lever.json", import.meta.url), "utf8")).beats;
+    expect(beats.slice(0, 3).map((b) => `${b.kind}:${b.move}`)).toEqual(["framing:explain", "explain:explain", "probe:probe"]);
+    const probeAt = beats.findIndex((b) => b.kind === "probe");
+    const probe = beats[probeAt]!;
+    const replay = (bs: B[]) => beginner(bs.map((b) => aili(b.move, { asked: false, concepts: b.concepts ?? [] })));
+    const asProbe = resp({ move: "probe", concepts: probe.concepts, narration: [], prompt: { text: probe.narration[0]!.text, chips: [] } });
+    // The framing beat names no concept (it describes the scene); the explain beat names the concept.
+    expect(beats[0]!.concepts ?? []).toEqual([]);
+    expect(validatePedagogy(asProbe, replay(beats.slice(0, probeAt)))).toEqual([]);
+    // Without the explain beat, a true beginner's probe is rejected.
+    expect(validatePedagogy(asProbe, replay(beats.slice(0, 1))).join()).toMatch(/explain-first-for-beginners/);
+  });
+
+  it("the lever lesson's explain beat: two or three sentences, intuition and an analogy, no question", () => {
     const beats = JSON.parse(readFileSync(new URL("../../../content/robotics/beats/beginner-lever.json", import.meta.url), "utf8")).beats;
-    expect(beats.slice(0, 2).map((b: { kind: string; move: string }) => `${b.kind}:${b.move}`)).toEqual(["framing:explain", "probe:probe"]);
-    // Its two framing lines describe the scene (a ruler held out, a sliding weight); they do not
-    // explain torque. Recorded as explaining the concept, the probe passes; recorded honestly as
-    // naming no concept, a true beginner's probe is rejected. See the slice 4 report.
-    expect(validatePedagogy(resp({ move: "probe" }), beginner([aili("explain", { concepts: [C] })]))).toEqual([]);
-    expect(validatePedagogy(resp({ move: "probe" }), beginner([aili("explain", { concepts: [] })])).join()).toMatch(/explain-first-for-beginners/);
+    const e = beats.find((b: { kind: string }) => b.kind === "explain");
+    const text: string = e.narration.map((n: { text: string }) => n.text).join(" ");
+    const sentences = text.split(/(?<=[.!])\s+/).filter(Boolean);
+    expect(sentences.length).toBeGreaterThanOrEqual(2);
+    expect(sentences.length).toBeLessThanOrEqual(3);
+    expect(text).not.toMatch(/[?\d]/);
+    expect(text).toMatch(/\blike\b/); // the analogy
+    expect(e.concepts).toEqual([C]);
+    // Calm pace on the stage: no caption line longer than the framing lines already shown.
+    const framingMax = Math.max(...beats[0].narration.map((n: { text: string }) => n.text.length));
+    for (const n of e.narration) expect(n.text.length, n.text).toBeLessThanOrEqual(framingMax);
+    expect(e.explanation).toBeUndefined(); // no extra text-panel content
   });
 });
 
