@@ -6,7 +6,8 @@
 //   "3D", "2D" — names of kinds of view ("the 3D view"), not measurements.
 export const ALLOWED_DIGIT_WORDS = ["3D", "2D"] as const;
 
-const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g;
+// A placeholder is a plain name ({{effort_far_vs_near}}) or a calculation output ({{c1.torque_nm}}).
+const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?)\s*\}\}/g;
 
 /** Returns readable errors; an empty array means the text is acceptable. */
 export function checkNarration(text: string, allowedPlaceholders: readonly string[], where = "narration"): string[] {
