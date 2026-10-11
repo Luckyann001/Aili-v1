@@ -13,3 +13,16 @@ export const ConceptId = z
   .string()
   .regex(/^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/, "concept IDs are dotted lowercase, e.g. mech.torque.static");
 export type ConceptId = z.infer<typeof ConceptId>;
+
+/**
+ * Review rules shared by every registry item. The AI never publishes: "reviewed"/"published"
+ * needs a named human reviewer and date. A test fixture (docs/m2-plan.md, decision 5) may be
+ * "published" for demos and tests, but never carries a review record: no reviewer is invented.
+ */
+export function reviewRules(item: { id: string; review_status: string; review?: unknown; test_fixture?: true }, ctx: z.RefinementCtx) {
+  if (item.test_fixture && item.review) {
+    ctx.addIssue({ code: "custom", message: `${item.id}: a test fixture never carries a review record (no reviewer may be invented)` });
+  } else if (!item.test_fixture && item.review_status !== "draft" && !item.review) {
+    ctx.addIssue({ code: "custom", message: `${item.id}: "${item.review_status}" needs a named human reviewer and date (review.by, review.on); the AI never publishes` });
+  }
+}

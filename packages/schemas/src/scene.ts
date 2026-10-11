@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ConceptId, Fidelity, ReviewStatus } from "./base";
+import { ConceptId, Fidelity, ReviewStatus, reviewRules } from "./base";
 
 // Scene registry (architecture §4, visuals §1–2). Scenes are JSON files in git; every field is
 // declared and unknown fields are rejected. The AI never publishes: a scene that is "reviewed" or
@@ -45,6 +45,8 @@ export const SceneManifest = z
     review_status: ReviewStatus,
     provenance: Provenance,
     review: Review.optional(),
+    /** Test-fixture scene: loaded only with the dev flag, refused in production (m2-plan decision 5). */
+    test_fixture: z.literal(true).optional(),
     parts: z.array(ScenePart).min(1),
     params: z.array(SceneParam).default([]),
     animations: z.array(SceneAnimation).default([]),
@@ -53,9 +55,7 @@ export const SceneManifest = z
   })
   .strict()
   .superRefine((s, ctx) => {
-    if (s.review_status !== "draft" && !s.review) {
-      ctx.addIssue({ code: "custom", message: `${s.id}: "${s.review_status}" needs a named human reviewer and date (review.by, review.on); the AI never publishes` });
-    }
+    reviewRules(s, ctx);
     for (const [what, ids] of [
       ["part", s.parts.map((p) => p.id)],
       ["setting", s.params.map((p) => p.id)],
