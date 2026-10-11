@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".next-nodrafts/**", // the no-drafts production test's build output
+    ".next-e2e/**", // the main e2e production build output
     "out/**",
     "build/**",
     "next-env.d.ts",

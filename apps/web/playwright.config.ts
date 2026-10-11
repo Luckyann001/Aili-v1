@@ -5,6 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Uses the installed Google Chrome (channel "chrome"); no Playwright browser download.
 const PORT = 3200;
 
+const ENV = "AILI_DIST_DIR=.next-e2e AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1";
+
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
@@ -17,7 +19,8 @@ export default defineConfig({
   ],
   webServer: {
     // AILI_ENABLE_PREVIEW=1 keeps the dev-only /preview page in this test build (it is tested here).
-    command: `AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 npm run build && AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 npx next start --port ${PORT}`,
+    // Own output folder (.next-e2e), so a test run never rebuilds a `.next` that `npm run start` is serving.
+    command: `${ENV} npm run build && ${ENV} npx next start --port ${PORT}`,
     url: `http://localhost:${PORT}/home`,
     timeout: 240_000,
     reuseExistingServer: false,
