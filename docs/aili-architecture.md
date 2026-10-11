@@ -172,7 +172,7 @@ Used by the beginner lever analogy to drive an illustrative, unitless effort gau
   "narration": [
     { "id": "n1", "text": "You said a bigger servo will do. Bigger needs a number: datasheets give torque at a stated supply voltage." }
   ],
-  "actions": [ { "type": "focus", "object": "servo.horn" } ],
+  "actions": [ { "type": "highlight_part", "part": "servo-horn" } ],
   "calc_requests": [],
   "evidence": ["ev.datasheet-stall-torque"],
   "prompt": { "text": "Which datasheet figure are you comparing, and at what voltage?", "chips": ["I have a datasheet", "Not sure where to look"] },
@@ -182,6 +182,7 @@ Used by the beginner lever analogy to drive an illustrative, unitless effort gau
 ```
 
 The only question is in `prompt`; narration explains and never asks (one open question, behavior spec A5). Fidelity uses the schema's values: `verified`, `simplified_teaching`, `illustrative`. [Example corrected Oct 11 2026.]
+Actions use the schema's existing types: `highlight_part` (with a part ID of the scene on stage) replaces the earlier `focus`. [Oct 11 2026, M2 slice 3]
 
 Failure rule: on any validation, provider or solver failure, keep the last valid state and show a clear message. Never present prepared content as a live model response.
 
