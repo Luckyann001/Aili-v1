@@ -27,7 +27,24 @@ const STEPS: Record<string, { label: string; apply: (s: Schema) => Schema }> = {
   c: { label: "without calc_requests", apply: (s) => without(s, ["calc_requests"]) },
   d: { label: "defaults removed", apply: (s) => stripDefaults(s) as Schema },
   e: { label: "minimal base only", apply: (s) => without(s, Object.keys(s.properties).filter((k) => !BASE.includes(k))) },
+  f: { label: "without calc_requests[].simulation", apply: (s) => withoutCalcSimulation(s) },
+  g: { label: "actions flattened (one shape: type list + optional fields)", apply: (s) => flattenActions(s) },
 };
+
+function withoutCalcSimulation(s: Schema): Schema {
+  const calc = structuredClone(s.properties.calc_requests) as { items: Schema };
+  calc.items = without(calc.items, ["simulation"]);
+  return { ...s, properties: { ...s.properties, calc_requests: calc } };
+}
+
+/** The actions union as one object: "type" from the list of variants, every other field optional. */
+function flattenActions(s: Schema): Schema {
+  const actions = s.properties.actions as { items: { anyOf: Schema[] }; [k: string]: unknown };
+  const variants = actions.items.anyOf;
+  const props: Record<string, unknown> = { type: { type: "string", enum: variants.map((v) => (v.properties.type as { const: string }).const) } };
+  for (const v of variants) for (const [k, sub] of Object.entries(v.properties)) if (k !== "type") props[k] = sub;
+  return { ...s, properties: { ...s.properties, actions: { ...actions, items: { type: "object", properties: props, required: ["type"], additionalProperties: false } } } };
+}
 
 async function main() {
   const a = args();
