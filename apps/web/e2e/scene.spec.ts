@@ -639,8 +639,20 @@ test.describe("testing-only performance readout (?demo=1)", () => {
     // Orbit with the panel closed (on a phone it covers part of the 3D view), then read it again.
     const summary = page.getByText("Demo controls (testing only)");
     await summary.click();
-    const c = await rect(canvas(page));
-    await drag(page, { x: c.x + c.width / 2, y: c.y + c.height * 0.6 }, 120, 10);
+    await expect(page.locator("details[open]")).toHaveCount(0);
+    // Drag only from a point that is on the 3D view once the layout has settled (on a phone the
+    // closing panel and the command area move things for a moment).
+    const at = async () => {
+      const c = await rect(canvas(page));
+      return { x: c.x + c.width / 2, y: c.y + c.height * 0.6 };
+    };
+    await expect
+      .poll(async () => {
+        const p = await at();
+        return page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName === "CANVAS", p);
+      })
+      .toBe(true);
+    await drag(page, await at(), 120, 10);
     await summary.click();
     await expect(panel.getByTestId("perf-frames")).toHaveText(/^median \d+\.\d ms, worst \d+\.\d ms \(\d+ frames\)$/);
     await panel.getByRole("button", { name: "Copy results" }).click();
