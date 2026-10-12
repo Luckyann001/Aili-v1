@@ -30,6 +30,8 @@ export interface Metrics {
   max_consecutive_questions: number;
   expectations: [number, number];
   failures: Record<string, number>;
+  /** Warnings on shown answers (semantic heuristics; for review, never a rejection). */
+  warnings: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -66,6 +68,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     max_consecutive_questions: maxRun,
     expectations: [exp.filter((e) => e.pass).length, exp.length],
     failures,
+    warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
   };
 }
 
@@ -100,17 +103,18 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Explain moves per question asked | ${Number.isNaN(m.explain_per_question) ? "n/a" : m.explain_per_question.toFixed(2)} |`,
     `| Most questions in a row | ${m.max_consecutive_questions} |`,
     `| Failures | ${movesText(m.failures)} |`,
+    `| Warnings (semantic, for review; never a rejection) | ${m.warnings} |`,
     "",
     "## Per scenario",
     "",
-    "| Scenario | Run | Category | Turns | Cost | Moves | 1st try (both) | After repair | Expectations | Median latency | Stopped |",
-    "|---|---|---|---|---|---|---|---|---|---|---|",
+    "| Scenario | Run | Category | Turns | Cost | Moves | 1st try (both) | After repair | Expectations | Warnings | Median latency | Stopped |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...result.records.map((r) => {
       const s = metrics(r.turns);
-      return `| ${r.scenario.id} | ${r.run} | ${r.scenario.category} | ${s.turns}/${r.scenario.turns.length} | ${usd(r.cost_micro_usd)} | ${movesText(s.moves)} | ${pct(...s.first_try_both)} | ${pct(...s.after_repair)} | ${pct(...s.expectations)} | ${s.latency_median_ms} ms | ${r.stopped ?? ""} |`;
+      return `| ${r.scenario.id} | ${r.run} | ${r.scenario.category} | ${s.turns}/${r.scenario.turns.length} | ${usd(r.cost_micro_usd)} | ${movesText(s.moves)} | ${pct(...s.first_try_both)} | ${pct(...s.after_repair)} | ${pct(...s.expectations)} | ${s.warnings} | ${s.latency_median_ms} ms | ${r.stopped ?? ""} |`;
     }),
     "",
-    "Code checks only what it can see (moves, questions, coverage, safety flag, validators, cost, time). Tone, physics and teaching quality are for the reviewer: read the transcripts.",
+    "Code rejects only objective violations (IDs, bounds, lengths, counts, numbers, order of moves). Semantic checks (analogy explained, the arm's own weight) are warnings and expectations, never rejections. Tone, physics and teaching quality are for the reviewer: read the transcripts.",
   ];
   return lines.join("\n") + "\n";
 }
@@ -143,6 +147,7 @@ export function transcriptMarkdown(r: ScenarioRecord, mode: "recorded" | "live")
       "",
       ...(r ? [`- assumptions: ${JSON.stringify(r.assumptions)}`, `- limitations: ${JSON.stringify(r.limitations)}`, `- safety: ${r.safety} · coverage: ${r.coverage ?? "(unset)"} · reading: ${JSON.stringify(r.reading ?? null)}`] : []),
       ...t.checks.flatMap((c) => c.errors.map((e) => `- check #${c.attempt} (${c.outcome}): ${e}`)),
+      ...t.warnings.map((w) => `- WARNING (for review, not a rejection): ${w}`),
       ...t.usage.map((u) => `- usage: ${u.model} in ${u.input_tokens} / out ${u.output_tokens} → ${usd(u.cost_micro_usd)}`),
       ...t.expectations.map((e) => `- expectation ${e.name}: ${e.pass ? "PASS" : "FAIL"} (${e.detail})`),
       "",

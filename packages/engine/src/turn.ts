@@ -160,7 +160,7 @@ export interface TurnSessionOptions {
    * Observes each check of a director answer (the bake-off's first-try and after-repair pass rates):
    * attempt 1 is the first answer, attempt 2 the repair. On a pass, the validated response.
    */
-  onCheck?: (c: { attempt: 1 | 2; outcome: "pass" | "validation" | "pedagogy"; errors: string[]; response?: DirectorResponse }) => void;
+  onCheck?: (c: { attempt: 1 | 2; outcome: "pass" | "validation" | "pedagogy"; errors: string[]; warnings: string[]; response?: DirectorResponse }) => void;
   /**
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
    * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
@@ -335,18 +335,18 @@ export class TurnSession {
         return "director";
       }
     };
-    const check = (raw: unknown): { r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] } => {
+    const check = (raw: unknown): ({ r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] }) & { warnings: string[] } => {
       const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
-      if (!v.response) return { reason: "validation", errors: v.errors };
+      if (!v.response) return { reason: "validation", errors: v.errors, warnings: v.warnings };
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
-      return p.length ? { reason: "pedagogy", errors: p } : { r: v.response };
+      return p.length ? { reason: "pedagogy", errors: p, warnings: v.warnings } : { r: v.response, warnings: v.warnings };
     };
 
     let reply = await callDirector();
     if (reply === "stale") return;
     if (typeof reply === "string") return fail(reply, [`director: ${reply}`]);
     const observe = (attempt: 1 | 2, c: ReturnType<typeof check>) =>
-      this.opts.onCheck?.("errors" in c ? { attempt, outcome: c.reason, errors: c.errors } : { attempt, outcome: "pass", errors: [], response: c.r });
+      this.opts.onCheck?.("errors" in c ? { attempt, outcome: c.reason, errors: c.errors, warnings: c.warnings } : { attempt, outcome: "pass", errors: [], warnings: c.warnings, response: c.r });
     let checked = check(reply.response);
     observe(1, checked);
     if ("errors" in checked) {

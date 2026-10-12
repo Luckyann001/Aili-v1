@@ -68,7 +68,13 @@ function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> =
   return errors;
 }
 
-export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[] } {
+/**
+ * `errors` are objective violations (IDs, bounds, lengths, counts, numbers, question placement):
+ * the answer is rejected. `warnings` are semantic heuristics (does the narration explain the
+ * analogy?): never a rejection, reported in the bake-off summary and transcripts for human review
+ * (Lucky's decision 2026-10-12).
+ */
+export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[]; warnings: string[] } {
   const sl = ctx.shortlist;
   const parsed = DirectorResponse.safeParse(raw);
   if (!parsed.success) {
@@ -80,10 +86,11 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
       const hint = i.path[0] === "concepts" ? ` (${valid(sl.concepts)})` : i.path[0] === "evidence" ? ` (${valid(sl.readings.map((x) => x.id))})` : "";
       return `${field || "(response)"}: ${i.message}${hint}`;
     });
-    return { response: null, errors: [...formatErrors, ...shapeChecks(raw, sl, flagged)] };
+    return { response: null, errors: [...formatErrors, ...shapeChecks(raw, sl, flagged)], warnings: [] };
   }
   const r = parsed.data;
   const errors: string[] = [];
+  const warnings: string[] = [];
   const notInShortlist = (field: string, id: string) => errors.push(`${field}: "${id}" is not in this turn's shortlist`);
 
   if (ctx.expected) {
@@ -192,9 +199,9 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
   if (r.analogy) {
     const an = sl.analogies.find((a) => a.id === r.analogy);
     if (!an) notInShortlist("analogy", r.analogy);
-    else if (!analogyExplained(r.narration.map((n) => n.text).join(" "), an.mapping))
-      errors.push(
-        `analogy: "${an.id}" is set, so the narration says what maps to what (${an.mapping.map((m) => `${m.source} → ${m.target}`).join("; ")}) and where it breaks down ("${an.breaks_down}")`,
+    else if (!analogyExplained(r.narration.map((n) => n.text).join(" "), an))
+      warnings.push(
+        `analogy: "${an.id}" is set, but the narration may not say what maps to what (${an.mapping.map((m) => `${m.source} → ${m.target}`).join("; ")}) or where it breaks down ("${an.breaks_down}")`,
       );
   }
 
@@ -242,20 +249,21 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     if (!source || (!source.verified && !source.test_fixture)) errors.push(`evidence[${i}]: "${id}" — its source "${reading.source}" has not been verified by a person`);
   });
 
-  return { response: errors.length ? null : r, errors };
+  return { response: errors.length ? null : r, errors, warnings };
 }
 
-// Words too common in this subject to show that an analogy was described.
-const COMMON = new Set(["the", "your", "how", "far", "from", "own", "you", "weight", "arm", "force", "torque", "load", "servo", "distance", "hard", "push", "twist", "its", "and", "with", "what", "where", "this", "that"]);
+// Words too common in this subject (or in fixture titles) to show that an analogy was described.
+const COMMON = new Set(["the", "your", "how", "far", "from", "own", "you", "weight", "arm", "force", "torque", "load", "payload", "mass", "moment", "servo", "distance", "hard", "push", "twist", "its", "and", "with", "what", "where", "this", "that", "long", "test", "fixture", "holding"]);
 /**
- * Whether narration describes an analogy (Lucky's decision 2026-10-12): it names something from the
- * mapping's source side (a distinctive word such as "bag" or "shoulder") AND says where it breaks
- * down ("breaks down", "unlike", "differs", "doesn't hold", "not like"). A heuristic: it cannot judge
- * whether the description is right, only that both parts are there.
+ * Whether narration seems to describe an analogy (a WARNING heuristic, Lucky's decision 2026-10-12):
+ * it names something distinctive from the analogy (a word from its title or either side of its
+ * mapping, such as "wrench", "bag" or "shoulder") AND says where it breaks down ("breaks down",
+ * "unlike", "differs", "doesn't hold", "not like"). It cannot judge whether the description is right.
  */
-export function analogyExplained(narration: string, mapping: ReadonlyArray<{ source: string }>): boolean {
+export function analogyExplained(narration: string, an: { title: string; mapping: ReadonlyArray<{ source: string; target: string }> }): boolean {
   const said = narration.toLowerCase();
-  const words = mapping.flatMap((m) => m.source.toLowerCase().match(/[a-z]{3,}/g) ?? []).filter((w) => !COMMON.has(w));
+  const text = [an.title, ...an.mapping.flatMap((m) => [m.source, m.target])].join(" ").toLowerCase();
+  const words = (text.match(/[a-z]{3,}/g) ?? []).filter((w) => !COMMON.has(w));
   const mapped = words.some((w) => new RegExp(`\\b${w}`).test(said));
   const breaks = /\bbreaks? down\b|\bunlike\b|\bdiffers?\b|\bdoesn['’]t (hold|work|apply)\b|\bnot like\b/.test(said);
   return mapped && breaks;

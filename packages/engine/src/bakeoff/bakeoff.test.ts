@@ -97,6 +97,18 @@ describe("runner (recorded mode)", () => {
     expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toContain("# Bake-off run: RECORDED");
   });
 
+  it("a semantic warning never fails the turn; it is listed in the transcript and counted in the summary", async () => {
+    const rec = recording("s03-true-beginner");
+    const valid = (rec.professor.steps[1] as { ok: { json: object } }).ok;
+    const warned = { ...rec, professor: { source: "test", steps: [{ ok: { ...valid, json: { ...valid.json, analogy: "analogy.fx-shopping-bag" } } }] } };
+    const r = await runBakeoff([byId("s03-true-beginner")], 1, deps({ "s03-true-beginner": warned as never }));
+    const t = r.records[0]!.turns[0]!;
+    expect(t.outcome).toBe("done");
+    expect(t.warnings).toHaveLength(1);
+    expect(transcriptMarkdown(r.records[0]!, "recorded")).toContain("WARNING (for review, not a rejection): analogy:");
+    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/\| Warnings \(semantic, for review; never a rejection\) \| 1 \|/);
+  });
+
   it("the hard cap stops the run before a turn whose worst case would pass it; nothing is called", async () => {
     const d = deps({ "s03-true-beginner": recording("s03-true-beginner") }, { cap: 1000 });
     const r = await runBakeoff([byId("s03-true-beginner")], 1, d);

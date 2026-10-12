@@ -17,6 +17,8 @@ export interface CheckRecord {
   attempt: 1 | 2;
   outcome: "pass" | "validation" | "pedagogy";
   errors: string[];
+  /** Semantic heuristics (never a rejection), for human review. */
+  warnings: string[];
 }
 
 export interface TurnRecord {
@@ -29,6 +31,8 @@ export interface TurnRecord {
   move?: DirectorResponse["move"];
   response?: DirectorResponse;
   checks: CheckRecord[];
+  /** Warnings on the answer that was shown (or the last one checked): never a rejection. */
+  warnings: string[];
   /** Automatic expectations: each with its result. */
   expectations: Array<{ name: string; pass: boolean; detail: string }>;
   usage: LedgerEntry[];
@@ -165,7 +169,8 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
           events,
           latency_ms,
           ...partial,
-          checks: checks.map(({ attempt, outcome, errors }) => ({ attempt, outcome, errors })),
+          checks: checks.map(({ attempt, outcome, errors, warnings }) => ({ attempt, outcome, errors, warnings })),
+          warnings: (passed ?? checks.at(-1))?.warnings ?? [],
           expectations,
           usage: [...usage],
           cost_micro_usd: usage.reduce((sum, e) => sum + e.cost_micro_usd, 0),
