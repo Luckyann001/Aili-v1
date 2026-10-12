@@ -14,6 +14,19 @@ production refuses them. `shortlist(concepts, level)` returns published items on
 fields, verified evidence, numbers only through `{{calc.output}}` placeholders from this turn, a
 question only in `prompt`, and narration caps. Errors name the exact field and value.
 
+It returns `errors` (objective violations: the answer is rejected and gets one repair) and
+`warnings` (semantic heuristics: never a rejection; listed in bake-off transcripts for review).
+
+| Rule (added after the first live runs, 2026-10-12) | Kind | Checks |
+|---|---|---|
+| narration length | error | at most 4 segments of at most **180** characters (the prompt asks for 140) |
+| concepts | error | each ID is one of this turn's shortlist concepts (`Shortlist.concepts`); the error lists the valid IDs |
+| evidence | error | each ID is a shortlist reading; the error lists the valid reading IDs |
+| prediction needs its prompt | error | a `prediction` with no `prompt` (`prompt: missing …`), or with a prompt not of kind `prediction` (`prompt.kind …`) |
+| actions | error | the provider schema is flattened, so the strict action union checks each action's required fields, field types, no foreign fields, no unknown type |
+| analogy explained | **warning** | a tagged analogy's narration has a word from its title or mapping and a breakdown phrase (breaks down, unlike, differs, doesn't hold, not like, but a servo, whereas) |
+| every error at once | — | when the format check fails, narration length, concepts and evidence are still checked; the repair gets every error and the previous answer |
+
 ## One turn (`src/turn.ts`, `src/fakeDirector.ts`)
 `TurnSession.run(input, emit)`: shortlist → director → structural validator → pedagogy validator →
 solvers → compile (placeholders filled, three significant figures) → events.
@@ -169,6 +182,7 @@ request as if config held those values; config is not changed.
 | challenge-budget | at most one non-safety challenge in any three turns | whether `safety: true` was justified |
 | answer-posture | no quiz or challenge moves in the Answer posture (a safety challenge is allowed) | — |
 | no-flattery, no-mastery-claim | phrases from `config/pedagogy-phrases.json` | see below |
+| no-meta-talk (2026-10-12) | the `meta_talk` phrases (my tools, my instructions, the shortlist, system prompt, …) | paraphrases; see below |
 | hold-under-pushback | pushback without new evidence → move `hold` | whether the earlier position was correct, whether the reply was pushback, whether the narration keeps the position; left to the M3 professor tests (behavior spec test 5) |
 
 ### Slice 5a rules (teaching state on the server)
