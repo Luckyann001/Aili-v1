@@ -14,12 +14,24 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
    - The bake-off runs every scenario **once** on two pairings. The 3-run consistency check runs only for the winner, and only on the confident-but-wrong scenarios.
 3. **Models to compare:**
    - (a) GPT-6.1 Sol (professor) + GPT-6 Luna (router);
-   - (b) Claude Sonnet 5.5 (professor) + Claude Haiku 4.5 (router).
+   - (b) Claude Sonnet 5.5 (professor) + Claude Haiku 4.5 (router). *Superseded by decision 7: Haiku 5.5.*
 
    **Before slice 7, re-check every model name and price on the providers' own pages.** If a page can't be reached, say so, and Lucky confirms them.
 4. **Slice 6:** plain HTTP (`fetch`), no provider SDK, unless structured output can't work without one; if so, ask Lucky first.
 5. **Added to M7:** a plain notice that learner text is sent to the AI provider, and the data-region and consent decision.
 6. **Readiness:** nothing is published yet, so live turns run against the test-fixture registry, labelled "Test fixture", until an expert publishes content (M4).
+
+### Update (Oct 12 2026, after slice 5b): first live test is Anthropic only
+
+7. **Correction:** "Claude Haiku 5.5" is a real model. Pairing (b) becomes **Claude Sonnet 5.5 (professor) + Claude Haiku 5.5 (router)**, replacing Haiku 4.5 in decision 3.
+8. **First live test uses Anthropic only:** professor `claude-sonnet-5-5`, router `claude-haiku-5-5`. Pairing (a) (GPT-6.1 Sol + GPT-6 Luna) comes later.
+9. **Prices, as Lucky read them on Anthropic's pricing page:**
+   - `claude-sonnet-5-5`: $2 in / $10 out per million tokens;
+   - `claude-haiku-5-5`: $0.10 / $0.50 per million tokens, prompts up to 100k tokens.
+
+   These match the test values already in `config/ai.json`. **Slice 7 re-verifies the model IDs and prices on Anthropic's own pages before any call**; if a page can't be reached, Claude says so and Lucky confirms.
+10. **Provider monthly limit for the first test: 5 USD** (replaces 30 USD in decision 2). Lucky sets it in Anthropic's dashboard and records it in `provider_monthly_limit_set`; Claude never fills that field in.
+11. **Slice 6 builds the Anthropic adapter first** (plain HTTP, decision 4); the OpenAI adapter follows later.
 
 ## Design summary
 
