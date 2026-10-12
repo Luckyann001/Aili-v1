@@ -4,19 +4,24 @@ import { useState, useSyncExternalStore } from "react";
 import { frameStats, readoutText, usePerf } from "@/scene/perfReadout";
 import { isRecognitionSupported } from "@/voice/recognition";
 import { useConsent } from "@/voice/consent";
+import { DEMO_TOOLS } from "@/turn/flags";
 import { useVoice } from "@/voice/store";
 import type { VoiceStatus } from "@/voice/machine";
 import styles from "./learn.module.css";
 
 const STATES: VoiceStatus[] = ["idle", "listening", "thinking", "speaking", "error"];
 
-/** Shown only with ?demo=1 in the address. Not linked anywhere; for testing the voice states. */
+/**
+ * Testing tools: only with ?demo=1 in the address AND a build with NEXT_PUBLIC_AILI_DEMO_TOOLS=1.
+ * In a real production build ?demo=1 does nothing. Not linked anywhere.
+ */
 export function useDemoMode(): boolean {
-  return useSyncExternalStore(
+  const asked = useSyncExternalStore(
     () => () => {},
     () => new URLSearchParams(window.location.search).get("demo") === "1",
     () => false,
   );
+  return DEMO_TOOLS && asked;
 }
 
 export function DemoControls({ onPlay }: { onPlay: () => void }) {

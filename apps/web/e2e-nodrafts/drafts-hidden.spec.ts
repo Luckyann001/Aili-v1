@@ -66,3 +66,12 @@ test("the production build contains nothing from content/robotics/test-fixtures"
   const { filesWithFixtureText } = await import("../e2e/fixture-text");
   expect(filesWithFixtureText(".next-nodrafts")).toEqual([]);
 });
+
+test("?demo=1 does nothing in production: no Demo controls, no readout, no fixture label, no scripted-reply line", async ({ page }) => {
+  await page.goto("/learn?demo=1");
+  await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
+  await expect(page.getByText("Demo controls (testing only)")).toHaveCount(0);
+  await expect(page.getByText(/Performance readout/)).toHaveCount(0);
+  await expect(page.getByText("Test fixture")).toHaveCount(0);
+  await expect(page.getByText(/Scripted reply/)).toHaveCount(0);
+});

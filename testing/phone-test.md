@@ -8,7 +8,9 @@ For Lucky to run by hand (slice 6). Judge speed on this **production build**, no
 1. **Phone:** Settings → About phone → tap **Build number** 7 times (on some Itel menus it is under About phone → Version). Then Settings → System → Developer options → turn on **USB debugging**.
 2. **Laptop:** build and start the app (keep the terminal open):
    `cd ~/Documents/Aili-v1 && npm run build && npm run start -w @aili/web`
-   (it uses `apps/web/.env.local`, so the draft lesson scenes are shown).
+   (it uses `apps/web/.env.local`, so the draft lesson scenes are shown). The `?demo=1` readout and
+   Demo controls need `NEXT_PUBLIC_AILI_DEMO_TOOLS=1` in `apps/web/.env.local` (added Oct 12 2026);
+   without it, as in a real production build, `?demo=1` does nothing.
 3. Plug the phone in by USB and allow debugging on the phone.
 4. **Laptop Chrome:** open `chrome://inspect/#devices` → **Port forwarding…** → add `3000` → `localhost:3000` → tick **Enable port forwarding** → Done.
 5. **Phone Chrome:** open `http://localhost:3000/learn?demo=1`. (Over USB this counts as `localhost`, so the microphone works without any flags.)
