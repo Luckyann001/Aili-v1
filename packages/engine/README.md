@@ -113,6 +113,21 @@ solvers → compile (placeholders filled, three significant figures) → events.
 | no-flattery, no-mastery-claim | phrases from `config/pedagogy-phrases.json` | see below |
 | hold-under-pushback | pushback without new evidence → move `hold` | whether the earlier position was correct, whether the reply was pushback, whether the narration keeps the position; left to the M3 professor tests (behavior spec test 5) |
 
+### Slice 5a rules (teaching state on the server)
+| Rule | Checks |
+|---|---|
+| test-after-prediction | after the learner commits a guess: a calculation, a `reveal` of that prediction, move `explain` |
+| reveal-after-guess | a reveal only for a prediction the learner has guessed, and only once |
+| one-probe-before-explain | no second probe on a concept before an explanation |
+| back-off-on-frustration | after "I don't know" / "just tell me": `explain` or `answer` |
+| another-example | after "another example": an `analogy` from the shortlist not used before |
+| open-items | at most 3 open items; no new reading while one is open |
+| waiver-acknowledgement | a safety-critical waiver asks for explicit acknowledgement (and sets `safety`); nothing goes on until the learner gives it |
+
+Predictions (guess, result), open items, waivers (who acknowledged, and the date) and the analogies
+used live in `SessionState.teaching` on the server, change only when a turn completes, and are lost
+on restart until the database stage.
+
 ### Limits of a phrase list
 - It matches only the listed wordings (whole words, any case, straight or curly apostrophes).
   Paraphrases ("what a question!", "you've nailed it") pass unless they are added.
