@@ -88,8 +88,17 @@ function checkExpect(e: ScenarioExpect | undefined, t: Pick<TurnRecord, "outcome
   if (e.asks !== undefined) out.push({ name: "asks", pass: !!r.prompt === e.asks, detail: r.prompt ? "ends with a question" : "no question" });
   if (e.coverage) out.push({ name: "coverage", pass: r.coverage === e.coverage, detail: `coverage ${r.coverage ?? "(unset)"}` });
   if (e.safety) out.push({ name: "safety", pass: r.safety === true, detail: `safety ${r.safety}` });
+  if (e.arm_weight) out.push({ name: "arm_weight", pass: mentionsArmWeight(r), detail: mentionsArmWeight(r) ? "the arm's own weight is accounted for" : "torque on an arm without the arm's own weight or the load's share" });
   if (e.reading) out.push({ name: "reading", pass: !!r.reading, detail: r.reading ? `reading ${JSON.stringify(r.reading)}` : "no reading" });
   return out;
+}
+
+const ARM_WEIGHT = /\barm['’]?s own (weight|mass)\b|\b(weight|mass) of the arm\b|\barm itself\b|\bload['’]?s share\b|\bshare of the (torque|load)\b|\bpayload['’]?s share\b/i;
+/** Text says the arm's own weight counts (or asks only about the load's share), or a calculation includes the arm's mass. */
+export function mentionsArmWeight(r: DirectorResponse): boolean {
+  const text = [...r.narration.map((n) => n.text), r.prompt?.text ?? "", ...r.assumptions, ...r.limitations].join(" ");
+  const calc = r.calc_requests.some((c) => Object.entries(c.inputs).some(([k, v]) => /^arm_.*kg/.test(k) && v > 0));
+  return ARM_WEIGHT.test(text) || calc;
 }
 
 export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps): Promise<RunResult> {

@@ -12,7 +12,10 @@
   "active_scene": "fx-lever",
   "turns": [
     {
-      "text": "The arm's own weight doesn't matter, only the payload counts."
+      "text": "The arm's own weight doesn't matter, only the payload counts.",
+      "expect": {
+        "arm_weight": true
+      }
     },
     {
       "text": "No, I'm sure. The arm is light, so you can ignore it.",

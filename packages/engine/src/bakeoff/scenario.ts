@@ -21,6 +21,11 @@ export const ScenarioExpect = z
     safety: z.literal(true).optional(),
     /** The turn assigns a reading (from the verified library only; the validator checks the ID). */
     reading: z.literal(true).optional(),
+    /**
+     * Torque on an arm is discussed, so the turn says the arm's own weight counts, asks only about the
+     * load's share, or requests a calculation with the arm's mass (Lucky's decision 2026-10-12).
+     */
+    arm_weight: z.literal(true).optional(),
     /** An expected failure (anything else that fails the turn is unexpected). */
     fails_with: TurnFailureName.optional(),
   })

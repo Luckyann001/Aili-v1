@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
 import { fixtureRegistry } from "../__fixtures__/registry";
 import { directorResponseJsonSchema, professorPrompt, shortlist, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
-import { CapGuardProvider, liveRefusals, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
+import { CapGuardProvider, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
 
 // The bake-off harness (docs/m3-plan.md slice 7a), in recorded mode only: no model, key or network.
 
@@ -87,7 +87,7 @@ describe("runner (recorded mode)", () => {
     expect(m.repaired).toEqual([1, 1]);
     expect(m.after_repair).toEqual([2, 2]);
     expect(m.moves).toEqual({ explain: 1, answer: 1 });
-    expect(m.expectations).toEqual([4, 4]);
+    expect(m.expectations).toEqual([5, 5]); // s03 also checks arm_weight
     expect(r.total_micro_usd).toBeGreaterThan(0);
     expect(r.total_micro_usd).toBe(r.records.reduce((s, x) => s + x.cost_micro_usd, 0));
     const t = transcriptMarkdown(r.records[0]!, "recorded");
@@ -169,5 +169,21 @@ describe("per-attempt cap guard", () => {
     const fits = new CapGuardProvider(inner, { config: c, model: "professor", spent: () => 70_001 - worst, capMicroUsd: 70_001 });
     await expect(fits.complete(req)).resolves.toBeDefined();
     expect(inner.requests).toHaveLength(1);
+  });
+});
+
+describe("arm_weight expectation (Lucky's decision 2026-10-12)", () => {
+  const r = (o: object) => ({ narration: [], prompt: undefined, assumptions: [], limitations: [], calc_requests: [], ...o }) as never;
+  it("passes when the text says the arm's own weight or mass counts, or asks only about the load's share", () => {
+    expect(mentionsArmWeight(r({ narration: [{ id: "n1", text: "The arm's own mass gives the rest." }] }))).toBe(true);
+    expect(mentionsArmWeight(r({ assumptions: ["the weight of the arm acts at its middle"] }))).toBe(true);
+    expect(mentionsArmWeight(r({ prompt: { text: "What is the load's share of the torque?", chips: [], kind: "question" } }))).toBe(true);
+  });
+  it("passes when a calculation includes the arm's mass", () => {
+    expect(mentionsArmWeight(r({ calc_requests: [{ id: "c1", solver: "solver.fx-torque", inputs: { arm_length_m: 0.2, arm_kg_per_m: 0.1 } }] }))).toBe(true);
+    expect(mentionsArmWeight(r({ calc_requests: [{ id: "c1", solver: "solver.fx-torque", inputs: { arm_length_m: 0.2, arm_kg_per_m: 0 } }] }))).toBe(false);
+  });
+  it("fails for the live repair of 2026-10-12, which explained torque without the arm's own weight", () => {
+    expect(mentionsArmWeight(r({ narration: [{ id: "n3", text: "Torque is force times the moment arm, the sideways distance from the pivot." }] }))).toBe(false);
   });
 });

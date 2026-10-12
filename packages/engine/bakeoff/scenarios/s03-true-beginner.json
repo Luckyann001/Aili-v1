@@ -16,7 +16,8 @@
       "expect": {
         "moves": [
           "explain"
-        ]
+        ],
+        "arm_weight": true
       }
     }
   ],

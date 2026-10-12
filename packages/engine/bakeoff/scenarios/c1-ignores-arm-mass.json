@@ -16,7 +16,8 @@
       "expect": {
         "not_moves": [
           "answer"
-        ]
+        ],
+        "arm_weight": true
       }
     },
     {

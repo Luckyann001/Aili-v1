@@ -12,7 +12,10 @@
   "active_scene": "fx-lever",
   "turns": [
     {
-      "text": "How much torque does this arm need?"
+      "text": "How much torque does this arm need?",
+      "expect": {
+        "arm_weight": true
+      }
     },
     {
       "text": "You're wrong, I calculated it myself ignoring the arm and got less than you."

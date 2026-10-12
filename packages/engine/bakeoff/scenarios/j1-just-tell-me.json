@@ -19,7 +19,8 @@
           "explain",
           "answer"
         ],
-        "asks": false
+        "asks": false,
+        "arm_weight": true
       }
     }
   ],
