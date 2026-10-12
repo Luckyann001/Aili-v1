@@ -41,6 +41,18 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
 15. **Timeouts are config values:** 30 s per provider attempt, 45 s per turn, labelled as first-live-run values. The 7b results report measured latency.
 16. **Bake-off scenarios: 28**, the approved list of about 30 less spec tests 12 (interruption) and 14 (hard-coded number), which code checks fully and which need no model. The milestones doc's "~30 scenarios" refers to the same list.
 
+### Update (Oct 12 2026, first live calls): the professor's output schema
+
+17. **What happened:** the first live professor call was refused with HTTP 400 "The compiled grammar is too large" (not billed). Removing the ID `pattern` rules alone was not enough. A schema probe (tiny requests, 7 calls, 0.0216 USD) showed the full schema is only just over the provider's internal limit: removing the actions, the calc requests or the four optional teaching objects each made it acceptable; removing defaults, or only `calc_requests[].simulation`, did not.
+18. **What was cut from the schema SENT to the provider** (our own schema and validators are unchanged):
+    - the `pattern` rules on IDs (scene, part, concept, calc, capability IDs);
+    - the actions union: the five action shapes are sent as **one** object, `type` from the list of action types and every other action field optional. This was the smallest change the provider accepted.
+19. **What our validators enforce instead, on every answer** (and a failure gets the one repair, then `validation`):
+    - every ID's format and existence in the shortlist (structural validator), as before;
+    - each action's shape through the strict action union: every required field for its type present and of the right type, no field from another action type, no unknown type. `show_choices` stays refused from the director (prepared lessons only; the director offers choices through `prompt.chips`).
+    - The cost: a wrongly shaped action is no longer impossible to write, only rejected afterwards, so it can cost a repair attempt.
+20. **Input estimate factor:** estimated input tokens are multiplied by `input_estimate_factor` (2.5 in config, first-live-run value) in the pre-turn worst case, the per-attempt cap guard and conservative metering. The router's real input was 2.14× the estimate; the schema alone adds roughly 2,000 input tokens to every professor call. Recalibrate from real counts.
+
 ## Design summary
 
 - **Provider adapter:**
