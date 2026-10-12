@@ -24,5 +24,7 @@
   "provider_monthly_limit_set": null,
   "provider_monthly_limit_set_about": "Filled in by Lucky ONLY after setting a monthly spending limit in the AI provider's own dashboard: { \"by\": \"Lucky\", \"on\": \"YYYY-MM-DD\", \"usd\": 30 }. Claude cannot check the dashboard; this records that Lucky did. Until it is filled in, live turns are refused.",
   "session_cap_micro_usd": 250000,
-  "session_cap_status": "test value"
+  "session_cap_status": "test value",
+  "bakeoff_cap_micro_usd": 3000000,
+  "bakeoff_cap_status": "3 USD for one whole bake-off run, set by Lucky (Oct 12 2026, slice 7a); checked before every turn"
 }

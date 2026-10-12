@@ -44,6 +44,9 @@ export const AiConfig = z
     provider_monthly_limit_set_about: z.string().optional(),
     session_cap_micro_usd: MicroUsd.refine((n) => n > 0, "the session cap must be above 0"),
     session_cap_status: z.string().min(1),
+    /** A hard cap on one whole bake-off run (all scenarios together), checked before every turn. */
+    bakeoff_cap_micro_usd: MicroUsd.refine((n) => n > 0, "the bake-off cap must be above 0"),
+    bakeoff_cap_status: z.string().min(1),
   })
   .strict();
 export type AiConfig = z.infer<typeof AiConfig>;

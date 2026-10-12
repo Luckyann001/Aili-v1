@@ -157,6 +157,11 @@ export interface TurnSessionOptions {
   /** Today's date as YYYY-MM-DD (waiver acknowledgements); a clock for tests. */
   today?: () => string;
   /**
+   * Observes each check of a director answer (the bake-off's first-try and after-repair pass rates):
+   * attempt 1 is the first answer, attempt 2 the repair. On a pass, the validated response.
+   */
+  onCheck?: (c: { attempt: 1 | 2; outcome: "pass" | "validation" | "pedagogy"; errors: string[]; response?: DirectorResponse }) => void;
+  /**
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
    * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
    */
@@ -339,13 +344,17 @@ export class TurnSession {
     let reply = await callDirector();
     if (reply === "stale") return;
     if (typeof reply === "string") return fail(reply, [`director: ${reply}`]);
+    const observe = (attempt: 1 | 2, c: ReturnType<typeof check>) =>
+      this.opts.onCheck?.("errors" in c ? { attempt, outcome: c.reason, errors: c.errors } : { attempt, outcome: "pass", errors: [], response: c.r });
     let checked = check(reply.response);
+    observe(1, checked);
     if ("errors" in checked) {
       const first = checked;
       reply = await callDirector({ errors: first.errors, previous: reply.response });
       if (reply === "stale") return;
       if (typeof reply === "string") return fail(reply, [`director: ${reply}`, ...first.errors]);
       checked = check(reply.response);
+      observe(2, checked);
       if ("errors" in checked) return fail(checked.reason, [...checked.errors, "(after one repair attempt)"]);
     }
     const r = checked.r;
