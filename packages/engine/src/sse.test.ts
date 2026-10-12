@@ -31,7 +31,7 @@ describe("SSE framing", () => {
   it("copes with events split anywhere across chunks, even one character at a time", async () => {
     const wire = (await events()).map(encodeEvent).join("");
     const r = parse([...wire]);
-    expect(r.got.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "calc.result", "prompt", "turn.done"]);
+    expect(r.got.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "action", "calc.result", "prompt", "turn.done"]);
     expect(r.leftover).toBe("");
   });
 

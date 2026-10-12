@@ -21,7 +21,7 @@ test.describe("fake-director turn route (demo flag on)", () => {
     expect(res.headers()["content-type"]).toMatch(/^text\/event-stream/);
     const text = await res.text();
     const types = [...text.matchAll(/^event: (.+)$/gm)].map((m) => m[1]);
-    expect(types).toEqual(["turn.started", "narration", "narration", "action", "action", "calc.result", "prompt", "turn.done"]);
+    expect(types).toEqual(["turn.started", "narration", "narration", "action", "action", "action", "calc.result", "prompt", "turn.done"]);
     expect(text).toContain('"value":"0.637"'); // the solver's number, marked as calculated
   });
 

@@ -141,7 +141,7 @@ test.describe("beginner lever lesson", () => {
     await expect(gauge(page)).toBeVisible({ timeout: 20000 });
     await page.waitForTimeout(400); // the weight is moving
     await page.locator("button[data-state]:visible").click(); // Stop
-    await expect(page.locator('p[role="status"][data-state]')).toHaveText("Stopped");
+    await expect(page.locator('p[role="status"][data-state]')).toHaveText("Stopped.");
     const w1 = await gaugeWidth(page);
     await page.waitForTimeout(1200);
     expect(await gaugeWidth(page)).toBe(w1); // stale animation frames were dropped

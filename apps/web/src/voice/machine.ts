@@ -18,7 +18,7 @@ export interface VoiceState {
   rev: number;
   caption: Caption | null;
   error: string | null;
-  /** Short note shown after a stop, e.g. "Stopped". Cleared by the next action. */
+  /** Short note shown after a stop, e.g. "Stopped.". Cleared by the next action. */
   note: string | null;
   /** Quick replies offered because Aili just asked a question; cleared by the learner's next action. */
   prompt: { chips: string[] } | null;
@@ -69,7 +69,7 @@ export function voiceReducer(state: VoiceState, event: VoiceEvent): VoiceState {
 
     case "interrupt":
       if (state.status === "idle" && !state.caption) return { ...state, rev: state.rev + 1, prompt: null };
-      return { ...state, status: "idle", rev: state.rev + 1, caption: null, error: null, note: "Stopped", prompt: null };
+      return { ...state, status: "idle", rev: state.rev + 1, caption: null, error: null, note: "Stopped.", prompt: null };
 
     case "reset":
       return { ...state, status: "idle", error: null, note: null };

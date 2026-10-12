@@ -41,7 +41,7 @@ describe("in order", () => {
     expect(s.status).toBe("done");
     expect(s.narration.map((n) => n.id)).toEqual(["n1", "n2"]);
     expect(s.narration[0]!.parts.some((p) => "value" in p)).toBe(true);
-    expect(s.actions.map((a) => a.type)).toEqual(["highlight_part", "set_parameter"]);
+    expect(s.actions.map((a) => a.type)).toEqual(["select_scene", "highlight_part", "set_parameter"]);
     expect(s.calcs).toHaveLength(1);
     expect(s.prompt?.chips).toEqual(["Closer to my hand", "Not sure"]);
     expect(s.committed.history.entries.map((e) => e.kind)).toEqual(["learner", "aili"]);

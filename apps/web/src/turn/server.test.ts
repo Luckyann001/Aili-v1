@@ -49,7 +49,7 @@ describe("flag on: POST /api/turn", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/^text\/event-stream/);
     const events = await readAll(res);
-    expect(events.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "calc.result", "prompt", "turn.done"]);
+    expect(events.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "action", "calc.result", "prompt", "turn.done"]);
     expect(new Set(events.map((e) => e.rev))).toEqual(new Set([5]));
     const done = events.at(-1) as Extract<TurnEvent, { type: "turn.done" }>;
     expect(done.state!.history.entries.map((e) => e.kind)).toEqual(["learner", "aili"]);

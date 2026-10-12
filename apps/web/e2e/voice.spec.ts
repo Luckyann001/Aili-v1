@@ -130,7 +130,7 @@ test.describe("prepared reply, captions and interrupt", () => {
     await expect(page.getByText(REPLY[0]!)).toBeVisible();
     await expect(voiceBtn(page)).toHaveAccessibleName("Stop speaking");
     await voiceBtn(page).click();
-    await expect(status(page)).toHaveText("Stopped");
+    await expect(status(page)).toHaveText("Stopped.");
     await expect(caption(page)).toHaveCount(0);
     const after = await fakeLog(page);
     expect(after.cancels).toBeGreaterThan(0);
@@ -143,7 +143,7 @@ test.describe("prepared reply, captions and interrupt", () => {
     await ask(page);
     await expect(page.getByText(REPLY[0]!)).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(status(page)).toHaveText("Stopped");
+    await expect(status(page)).toHaveText("Stopped.");
     await expect(caption(page)).toHaveCount(0);
   });
 

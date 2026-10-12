@@ -32,7 +32,7 @@ describe("voice state machine", () => {
     const oldRev = s.rev;
     s = run([{ type: "speak", rev: oldRev, seq: 0, text: "first segment" }], s);
     s = run([{ type: "interrupt" }], s);
-    expect(s).toMatchObject({ status: "idle", caption: null, note: "Stopped" });
+    expect(s).toMatchObject({ status: "idle", caption: null, note: "Stopped." });
 
     // The timer for segment 2 fires late, after the interrupt.
     const after = run([{ type: "speak", rev: oldRev, seq: 1, text: "second segment" }], s);

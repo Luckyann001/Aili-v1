@@ -25,6 +25,7 @@ function valid(req: DirectorRequest) {
       { id: "n2", text: "The payload at the tip gives {{c1.payload_torque_nm}} of that; the arm's own mass gives the rest." },
     ],
     actions: [
+      { type: "select_scene", scene: "fx-lever" },
       { type: "highlight_part", part: "weight" },
       { type: "set_parameter", param: "weight_distance_m", value: 0.2 },
     ],
@@ -43,9 +44,9 @@ export function fakeResponse(c: FakeCase, req: DirectorRequest): unknown {
     case "slow":
       return r;
     case "invalid-id":
-      return { ...r, actions: [{ type: "highlight_part", part: "servo-horn" }] };
+      return { ...r, actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "servo-horn" }] };
     case "out-of-bounds":
-      return { ...r, actions: [{ type: "set_parameter", param: "weight_distance_m", value: 0.5 }] };
+      return { ...r, actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "set_parameter", param: "weight_distance_m", value: 0.5 }] };
     case "hard-coded-number":
       return { ...r, narration: [{ id: "n1", text: "Holding this arm level takes 2.5 newton-metres." }] };
     case "pedagogy-violation":

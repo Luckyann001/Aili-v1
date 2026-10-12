@@ -22,15 +22,15 @@ describe("event order", () => {
     const { s } = session("valid");
     const { events, emit } = collect();
     await s.run(input, emit);
-    expect(events.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "calc.result", "prompt", "turn.done"]);
-    expect(events.map((e) => e.seq)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(events.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "action", "calc.result", "prompt", "turn.done"]);
+    expect(events.map((e) => e.seq)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
     expect(new Set(events.map((e) => `${e.turn_id}@${e.rev}`)).size).toBe(1);
     // Numbers come from the solver, filled into the placeholders (0.065 kg·m × g, three significant figures).
     const n1 = events[1] as Extract<TurnEvent, { type: "narration" }>;
     expect(n1.text).toBe("Holding this arm level takes 0.637 newton-metres.");
     // The calculated value is marked, so the client can show it differently from the words around it.
     expect(n1.parts).toEqual([{ text: "Holding this arm level takes " }, { value: "0.637", calc_id: "c1", output: "torque_nm" }, { text: " newton-metres." }]);
-    const calc = events[5] as Extract<TurnEvent, { type: "calc.result" }>;
+    const calc = events[6] as Extract<TurnEvent, { type: "calc.result" }>;
     expect(calc.outputs.torque_nm).toBeCloseTo(9.80665 * 0.065, 10);
   });
 
@@ -44,8 +44,8 @@ describe("event order", () => {
 
 describe("failure keeps the last valid state and emits no partial actions", () => {
   const cases: Array<[FakeCase, string, RegExp]> = [
-    ["invalid-id", "validation", /actions\[0\]\.part: "servo-horn" is not a part of scene "fx-lever"/],
-    ["out-of-bounds", "validation", /actions\[0\]\.value: 0\.5 is outside weight_distance_m/],
+    ["invalid-id", "validation", /actions\[1\]\.part: "servo-horn" is not a part of scene "fx-lever"/],
+    ["out-of-bounds", "validation", /actions\[1\]\.value: 0\.5 is outside weight_distance_m/],
     ["hard-coded-number", "validation", /narration\[0\]\.text: hard-coded number "2\.5"/],
     ["pedagogy-violation", "pedagogy", /rule no-flattery \(turn 1\)/],
     ["solver-failure", "solver", /a supplied torque rating must be greater than 0/],
