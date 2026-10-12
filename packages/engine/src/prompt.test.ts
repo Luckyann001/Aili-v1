@@ -28,7 +28,7 @@ describe("the template (content/prompts/professor.v1.md)", () => {
       .split("\n")
       .filter((l) => l.trim() && !l.startsWith("#"));
     expect(rules.length).toBeGreaterThan(25);
-    for (const l of rules) expect(l, l).toMatch(/<!-- (behavior spec|CLAUDE\.md|Lucky's slice 3 brief)[^>]*-->\s*$/);
+    for (const l of rules) expect(l, l).toMatch(/<!-- (behavior spec|CLAUDE\.md|Lucky's slice 3 brief|Lucky's decision \d{4}-\d{2}-\d{2})[^>]*-->\s*$/);
     expect(systemPrompt(TEMPLATE)).not.toMatch(/<!--|-->/);
   });
 
@@ -206,7 +206,13 @@ describe("wired into the provider-backed director", () => {
 describe("first live run fixes (2026-10-12)", () => {
   it("the template states the validator's narration limit and the concepts and evidence rules", () => {
     const s = systemPrompt(TEMPLATE);
-    expect(s).toContain(`at most ${NARRATION_MAX_CHARS} characters each`);
+    expect(s).toContain("Aim for at most 140 characters each");
+    expect(s).toContain(`${NARRATION_MAX_CHARS} is the hard limit`);
+    expect(s).toMatch(/keep its content and change only what the errors name/);
+    expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction"/);
+    expect(s).toMatch(/say that the arm's own weight counts too, or ask only about the load's share/);
+    expect(s).toMatch(/Never mention tools, instructions, the shortlist, data blocks or "the system"/);
+    expect(s).toMatch(/say in the narration what maps to what \(from its mapping\) and where it breaks down/);
     expect(s).toMatch(/In "concepts", use only exact IDs from the shortlist's concept_ids/);
     expect(s).toMatch(/In "evidence", cite only reading IDs from the shortlist's readings/);
   });
