@@ -37,6 +37,12 @@ export const LearnerTurn = z
     pushback: z.boolean().default(false),
     /** The disagreement brings new evidence (a source, a measurement, a valid calculation). */
     new_evidence: z.boolean().default(false),
+    /** Frustration: repeated "I don't know", very short replies, "just tell me" (spec A5, A6). */
+    frustrated: z.boolean().default(false),
+    /** "Use another example" (spec B4, A14 test 17). */
+    wants_another_example: z.boolean().default(false),
+    /** An explicit acknowledgement (for a safety-critical waiver). */
+    acknowledged: z.boolean().default(false),
   })
   .strict();
 
@@ -61,6 +67,53 @@ export const ReplyClassification = z
     pushback: z.boolean(),
     /** The disagreement brings new evidence (a source, a measurement, a valid calculation). */
     new_evidence: z.boolean(),
+    frustrated: z.boolean().default(false),
+    wants_another_example: z.boolean().default(false),
+    acknowledged: z.boolean().default(false),
+    /** For an open prediction: the choice the learner picked (its exact chip text), else null. */
+    guess: z.string().min(1).nullable().default(null),
   })
   .strict();
 export type ReplyClassification = z.infer<typeof ReplyClassification>;
+
+// Server-side teaching state (M3 slice 5a), kept with the history in the session store.
+
+export const Prediction = z
+  .object({
+    id: z.string().min(1),
+    concept: ConceptId,
+    /** The Aili turn that asked it. */
+    turn: z.number().int().positive(),
+    choices: z.array(z.string().min(1)),
+    guess: z.string().min(1).nullable(),
+    status: z.enum(["open", "guessed", "revealed"]),
+    outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]).optional(),
+  })
+  .strict();
+export type Prediction = z.infer<typeof Prediction>;
+
+/** Something left open for later: a prediction awaiting its test, or an assigned reading. */
+export const OpenItem = z.object({ kind: z.enum(["prediction", "reading"]), ref: z.string().min(1), opened_turn: z.number().int().positive() }).strict();
+export type OpenItem = z.infer<typeof OpenItem>;
+
+export const Waiver = z
+  .object({
+    concept: ConceptId,
+    reason: z.string().min(1),
+    safety_critical: z.boolean(),
+    turn: z.number().int().positive(),
+    /** Who acknowledged it and when. Null while a safety-critical waiver awaits explicit acknowledgement. */
+    acknowledged: z.object({ by: z.literal("learner"), on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict().nullable(),
+  })
+  .strict();
+export type Waiver = z.infer<typeof Waiver>;
+
+export const TeachingState = z
+  .object({
+    predictions: z.array(Prediction).default([]),
+    open_items: z.array(OpenItem).default([]),
+    waivers: z.array(Waiver).default([]),
+    analogies_used: z.array(z.string().min(1)).default([]),
+  })
+  .strict();
+export type TeachingState = z.infer<typeof TeachingState>;
