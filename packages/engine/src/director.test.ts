@@ -322,3 +322,14 @@ describe("a prediction always comes with its prompt (Lucky's decision 2026-10-12
     expect(errs({ prediction, prompt: { kind: "prediction", text: "What happens?", chips: ["More", "Less", "Not sure"] } })).toEqual([]);
   });
 });
+
+describe("mild praise is a warning only (config flattery_warn; Lucky's decision 2026-10-12)", () => {
+  it("\"That's a fine start\" is accepted with a warning, any case and apostrophe", () => {
+    for (const text of ["That's a fine start. Let's build on it.", "That’s a FINE start, now the idea."]) {
+      const r = run({ narration: [{ id: "n1", text }] });
+      expect(r.errors).toEqual([]);
+      expect(r.response).not.toBeNull();
+      expect(r.warnings).toEqual([`narration[0].text says "that's a fine start" (mild praise; for review, not a rejection)`]);
+    }
+  });
+});

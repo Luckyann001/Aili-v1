@@ -1,5 +1,5 @@
 {
-  "_about": "Phrases Aili must never say (behavior spec A11, A12, A8; meta_talk: Lucky's decision 2026-10-12, after a first live answer said \"with my tools\"). Matched case-insensitively as whole words, with curly and straight apostrophes treated alike. A phrase list catches only these exact wordings; it cannot judge intent. Add or remove entries only with review. See packages/engine/README.md.",
+  "_about": "Phrases Aili must never say (behavior spec A11, A12, A8; meta_talk: Lucky's decision 2026-10-12, after a first live answer said \"with my tools\"). Matched case-insensitively as whole words, with curly and straight apostrophes treated alike. A phrase list catches only these exact wordings; it cannot judge intent. Add or remove entries only with review. See packages/engine/README.md. flattery_warn: mild praise reported as a WARNING only, never a rejection (Lucky's decision 2026-10-12).",
   "flattery": [
     "great question",
     "excellent question",
@@ -29,5 +29,8 @@
     "my shortlist",
     "data block",
     "data blocks"
+  ],
+  "flattery_warn": [
+    "that's a fine start"
   ]
 }

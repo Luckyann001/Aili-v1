@@ -10,6 +10,9 @@ import PHRASES from "../../../config/pedagogy-phrases.json";
 // Aili's earlier position was correct, and whether the narration really keeps it, is left to the
 // M3 professor tests (behavior spec test 5).
 
+/** Mild praise: a WARNING in the structural validator, never a rejection (Lucky's decision 2026-10-12). */
+export const WARN_PHRASES: { flattery: readonly string[] } = { flattery: PHRASES.flattery_warn ?? [] };
+
 export const BANNED_PHRASES: { flattery: readonly string[]; mastery: readonly string[]; meta_talk?: readonly string[] } = { flattery: PHRASES.flattery, mastery: PHRASES.mastery, meta_talk: PHRASES.meta_talk };
 
 /** Moves that quiz or challenge; none of them belongs in the Answer posture (spec A2). */

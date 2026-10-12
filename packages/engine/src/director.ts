@@ -1,6 +1,7 @@
 import { DirectorResponse, type BoundedInput, type SceneManifest } from "@aili/schemas";
 import type { Shortlist } from "./capabilities";
 import { checkNarration } from "./narration";
+import { findPhrases, WARN_PHRASES } from "./pedagogy";
 
 // Structural validator for the director's response (docs/m2-plan.md §2, slice 3). Checks, with
 // every error naming the exact field and the offending value:
@@ -174,6 +175,7 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     ...r.limitations.map((l, i): [string, string] => [`limitations[${i}]`, l]),
   ];
   for (const [field, t] of text) {
+    for (const p of findPhrases(t, WARN_PHRASES.flattery)) warnings.push(`${field} says "${p}" (mild praise; for review, not a rejection)`);
     errors.push(...checkNarration(t, placeholders, field));
     const q = t.match(QUESTION)?.length ?? 0;
     if (field === "prompt.text") {
