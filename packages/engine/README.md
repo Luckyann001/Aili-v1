@@ -72,10 +72,24 @@ solvers → compile (placeholders filled, three significant figures) → events.
   tokens for the professor and the router. The current prices are **test values, not real pricing**.
   A test greps every source file for the configured numbers.
 - **Cost** is exact integer arithmetic, rounded up per direction, so a cap is never passed by rounding.
-- **Before each turn**: `AILI_AI_KILL_SWITCH=1` (server env, read per request) refuses it; then a
-  page session that has reached `session_cap_micro_usd` is refused. Both say so in plain words and
-  keep the last valid state; the director is not called.
-- **After the director answers**, its token usage is recorded, even if the response then fails a check.
+- **Before each turn, before anything is called** (router included), in order:
+  1. `AILI_AI_KILL_SWITCH=1` (server env, read per request);
+  2. live turns only: a provider, model and key (presence only, `keyPresent`) for both models,
+     otherwise `not_configured`;
+  3. live turns only: `provider_monthly_limit_set` recorded in config (by Lucky, after setting the
+     provider's limit; Claude cannot check the dashboard), otherwise `limit_not_recorded`;
+  4. the worst case: cost so far + 2 × (estimated input + max output) for the professor and the
+     router, at config prices, must fit `session_cap_micro_usd`, otherwise `session_cap`.
+  Each says so in plain words and keeps the last valid state. Fake-director demo turns are not
+  live, so 2 and 3 do not apply to them.
+- **Estimates**: the provider-backed director reports its assembled prompt's estimate; otherwise the
+  full prompt budget (5,000) and a 1,000-token router allowance are assumed. The worst case counts
+  two attempts (the answer and its repair); a transport retry inside either is metered when it
+  happens but is not in the pre-turn check.
+- **Each provider attempt is metered as it ends**, even after the turn has timed out or been
+  interrupted. A timed-out or aborted attempt is charged its estimated input + max output (the
+  provider may still bill it); 429, 5xx and other refusals are charged zero; a request that never
+  reached a provider (no key, no config) is not metered at all.
 - **The ledger is in memory only**: lost on restart, separate per server instance, keyed by page
   session. **Per-user and global caps (and daily limits, rate limits, spike alerts) need the
   database** (deferred stage) and M7. Voice and hosting costs are 0 in config: not metered yet.
