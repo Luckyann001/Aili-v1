@@ -26,7 +26,10 @@
         "moves": [
           "probe"
         ],
-        "asks": true
+        "asks": true,
+        "prompt_kind": [
+          "question"
+        ]
       },
       "expect": {
         "moves": [

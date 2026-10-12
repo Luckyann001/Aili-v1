@@ -223,3 +223,13 @@ describe("script diverged (Lucky's decision 2026-10-12)", () => {
     expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/Script diverged \(not a professor failure\): s03-true-beginner run 1, turn 2/);
   });
 });
+
+describe("s02: turn 1 must be a plain question (Lucky's decision 2026-10-12)", () => {
+  it("a prediction as the first probe makes the script diverge; a plain baseline question fits", () => {
+    const after = byId("s02-goal-statement").turns[1]!.after;
+    expect(after).toEqual({ moves: ["probe"], asks: true, prompt_kind: ["question"] });
+    const asked = (kind: string) => ({ move: "probe", prompt: { kind, text: "Q", chips: [] } }) as never;
+    expect(divergence(after, asked("prediction"))).toMatch(/expects a question prompt; got move probe, a prediction/);
+    expect(divergence(after, asked("question"))).toBeNull();
+  });
+});
