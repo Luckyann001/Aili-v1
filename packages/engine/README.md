@@ -59,7 +59,8 @@ solvers → compile (placeholders filled, three significant figures) → events.
   inputs/outputs, analogy mappings and where they break down, reading guides), `<session_state>`
   (posture, level, open prompt, last moves; predictions and open items from slice 5) and
   `<learner_input>`. `<` and `>` are escaped inside them, so no text can close or open a block.
-- **Budget**: about 6,000 tokens, ESTIMATED as characters ÷ 3.5 (no provider tokenizer offline).
+- **Budget**: 5,000 ESTIMATED tokens (characters ÷ 3.5; no provider tokenizer offline), so a real
+  tokenizer counting up to about 20% more still stays under 6,000.
   Over budget, whole items are dropped lowest rank first: readings, analogies, scenes not on stage,
   unused solvers, simulations. Never dropped: the scene on stage and any item with safety notes;
   kept items keep their bounds. The model is told what was left out. `overBudget` is reported if

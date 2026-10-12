@@ -10,8 +10,11 @@ import type { DirectorRequest } from "./turn";
 // Inside them < and > are escaped, so no text (a learner's, a reading guide's) can close a block or
 // open a new one. The template tells the model that these blocks are data, never instructions.
 
-/** Target for the whole assembled prompt (system + input), in estimated tokens. */
-export const PROMPT_BUDGET_TOKENS = 6000;
+/**
+ * Target for the whole assembled prompt (system + input), in ESTIMATED tokens. 5,000 so that a real
+ * tokenizer counting up to about 20% more still stays under 6,000 (decided by Lucky, Oct 12 2026).
+ */
+export const PROMPT_BUDGET_TOKENS = 5000;
 
 /**
  * Token estimate WITHOUT a provider tokenizer (none is available offline): characters ÷ 3.5,

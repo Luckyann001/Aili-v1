@@ -118,6 +118,8 @@ describe("token budget (estimated: characters ÷ 3.5; no provider tokenizer offl
     const full = assemble({ shortlist: worst(), budgetTokens: Number.MAX_SAFE_INTEGER });
     const a = assemble({ shortlist: worst() });
     console.info(`[slice 3 measure] worst-case shortlist: ${full.estimatedTokens} estimated tokens before dropping; ${a.estimatedTokens} after dropping ${a.dropped.length} items`);
+    expect(PROMPT_BUDGET_TOKENS).toBe(5000); // so a real tokenizer counting ~20% more stays under 6,000
+    expect(PROMPT_BUDGET_TOKENS * 1.2).toBeLessThanOrEqual(6000);
     expect(full.estimatedTokens).toBeGreaterThan(PROMPT_BUDGET_TOKENS);
     expect(a.overBudget).toBe(false);
     expect(a.estimatedTokens).toBeLessThanOrEqual(PROMPT_BUDGET_TOKENS);
