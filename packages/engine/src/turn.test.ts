@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
@@ -313,5 +313,22 @@ describe("prompt re-attached from stored state (Lucky's decision 2026-10-12)", (
     expect(events.at(-1)!.type).toBe("turn.error");
     expect(checks[0]!.errors.join()).toMatch(/prompt: missing/);
     expect(checks[0]!.warnings.join()).not.toMatch(/re-attached/);
+  });
+});
+
+describe("the turn passes the open question to the router (Lucky's decision 2026-10-12)", () => {
+  it("turn 2's router request carries turn 1's question text, kind and choices", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const seen: Array<RouterRequest> = [];
+    const fake = createFakeRouter();
+    const router = { classify: (req: RouterRequest, signal: AbortSignal) => (seen.push(req), fake.classify(req, signal)) };
+    let n = 0;
+    const director: Director = { async respond() { n++; return { response: { ...VALID, request_id: `turn_${n}`, state_rev: n } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router, state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Why is it hard?" }, () => {});
+    await s.run({ text: "Closer to my hand" }, () => {});
+    const p = VALID.prompt as { text: string; chips: string[]; kind?: string };
+    expect(seen[0]!.open_question).toBeUndefined();
+    expect(seen[1]!.open_question).toEqual({ text: p.text, kind: p.kind ?? "question", choices: p.chips });
   });
 });

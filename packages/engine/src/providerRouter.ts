@@ -13,11 +13,13 @@ import type { Router, RouterReply, RouterRequest } from "./router";
 export const routerJsonSchema = (): object => z.toJSONSchema(ReplyClassification, { io: "output" });
 
 /** The router's prompt: the template's system prompt, and two DATA blocks. */
-export function assembleRouterPrompt(template: string, req: Pick<RouterRequest, "text" | "history" | "open_prompt" | "prediction_choices">): { system: string; input: string } {
+export function assembleRouterPrompt(template: string, req: Pick<RouterRequest, "text" | "history" | "open_prompt" | "prediction_choices" | "open_question">): { system: string; input: string } {
   const lastMoves = req.history.entries.filter((e) => e.kind === "aili").slice(-3).map((e) => e.move);
   const state = {
     posture: req.history.posture,
     question_open: req.open_prompt,
+    // The open question itself, so a reply can be judged against it (Lucky's decision 2026-10-12).
+    open_question: req.open_prompt && req.open_question ? req.open_question : null,
     open_prediction_choices: req.prediction_choices ?? null,
     last_moves: lastMoves,
   };

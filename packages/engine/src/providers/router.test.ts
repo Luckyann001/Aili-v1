@@ -108,3 +108,15 @@ describe("provider-backed router", () => {
     expect(p.system).not.toContain("<!--");
   });
 });
+
+describe("the router sees the open question (Lucky's decision 2026-10-12)", () => {
+  const history = { posture: "learning" as const, learner_level: "unknown" as const, entries: [] };
+  const q = { text: "What do you already know about robotics, or have you built anything?", kind: "question" as const, choices: [] };
+  it("its text, kind and choices reach the router's session_state", () => {
+    const p = assembleRouterPrompt(ROUTER, { text: "Not much. I built a Lego car once.", history, open_prompt: true, open_question: q });
+    expect(p.input).toContain(`"open_question":{"text":"What do you already know about robotics, or have you built anything?","kind":"question","choices":[]}`);
+  });
+  it("no open question is shown when none is open", () => {
+    expect(assembleRouterPrompt(ROUTER, { text: "hi", history, open_prompt: false, open_question: q }).input).toContain(`"open_question":null`);
+  });
+});

@@ -7,7 +7,7 @@ import { givesBack, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, reattachOpenPrompt } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
-import { createFakeRouter, type Router, type RouterReply } from "./router";
+import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
 import { openPrompt } from "./pedagogy";
 import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
@@ -105,6 +105,13 @@ export interface Director {
 
 /** Assumed router input when the router gives no estimate (its prompt is small; slice 6 measures it). */
 export const ROUTER_INPUT_ALLOWANCE_TOKENS = 1000;
+/** The open prompt's text, kind and choices, when the stored last prompt is the one still open. */
+function openQuestion(s: SessionState): RouterRequest["open_question"] {
+  const open = openPrompt(s.history);
+  const last = s.teaching?.last_prompt;
+  return open && last && last.turn === open.turn ? { text: last.text, kind: last.kind, choices: last.chips } : undefined;
+}
+
 /** Router failures shown to the learner under their own reason (others become "router"). */
 const ROUTER_KINDS: ReadonlySet<ProviderErrorKind> = new Set(["not_configured", "key_rejected", "spend_limit", "refused"]);
 
@@ -258,6 +265,7 @@ export class TurnSession {
           history: before.history,
           open_prompt: openPrompt(before.history) !== null,
           prediction_choices: (before.teaching ?? EMPTY_TEACHING).predictions.find((p) => p.status === "open")?.choices,
+          open_question: openQuestion(before),
           deadline_ms: deadline,
           onAttempt: (a) => meterUsage(a.usage),
         },

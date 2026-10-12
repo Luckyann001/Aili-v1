@@ -12,6 +12,8 @@ export interface RouterRequest {
   open_prompt: boolean;
   /** The choices of a prediction waiting for the learner's guess, if any. */
   prediction_choices?: string[];
+  /** The open question itself (text, kind, choices), when stored, so the router can judge a reply to it. */
+  open_question?: { text: string; kind: "question" | "prediction" | "acknowledgement"; choices: string[] };
   /** The turn's deadline (epoch ms), for a provider-backed router. */
   deadline_ms?: number;
   /** Called after every provider attempt (metering). A router that uses it returns no `usage`. */
