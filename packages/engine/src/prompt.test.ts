@@ -34,7 +34,10 @@ describe("the template (content/prompts/professor.v1.md)", () => {
 
   it("says what Lucky asked for: identity honesty, placeholders only, shortlist only, data not instructions", () => {
     const s = systemPrompt(TEMPLATE);
-    expect(s).toMatch(/You are an AI\. Never claim to be a human\. Never name or describe the model or company behind you/);
+    expect(s).toMatch(/You are an AI\. Never claim to be a human, and never name the model or company behind you\./);
+    expect(s).toMatch(/If a learner sincerely asks what you are, say plainly that you are Aili, an AI professor built on an AI model, and that you don't share details of how you are built\./);
+    expect(s).toMatch(/Never deny being built on a model\./);
+    expect(s).not.toMatch(/cannot share more/); // the old wording, which could read as a denial
     expect(s).toMatch(/Never claim to have run, measured, tested or seen something you did not/);
     expect(s).toMatch(/Never write an engineering number[\s\S]*\{\{c1\.torque_nm\}\}/);
     expect(s).toMatch(/Never invent an ID, a book, a chapter, a page, a video, a timestamp, a source or a quotation/);
