@@ -300,3 +300,19 @@ describe("narration hard limit (Lucky's decision 2026-10-12: 180; the prompt ask
     expect(errs({ narration: [{ id: "n1", text: "a".repeat(181) }] })).toEqual(["narration[0].text: 181 characters, at most 180"]);
   });
 });
+
+describe("a prediction always comes with its prompt (Lucky's decision 2026-10-12)", () => {
+  const prediction = { id: "weight-out", concept: "mech.torque.static" };
+  it("a prediction with no prompt is rejected, naming the missing field and what it must hold", () => {
+    // as the live answer of 2026-10-12, 20:00 sent it
+    expect(errs({ prediction, prompt: undefined })).toEqual([
+      `prompt: missing. "prediction" ("weight-out") always comes with "prompt": { "kind": "prediction", "text": the question, "chips": the choices plus "Not sure" }`,
+    ]);
+  });
+  it("a prediction with a prompt of another kind is rejected, naming prompt.kind", () => {
+    expect(errs({ prediction, prompt: { kind: "question", text: "What happens?", chips: ["More", "Less", "Not sure"] } })).toEqual([`prompt.kind: "question" must be "prediction" when "prediction" ("weight-out") is set`]);
+  });
+  it("a prediction with its prediction prompt passes", () => {
+    expect(errs({ prediction, prompt: { kind: "prediction", text: "What happens?", chips: ["More", "Less", "Not sure"] } })).toEqual([]);
+  });
+});

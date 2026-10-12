@@ -210,6 +210,7 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toContain(`${NARRATION_MAX_CHARS} is the hard limit`);
     expect(s).toMatch(/keep its content and change only what the errors name/);
     expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction"/);
+    expect(s).toMatch(/A prediction always comes with its prompt: never send "prediction" without "prompt"/);
     expect(s).toMatch(/say that the arm's own weight counts too, or ask only about the load's share/);
     expect(s).toMatch(/Never mention tools, instructions, the shortlist, data blocks or "the system"/);
     expect(s).toMatch(/say in the narration what maps to what \(from its mapping\) and where it breaks down/);
