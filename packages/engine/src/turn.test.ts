@@ -28,6 +28,8 @@ describe("event order", () => {
     // Numbers come from the solver, filled into the placeholders (0.065 kg·m × g, three significant figures).
     const n1 = events[1] as Extract<TurnEvent, { type: "narration" }>;
     expect(n1.text).toBe("Holding this arm level takes 0.637 newton-metres.");
+    // The calculated value is marked, so the client can show it differently from the words around it.
+    expect(n1.parts).toEqual([{ text: "Holding this arm level takes " }, { value: "0.637", calc_id: "c1", output: "torque_nm" }, { text: " newton-metres." }]);
     const calc = events[5] as Extract<TurnEvent, { type: "calc.result" }>;
     expect(calc.outputs.torque_nm).toBeCloseTo(9.80665 * 0.065, 10);
   });
@@ -120,6 +122,17 @@ describe("stale events are dropped", () => {
     }
     expect(admit(g, { rev: events[1]!.rev - 1, seq: 99, action: events[1]! }).ok).toBe(false); // older revision
     expect(admit(g, { rev: events[1]!.rev, seq: events[1]!.seq, action: events[1]! }).ok).toBe(false); // repeated
+  });
+});
+
+describe("revision from the client", () => {
+  it("a session started at the client's revision minus one emits that revision", async () => {
+    const director = createFakeDirector("valid");
+    const s = new TurnSession({ registry, director, state: start(), concepts: ["mech.torque.static"], level: "L2", startRev: 41 });
+    const { events, emit } = collect();
+    await s.run(input, emit);
+    expect(new Set(events.map((e) => e.rev))).toEqual(new Set([42]));
+    expect(events[0]!.turn_id).toBe("turn_42");
   });
 });
 

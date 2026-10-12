@@ -16,13 +16,19 @@ import { givesBack, validatePedagogy } from "./pedagogy";
 
 export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
   | { type: "turn.started" }
-  | { type: "narration"; id: string; text: string }
+  | { type: "narration"; id: string; text: string; parts: TextPart[] }
   | { type: "action"; action: DirectorResponse["actions"][number] }
   | { type: "calc.result"; calc_id: string; outputs: Record<string, number> }
-  | { type: "prompt"; text: string; chips: string[] }
+  | { type: "prompt"; text: string; parts: TextPart[]; chips: string[] }
   | { type: "turn.done"; move: DirectorResponse["move"] }
   | { type: "turn.error"; reason: TurnFailure; message: string; details: string[] }
 );
+
+/**
+ * Learner-facing text split so the client can mark calculated values (behavior spec A10: a
+ * calculated result looks different from an explanation). `text` stays the plain sentence for speech.
+ */
+export type TextPart = { text: string } | { value: string; calc_id: string; output: string };
 
 export type TurnFailure = "director" | "timeout" | "validation" | "pedagogy" | "solver";
 
@@ -86,6 +92,11 @@ export interface TurnSessionOptions {
   solvers?: Record<string, SolverFn>;
   /** Give up on the director after this long. */
   timeoutMs?: number;
+  /**
+   * The revision before this session's first turn. A stateless server passes the client's revision
+   * minus one, so the turn's events carry the revision the client's gate expects.
+   */
+  startRev?: number;
 }
 
 /** Numbers shown to learners: three significant figures, no exponent for ordinary values. */
@@ -100,6 +111,7 @@ export class TurnSession {
   constructor(opts: TurnSessionOptions) {
     this.opts = opts;
     this.state = opts.state;
+    this.rev = opts.startRev ?? 0;
   }
 
   get revision(): number {
@@ -174,10 +186,24 @@ export class TurnSession {
       results.push({ calc_id: c.id, outputs });
       for (const [k, x] of Object.entries(outputs)) values[`${c.id}.${k}`] = formatNumber(x);
     }
-    const fill = (t: string) => t.replace(/\{\{\s*([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?)\s*\}\}/g, (_, name: string) => values[name] ?? `{{${name}}}`);
+    const PH = /\{\{\s*([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?)\s*\}\}/g;
+    const fill = (t: string) => t.replace(PH, (_, name: string) => values[name] ?? `{{${name}}}`);
+    const partsOf = (t: string): TextPart[] => {
+      const out: TextPart[] = [];
+      let at = 0;
+      for (const m of t.matchAll(PH)) {
+        if (m.index > at) out.push({ text: t.slice(at, m.index) });
+        const name = m[1]!;
+        const [calc_id, output] = name.split(".") as [string, string];
+        out.push(name in values ? { value: values[name]!, calc_id, output } : { text: m[0] });
+        at = m.index + m[0].length;
+      }
+      if (at < t.length) out.push({ text: t.slice(at) });
+      return out;
+    };
     const compiled = {
-      narration: r.narration.map((n) => ({ id: n.id, text: fill(n.text) })),
-      prompt: r.prompt ? { text: fill(r.prompt.text), chips: r.prompt.chips.map(fill) } : null,
+      narration: r.narration.map((n) => ({ id: n.id, text: fill(n.text), parts: partsOf(n.text) })),
+      prompt: r.prompt ? { text: fill(r.prompt.text), parts: partsOf(r.prompt.text), chips: r.prompt.chips.map(fill) } : null,
     };
     const unfilled = [...compiled.narration.map((n) => n.text), compiled.prompt?.text ?? "", ...(compiled.prompt?.chips ?? [])].find((t) => /\{\{/.test(t));
     if (unfilled) return fail("solver", [`a placeholder had no calculated value: "${unfilled}"`]);
