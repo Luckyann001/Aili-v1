@@ -125,7 +125,8 @@ export function assembleProfessorPrompt(o: {
   const dropped: string[] = [];
   const build = () => {
     const kept = items.filter((it) => !dropped.includes(it.id));
-    const shortlist = kept.reduce<Record<string, unknown[]>>((acc, it) => ((acc[`${it.kind}s`] ??= []).push(it.data), acc), {});
+    // The valid concept IDs come first and are never dropped: "concepts" may name only these.
+    const shortlist = kept.reduce<Record<string, unknown[]>>((acc, it) => ((acc[`${it.kind}s`] ??= []).push(it.data), acc), { concept_ids: [...o.shortlist.concepts] });
     if (dropped.length) shortlist.left_out_to_fit = [...dropped];
     return [block("shortlist", JSON.stringify(shortlist)), stateBlock, learner].join("\n\n");
   };

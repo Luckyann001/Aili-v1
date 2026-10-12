@@ -202,3 +202,22 @@ describe("wired into the provider-backed director", () => {
     expect(sent.maxOutputTokens).toBe(cfg.models.professor.max_output_tokens);
   });
 });
+
+describe("first live run fixes (2026-10-12)", () => {
+  it("the template states the validator's narration limit and the concepts and evidence rules", () => {
+    const s = systemPrompt(TEMPLATE);
+    expect(s).toContain(`at most ${NARRATION_MAX_CHARS} characters each`);
+    expect(s).toMatch(/In "concepts", use only exact IDs from the shortlist's concept_ids/);
+    expect(s).toMatch(/In "evidence", cite only reading IDs from the shortlist's readings/);
+  });
+
+  it("the shortlist block lists the valid concept IDs first, and keeps them when items are dropped to fit", () => {
+    const shortlistJson = (input: string) => JSON.parse(/<shortlist>\n([\s\S]*?)\n<\/shortlist>/.exec(input)![1]!.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+    const full = shortlistJson(assemble().input);
+    expect(Object.keys(full)[0]).toBe("concept_ids");
+    expect(full.concept_ids).toEqual(["mech.moment-arm", "mech.torque.static"]);
+    const tight = assemble({ budgetTokens: 100 });
+    expect(tight.dropped.length).toBeGreaterThan(0);
+    expect(shortlistJson(tight.input).concept_ids).toEqual(["mech.moment-arm", "mech.torque.static"]);
+  });
+});
