@@ -264,6 +264,10 @@ describe("repair feedback", () => {
     expect(repair).toContain("evidence[0]:");
     expect(repair).toContain("narration[0].text: 223 characters, at most 160");
     expect(repair).toContain("valid: mech.moment-arm, mech.torque.static");
+    // the previous answer travels with the errors, as escaped data, so the content can be kept
+    expect(repair).toContain("<previous_answer>");
+    expect(repair).toContain('"concepts":["servo"]');
+    expect(repair).toContain("Keep its content and change only what these errors name");
   });
 });
 
@@ -285,8 +289,8 @@ describe("config: provider fields", () => {
     const c = AiConfig.parse({ ...configJson(), models: CONFIGURED.models, attempt_timeout_ms: 150, turn_timeout_ms: 150 });
     const t = turn(recorded({ hang: true }), { config: c });
     await t.run();
-    // the helper's prompt: a fixed system line, and "turn_1: <learner text>" (+ the repair separator)
-    const raw = estimateTokens("slice 3 builds the real prompt") + estimateTokens("turn_1: Why is it hard to hold?" + "\n\n");
+    // the helper's prompt: a fixed system line, and "turn_1: <learner text>" (no repair on a first attempt)
+    const raw = estimateTokens("slice 3 builds the real prompt") + estimateTokens("turn_1: Why is it hard to hold?");
     const [a] = t.ledger.entries("p").filter((e) => e.model === "professor");
     expect(c.input_estimate_factor).toBeGreaterThan(1);
     expect(a!.input_tokens).toBe(Math.ceil(raw * c.input_estimate_factor));

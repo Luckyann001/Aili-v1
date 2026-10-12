@@ -1,7 +1,7 @@
 import type { AiConfig } from "@aili/schemas";
 import { completeWithPolicy, ProviderError, type Attempt, type ProfessorProvider } from "./provider";
 import { padEstimate } from "./metering";
-import { estimateTokens } from "./prompt";
+import { block, estimateTokens } from "./prompt";
 import { DirectorCallFailed, type Director, type DirectorReply, type DirectorRequest } from "./turn";
 
 // A Director backed by a model provider (docs/m3-plan.md slice 2). Provider, model and the key's
@@ -35,10 +35,12 @@ export class ProviderDirector implements Director {
     if (!m.provider || !m.model || !this.o.hasKey()) throw new DirectorCallFailed("not_configured", []);
     const { system, input } = this.o.prompt(req);
     // Padded by config input_estimate_factor: the charge for an attempt that may be billed but reports nothing.
-    const estimatedInputTokens = padEstimate(this.o.config, estimateTokens(system) + estimateTokens(input + "\n\n" + (req.repair?.errors.join("\n") ?? "")));
+    // The repair shows the previous answer (as escaped DATA) and every error, so the model can keep the
+    // content and change only what the errors name (Lucky's decision 2026-10-12).
     const repair = req.repair
-      ? `\n\nYour previous answer failed these checks. Return a corrected answer that passes them:\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
+      ? `\n\n${block("previous_answer", JSON.stringify(req.repair.previous))}\n\nYour previous answer (above) failed these checks. Keep its content and change only what these errors name:\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
       : "";
+    const estimatedInputTokens = padEstimate(this.o.config, estimateTokens(system) + estimateTokens(input + repair));
     const attempts: Attempt[] = [];
     try {
       const r = await completeWithPolicy(

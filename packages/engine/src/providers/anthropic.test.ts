@@ -187,7 +187,7 @@ describe("whole turns through the adapter", () => {
     await t.run();
     expect(last(t.events).type).toBe("turn.done");
     expect(t.srv.received).toHaveLength(2);
-    expect(JSON.parse(t.srv.received[1]!.body).messages[0].content).toContain("Your previous answer failed these checks");
+    expect(JSON.parse(t.srv.received[1]!.body).messages[0].content).toContain("failed these checks. Keep its content and change only what these errors name");
     expect(professorAttempts(t.ledger)).toHaveLength(2);
   });
 
