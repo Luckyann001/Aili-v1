@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
-import { costMicroUsd, createFakeDirector, createFakeRouter, FAKE_USAGE, InMemoryLedger, refuseTurn, TurnSession, type SessionState, type TurnEvent } from "./index";
+import { costMicroUsd, createFakeDirector, createFakeRouter, FAKE_USAGE, InMemoryLedger, refuseTurn, TurnSession, worstCaseTurnCost, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 
 // Metering, cap and kill switch (M2 slice 7). Real prices are read from config/ai.json, never
@@ -59,16 +59,18 @@ describe("ledger (in memory) and refusals", () => {
     expect(l.entries("a").map((e) => e.turn_id)).toEqual(["turn_1", "turn_2"]);
   });
 
-  it("the kill switch refuses first; the cap refuses once spending reaches it", () => {
+  it("the kill switch refuses first; then the worst case (spent + this turn's worst) must fit the cap", () => {
     const l = new InMemoryLedger();
-    const ask = (killSwitch: boolean) => refuseTurn({ killSwitch, ledger: l, sessionId: "a", config: MADE_UP });
+    const estimate = { professorInputTokens: 0, routerInputTokens: 0 };
+    const worst = worstCaseTurnCost(MADE_UP, estimate);
+    const ask = (killSwitch: boolean) => refuseTurn({ killSwitch, ledger: l, sessionId: "a", config: MADE_UP, estimate })?.reason ?? null;
     expect(ask(false)).toBeNull();
     expect(ask(true)).toBe("kill_switch");
-    l.record("a", { model: "professor", input_tokens: 0, output_tokens: 0, turn_id: "t", cost_micro_usd: MADE_UP.session_cap_micro_usd - 1 });
-    expect(ask(false)).toBeNull(); // one below the cap
+    l.record("a", { model: "professor", input_tokens: 0, output_tokens: 0, turn_id: "t", cost_micro_usd: MADE_UP.session_cap_micro_usd - worst });
+    expect(ask(false)).toBeNull(); // spent + worst exactly at the cap: allowed
     l.record("a", { model: "professor", input_tokens: 0, output_tokens: 0, turn_id: "t", cost_micro_usd: 1 });
-    expect(ask(false)).toBe("session_cap"); // exactly at the cap
-    expect(ask(true)).toBe("kill_switch");
+    expect(ask(false)).toBe("session_cap"); // one micro-USD over, though spending is still below the cap
+    expect(l.spent("a")).toBeLessThan(MADE_UP.session_cap_micro_usd);
   });
 });
 

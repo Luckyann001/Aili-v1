@@ -4,7 +4,8 @@ import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
 import { validateDirectorResponse } from "./director";
 import { givesBack, validatePedagogy } from "./pedagogy";
-import { ReplyClassification, type AiConfig } from "@aili/schemas";
+import { ReplyClassification, type AiConfig, type RuntimeModel } from "@aili/schemas";
+import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply } from "./router";
 import type { Attempt, ProviderErrorKind } from "./provider";
 import { openPrompt } from "./pedagogy";
@@ -35,10 +36,11 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
  */
 export type TextPart = { text: string } | { value: string; calc_id: string; output: string };
 
-export type TurnFailure = "not_configured" | "key_rejected" | "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
+export type TurnFailure = "limit_not_recorded" | "not_configured" | "key_rejected" | "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
 
 /** Plain words for the learner. Details go to the event's `details` for developers and logs. */
 export const FAILURE_MESSAGES: Record<TurnFailure, string> = {
+  limit_not_recorded: "Live answers are off until a monthly spending limit is set with the AI provider and recorded. Prepared lessons still work. Nothing on the stage changed.",
   not_configured: "Live answers aren't set up on this computer. Prepared lessons still work. Nothing on the stage changed.",
   key_rejected: "The AI provider didn't accept the key set up on this computer. Prepared lessons still work. Nothing on the stage changed.",
   router: "Aili couldn't make sense of that reply this time. Nothing on the stage changed.",
@@ -62,6 +64,11 @@ export interface DirectorRequest {
   deadline_ms: number;
   /** Set on the one repair attempt: the previous answer and why it failed the checks. */
   repair?: { errors: string[]; previous: unknown };
+  /**
+   * Called as each provider attempt ends, so it is metered even if the turn has already timed out
+   * or been interrupted (the provider may still bill it).
+   */
+  onAttempt?: (a: Attempt) => void;
 }
 
 /** What a director call returns: the raw response (validated here) and the tokens it used. */
@@ -87,7 +94,12 @@ export class DirectorCallFailed extends Error {
 /** The professor model in M3; a scripted fake in M2. */
 export interface Director {
   respond(req: DirectorRequest, signal: AbortSignal): Promise<DirectorReply>;
+  /** Estimated input tokens for this request (the assembled prompt), for the worst-case check. */
+  estimateInputTokens?(req: Omit<DirectorRequest, "deadline_ms" | "repair">): number;
 }
+
+/** Assumed router input when the router gives no estimate (its prompt is small; slice 6 measures it). */
+export const ROUTER_INPUT_ALLOWANCE_TOKENS = 1000;
 
 /** A solver as the pipeline calls it: unit-named inputs in, unit-named numeric outputs out. */
 export type SolverFn = (inputs: Record<string, number>) => Record<string, number>;
@@ -137,7 +149,14 @@ export interface TurnSessionOptions {
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
    * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
    */
-  meter?: { ledger: Ledger; sessionId: string; config: AiConfig; killSwitch: boolean };
+  meter?: {
+    ledger: Ledger;
+    sessionId: string;
+    config: AiConfig;
+    killSwitch: boolean;
+    /** Live (real-model) turns: whether each model's key is set (presence only, never the value). */
+    live?: { hasKey: (model: RuntimeModel) => boolean };
+  };
 }
 
 /** Numbers shown to learners: three significant figures, no exponent for ordinary values. */
@@ -188,11 +207,18 @@ export class TurnSession {
     const remaining = () => Math.max(0, deadline - Date.now());
     const sl = shortlist(this.opts.registry, { concepts: this.opts.concepts, level: this.opts.level });
 
-    // Refused before it starts: the kill switch, or this session's cap already reached.
+    // Refused before anything is called: kill switch, (live) configuration and key, (live) the
+    // provider-limit record, then the worst case against this session's cap.
     const meter = this.opts.meter;
     if (meter) {
-      const refusal = refuseTurn({ killSwitch: meter.killSwitch, ledger: meter.ledger, sessionId: meter.sessionId, config: meter.config });
-      if (refusal) return fail(refusal, [refusal === "kill_switch" ? "AILI_AI_KILL_SWITCH=1" : `spent ${meter.ledger.spent(meter.sessionId)} of ${meter.config.session_cap_micro_usd} micro-USD`]);
+      const router = this.opts.router;
+      const estimate = {
+        professorInputTokens:
+          this.opts.director.estimateInputTokens?.({ request_id: turn_id, state_rev: rev, shortlist: sl, history: before.history, active_scene: before.activeScene, learner_text: input.text }) ?? PROMPT_BUDGET_TOKENS,
+        routerInputTokens: router?.estimateInputTokens?.(input.text) ?? ROUTER_INPUT_ALLOWANCE_TOKENS,
+      };
+      const refusal = refuseTurn({ killSwitch: meter.killSwitch, ledger: meter.ledger, sessionId: meter.sessionId, config: meter.config, estimate, live: meter.live });
+      if (refusal) return fail(refusal.reason, [refusal.detail]);
     }
 
     // Router: how to read the learner's reply, decided here on the server, never by the client.
@@ -215,17 +241,17 @@ export class TurnSession {
 
     // Director, then the checks; one repair attempt (with the errors fed back) if the checks fail.
     // Every attempt is metered, whether or not its answer passes.
+    const meterUsage = (u: TokenUsage) => meter?.ledger.record(meter.sessionId, { ...u, turn_id, cost_micro_usd: costMicroUsd(u, meter.config) });
+    // Provider attempts are metered as they end (onAttempt); a director without them reports one usage.
     const meterReply = (reply: DirectorReply | DirectorCallFailed) => {
-      if (!meter) return;
-      const usages = reply.attempts ? reply.attempts.map((a) => a.usage) : "usage" in reply && reply.usage ? [reply.usage] : [];
-      for (const u of usages) meter.ledger.record(meter.sessionId, { ...u, turn_id, cost_micro_usd: costMicroUsd(u, meter.config) });
+      if (!(reply instanceof DirectorCallFailed) && !reply.attempts && reply.usage) meterUsage(reply.usage);
     };
     const callDirector = async (repair?: { errors: string[]; previous: unknown }): Promise<DirectorReply | TurnFailure | "stale"> => {
       if (remaining() <= 0) return "timeout";
       try {
         const reply = await withTimeout(
           this.opts.director.respond(
-            { request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, ...(repair ? { repair } : {}) },
+            { request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
             abort.signal,
           ),
           remaining(),

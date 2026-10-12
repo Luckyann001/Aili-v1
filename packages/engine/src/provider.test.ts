@@ -46,6 +46,7 @@ async function policy(steps: RecordedStep[], o: { deadlineIn?: number; attemptTi
     attemptTimeoutMs: o.attemptTimeoutMs,
     onAttempt: (a) => attempts.push(a),
     model: "professor",
+    estimatedInputTokens: 100,
     sleep: async (ms) => void pauses.push(ms),
     random: () => 0.5,
   });
@@ -112,7 +113,7 @@ describe("retry and timeout rules", () => {
 
   it("every attempt is reported for metering, failed ones with zero tokens", async () => {
     const attempts: Attempt[] = [];
-    await completeWithPolicy(recorded({ status: 429 }, ok()), req(), { deadlineMs: Date.now() + 20_000, onAttempt: (a) => attempts.push(a), model: "professor", sleep: async () => {} });
+    await completeWithPolicy(recorded({ status: 429 }, ok()), req(), { deadlineMs: Date.now() + 20_000, onAttempt: (a) => attempts.push(a), model: "professor", estimatedInputTokens: 100, sleep: async () => {} });
     expect(attempts.map((a) => [a.outcome, a.usage.input_tokens, a.usage.output_tokens])).toEqual([
       ["rate_limited", 0, 0],
       ["ok", 5200, 480],

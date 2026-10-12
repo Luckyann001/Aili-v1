@@ -56,12 +56,57 @@ export class InMemoryLedger implements Ledger {
   }
 }
 
-export type Refusal = "kill_switch" | "session_cap";
+export type Refusal = "kill_switch" | "not_configured" | "limit_not_recorded" | "session_cap";
 
-/** Checked before any AI turn starts: the kill switch first, then this session's cap. */
-export function refuseTurn(opts: { killSwitch: boolean; ledger: Ledger; sessionId: string; config: AiConfig }): Refusal | null {
-  if (opts.killSwitch) return "kill_switch";
-  if (opts.ledger.spent(opts.sessionId) >= opts.config.session_cap_micro_usd) return "session_cap";
+/**
+ * Attempts counted in the worst case: the first answer and the one repair (Lucky's slice 4 rule).
+ * Note: a transport retry inside either call could add a third or fourth; those are metered as
+ * they happen, so the ledger stays right, but the pre-turn check counts two.
+ */
+export const WORST_CASE_ATTEMPTS = 2;
+
+/** The most a turn can cost in micro-USD: both models, each at its max output, times the attempts. */
+export function worstCaseTurnCost(config: AiConfig, est: { professorInputTokens: number; routerInputTokens: number }): number {
+  const one = (model: RuntimeModel, input: number) => costMicroUsd({ model, input_tokens: input, output_tokens: config.models[model].max_output_tokens }, config);
+  return WORST_CASE_ATTEMPTS * (one("professor", est.professorInputTokens) + one("router", est.routerInputTokens));
+}
+
+/** Whether the key for `model` is set. Only presence is checked; the value never leaves here. */
+export function keyPresent(config: AiConfig, model: RuntimeModel, env: Record<string, string | undefined>): boolean {
+  const v = env[config.models[model].api_key_env];
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+export interface RefuseOptions {
+  killSwitch: boolean;
+  ledger: Ledger;
+  sessionId: string;
+  config: AiConfig;
+  /** Estimated input tokens for this turn (the assembled prompt, the router's input). */
+  estimate: { professorInputTokens: number; routerInputTokens: number };
+  /** Live (real-model) turns only: whether each model's key is set. */
+  live?: { hasKey: (model: RuntimeModel) => boolean };
+}
+
+/**
+ * Checked before any AI call in a turn, in this order: the kill switch; for live turns, a
+ * provider, model and key for both models, then the provider-limit record; then the worst case
+ * (cost so far + this turn's worst case) against this session's cap.
+ */
+export function refuseTurn(o: RefuseOptions): { reason: Refusal; detail: string } | null {
+  if (o.killSwitch) return { reason: "kill_switch", detail: "AILI_AI_KILL_SWITCH=1" };
+  if (o.live) {
+    for (const model of ["router", "professor"] as const) {
+      const m = o.config.models[model];
+      if (!m.provider || !m.model) return { reason: "not_configured", detail: `${model}: no provider or model in config` };
+      if (!o.live.hasKey(model)) return { reason: "not_configured", detail: `${model}: ${m.api_key_env} is not set` };
+    }
+    if (!o.config.provider_monthly_limit_set) return { reason: "limit_not_recorded", detail: "provider_monthly_limit_set is empty in config/ai.json" };
+  }
+  const spent = o.ledger.spent(o.sessionId);
+  const worst = worstCaseTurnCost(o.config, o.estimate);
+  if (spent + worst > o.config.session_cap_micro_usd)
+    return { reason: "session_cap", detail: `spent ${spent} + worst case ${worst} > cap ${o.config.session_cap_micro_usd} micro-USD` };
   return null;
 }
 

@@ -8,7 +8,9 @@ import type { TokenUsage } from "./metering";
 // - network error, attempt timeout, 429, 5xx: ONE retry after a jittered pause, only if time remains;
 // - 401/403: no retry, "key rejected";  other 4xx: no retry;
 // - an interrupt aborts at once, with no retry;
-// - every attempt is reported for metering, even a failed one.
+// - every attempt is reported for metering, even a failed one. An attempt that timed out or was
+//   aborted after it started is metered CONSERVATIVELY (estimated input + max output), because the
+//   provider may still bill it; other failures are metered at zero.
 // Errors carry a kind and a status code only, never a response body or a key.
 
 export interface CompletionRequest {
@@ -72,6 +74,8 @@ export interface PolicyOptions {
   /** Called after every attempt, success or not (metering). */
   onAttempt: (a: Attempt) => void;
   model: TokenUsage["model"];
+  /** Estimated input tokens of this request: with maxOutputTokens, the charge for a timed-out or aborted attempt. */
+  estimatedInputTokens: number;
 }
 
 const realSleep = (ms: number, signal: AbortSignal) =>
@@ -87,6 +91,7 @@ export async function completeWithPolicy(provider: ProfessorProvider, req: Compl
   const sleep = o.sleep ?? realSleep;
   const random = o.random ?? Math.random;
   const zero: TokenUsage = { model: o.model, input_tokens: 0, output_tokens: 0 };
+  const conservative: TokenUsage = { model: o.model, input_tokens: o.estimatedInputTokens, output_tokens: req.maxOutputTokens };
   for (let attempt = 1; ; attempt++) {
     if (req.signal.aborted) throw new ProviderError("aborted");
     const remaining = o.deadlineMs - now();
@@ -110,7 +115,8 @@ export async function completeWithPolicy(provider: ProfessorProvider, req: Compl
           : err instanceof ProviderError
             ? err
             : new ProviderError("network");
-      o.onAttempt({ usage: zero, outcome: failure.kind });
+      // The request was sent: a timeout or an abort may still be billed, so charge the most it could cost.
+      o.onAttempt({ usage: failure.kind === "timeout" || failure.kind === "aborted" ? conservative : zero, outcome: failure.kind });
     } finally {
       clearTimeout(timer);
       req.signal.removeEventListener("abort", onAbort);

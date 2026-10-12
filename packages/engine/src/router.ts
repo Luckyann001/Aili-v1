@@ -19,6 +19,8 @@ export interface RouterReply {
 
 export interface Router {
   classify(req: RouterRequest, signal: AbortSignal): Promise<RouterReply>;
+  /** Estimated input tokens for classifying `text`, for the worst-case check. */
+  estimateInputTokens?(text: string): number;
 }
 
 /** Token counts the fake router reports per reply (counts only; prices come from config). */
