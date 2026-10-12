@@ -53,7 +53,8 @@ export class ProviderRouter implements Router {
       this.o.provider,
       { system, input, outputSchema: this.schema, maxOutputTokens: m.max_output_tokens, signal },
       {
-        deadlineMs: req.deadline_ms ?? now() + 20_000,
+        deadlineMs: req.deadline_ms ?? now() + this.o.config.turn_timeout_ms,
+        attemptTimeoutMs: this.o.config.attempt_timeout_ms,
         onAttempt: (a) => req.onAttempt?.(a),
         model: "router",
         estimatedInputTokens: estimateTokens(system) + estimateTokens(input),

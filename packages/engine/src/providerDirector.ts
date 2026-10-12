@@ -42,7 +42,7 @@ export class ProviderDirector implements Director {
       const r = await completeWithPolicy(
         this.o.provider,
         { system, input: input + repair, outputSchema: this.o.outputSchema, maxOutputTokens: m.max_output_tokens, signal },
-        { deadlineMs: req.deadline_ms, onAttempt: (a) => (attempts.push(a), req.onAttempt?.(a)), model: "professor", estimatedInputTokens, now: this.o.now, sleep: this.o.sleep, random: this.o.random },
+        { deadlineMs: req.deadline_ms, attemptTimeoutMs: this.o.config.attempt_timeout_ms, onAttempt: (a) => (attempts.push(a), req.onAttempt?.(a)), model: "professor", estimatedInputTokens, now: this.o.now, sleep: this.o.sleep, random: this.o.random },
       );
       return { response: r.json, attempts };
     } catch (err) {

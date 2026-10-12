@@ -120,7 +120,6 @@ describe("live mode readiness (no call is made here)", () => {
   it("the committed config is refused, with every gap named", () => {
     const r = liveRefusals(AiConfig.parse(JSON.parse(read("config/ai.json"))), {});
     expect(r.join("\n")).toMatch(/provider_monthly_limit_set is not recorded/);
-    expect(r.join("\n")).toMatch(/models.professor.model is not set/);
     expect(r.join("\n")).toMatch(/no key in AILI_ROUTER_API_KEY/);
   });
   it("without the limit record it refuses even with models and keys", () => {

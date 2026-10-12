@@ -38,16 +38,28 @@ export const AiConfig = z
      * are refused. Nobody but Lucky can confirm the dashboard; this field only records that Lucky did.
      */
     provider_monthly_limit_set: z
-      .object({ by: z.string().min(1), on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "on is a date, YYYY-MM-DD"), usd: z.number().positive() })
+      .object({
+        by: z.string().min(1),
+        on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "on is a date, YYYY-MM-DD"),
+        usd: z.number().positive(),
+        /** Optional, Lucky's own words (for example: the real protection is a prepaid balance). */
+        note: z.string().min(1).optional(),
+      })
       .strict()
       .nullable(),
     provider_monthly_limit_set_about: z.string().optional(),
     session_cap_micro_usd: MicroUsd.refine((n) => n > 0, "the session cap must be above 0"),
     session_cap_status: z.string().min(1),
+    /** The longest one provider attempt may take (a hung call still leaves time to retry). */
+    attempt_timeout_ms: z.number().int().positive().max(120_000),
+    /** One budget for a whole live turn: router, director, retries and the repair share it. */
+    turn_timeout_ms: z.number().int().positive().max(180_000),
+    timeouts_status: z.string().min(1),
     /** A hard cap on one whole bake-off run (all scenarios together), checked before every turn. */
     bakeoff_cap_micro_usd: MicroUsd.refine((n) => n > 0, "the bake-off cap must be above 0"),
     bakeoff_cap_status: z.string().min(1),
   })
-  .strict();
+  .strict()
+  .refine((c) => c.attempt_timeout_ms <= c.turn_timeout_ms, { message: "attempt_timeout_ms must not be longer than turn_timeout_ms", path: ["attempt_timeout_ms"] });
 export type AiConfig = z.infer<typeof AiConfig>;
 export type RuntimeModel = keyof AiConfig["models"];

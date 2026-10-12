@@ -152,7 +152,9 @@ const error = (events: TurnEvent[]) => events.at(-1) as Extract<TurnEvent, { typ
 describe("errors become plain turn.error reasons", () => {
   it("no provider or model in config: not_configured, and the provider is never called", async () => {
     const provider = recorded(ok());
-    const t = turn(provider, { config: AiConfig.parse(configJson()) }); // the committed file: provider and model are null
+    const c = configJson();
+    for (const m of ["professor", "router"] as const) Object.assign(c.models[m], { provider: null, model: null });
+    const t = turn(provider, { config: AiConfig.parse(c) });
     await t.run();
     expect(error(t.events).reason).toBe("not_configured");
     expect(error(t.events).message).toBe("Live answers aren't set up on this computer. Prepared lessons still work. Nothing on the stage changed.");
@@ -250,10 +252,40 @@ describe("interrupt and leaks", () => {
 });
 
 describe("config: provider fields", () => {
-  it("the committed file has no provider or model, and only variable NAMES for keys", () => {
+  it("timeouts come from config: the attempt limit and the whole turn's budget (slice 7a)", async () => {
+    // One hung step. With the config's 150 ms turn budget there is no time to retry: "timeout" after one
+    // attempt. (With a 20 s default budget it would retry, find no second step and fail as "director".)
+    const c = AiConfig.parse({ ...configJson(), models: CONFIGURED.models, attempt_timeout_ms: 150, turn_timeout_ms: 150 });
+    const t = turn(recorded({ hang: true }), { config: c }); // no timeoutMs: the config's turn budget applies
+    const started = Date.now();
+    await t.run();
+    expect(error(t.events).reason).toBe("timeout");
+    expect(t.ledger.entries("p").filter((e) => e.model === "professor")).toHaveLength(1);
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect(AiConfig.parse(configJson()).attempt_timeout_ms).toBeLessThanOrEqual(AiConfig.parse(configJson()).turn_timeout_ms);
+  });
+
+  it("an attempt limit longer than the turn budget is rejected", () => {
+    expect(AiConfig.safeParse({ ...configJson(), attempt_timeout_ms: 50_000, turn_timeout_ms: 45_000 }).success).toBe(false);
+  });
+
+  it("the provider-limit record takes an optional note; by, on and usd stay required", () => {
+    const rec = { by: "Lucky", on: "2026-10-12", usd: 5 };
+    expect(AiConfig.safeParse({ ...configJson(), provider_monthly_limit_set: { ...rec, note: "real protection: a prepaid balance" } }).success).toBe(true);
+    expect(AiConfig.safeParse({ ...configJson(), provider_monthly_limit_set: rec }).success).toBe(true);
+    for (const k of ["by", "on", "usd"] as const) {
+      const r: Record<string, unknown> = { ...rec, note: "x" };
+      delete r[k];
+      expect(AiConfig.safeParse({ ...configJson(), provider_monthly_limit_set: r }).success, k).toBe(false);
+    }
+    expect(AiConfig.safeParse({ ...configJson(), provider_monthly_limit_set: { ...rec, note: "" } }).success).toBe(false);
+  });
+
+  it("the committed file names a provider and a model (slice 7a), and only variable NAMES for keys", () => {
     const c = AiConfig.parse(configJson());
     for (const m of [c.models.professor, c.models.router]) {
-      expect([m.provider, m.model]).toEqual([null, null]);
+      expect(typeof m.provider).toBe("string");
+      expect(typeof m.model).toBe("string");
       expect(m.api_key_env).toMatch(/^AILI_[A-Z]+_API_KEY$/);
       expect(m.max_output_tokens).toBeGreaterThan(0);
     }

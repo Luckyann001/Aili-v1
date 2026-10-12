@@ -145,7 +145,7 @@ export interface TurnSessionOptions {
   concepts: readonly string[];
   level: "L1" | "L2" | "L3";
   solvers?: Record<string, SolverFn>;
-  /** Give up on the director after this long. */
+  /** The whole turn's budget. Default: config turn_timeout_ms when metered, else 20 s. */
   timeoutMs?: number;
   /**
    * The revision before this session's first turn. A stateless server passes the client's revision
@@ -219,7 +219,8 @@ export class TurnSession {
     send({ type: "turn.started" });
     const before = this.state;
     // One time budget for the whole turn: router, director, retries and the repair share it.
-    const deadline = Date.now() + (this.opts.timeoutMs ?? 20_000);
+    // A metered (live or bake-off) turn takes its budget from config; tests and the demo pass their own.
+    const deadline = Date.now() + (this.opts.timeoutMs ?? this.opts.meter?.config.turn_timeout_ms ?? 20_000);
     const remaining = () => Math.max(0, deadline - Date.now());
     const sl = shortlist(this.opts.registry, { concepts: this.opts.concepts, level: this.opts.level });
     // Safety-critical concepts and items, from the registry (never from the director).

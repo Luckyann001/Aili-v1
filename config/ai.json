@@ -1,30 +1,37 @@
 {
-  "_about": "AI cost configuration (M2 slice 7). Prices are integer micro-USD per million tokens. ALL PRICES BELOW ARE TEST VALUES, NOT REAL PRICING; re-verify against the provider's own pricing page before any real key. They come from the provider-docs snapshot in docs/aili-architecture.md dated 2026-10-06. Code never contains prices: the ledger and the cap read them only from this file. Provider and model are null until Lucky chooses them; api_key_env is the NAME of a server-only environment variable (its value lives only in apps/web/.env.local and is never committed, read by Claude, printed or logged).",
+  "_about": "AI cost configuration (M2 slice 7; models filled in M3 slice 7a). Prices are integer micro-USD per million tokens, verified on Anthropic's own models and pricing pages on 2026-10-12 (see each pricing_status); re-verify before relying on them later. Code never contains prices or model IDs: the ledger, the cap and the adapters read them only from this file. api_key_env is the NAME of a server-only environment variable (its value lives only in apps/web/.env.local and is never committed, read by Claude, printed or logged).",
   "currency": "USD",
   "models": {
     "professor": {
-      "provider": null,
-      "model": null,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
       "api_key_env": "AILI_PROFESSOR_API_KEY",
-      "max_output_tokens": 1200,
+      "max_output_tokens": 3000,
+      "thinking": "adaptive",
+      "effort": "low",
       "price_micro_usd_per_million_tokens": { "input": 2000000, "output": 10000000 },
-      "pricing_status": "test values, not real pricing; re-verify before any real key"
+      "pricing_status": "verified 2026-10-12 on Anthropic's pricing page: $2/$10 per MTok"
     },
     "router": {
-      "provider": null,
-      "model": null,
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
       "api_key_env": "AILI_ROUTER_API_KEY",
-      "max_output_tokens": 150,
+      "max_output_tokens": 200,
+      "thinking": "disabled",
+      "effort": "low",
       "price_micro_usd_per_million_tokens": { "input": 100000, "output": 500000 },
-      "pricing_status": "test values, not real pricing; re-verify before any real key"
+      "pricing_status": "verified 2026-10-12: $0.10/$0.50 per MTok for prompts up to 100k tokens ($0.50/$2.50 above)"
     }
   },
   "voice": { "micro_usd_per_second": 0, "status": "not metered yet" },
   "hosting": { "micro_usd_per_turn": 0, "status": "not metered yet" },
   "provider_monthly_limit_set": null,
   "provider_monthly_limit_set_about": "Filled in by Lucky ONLY after setting a monthly spending limit in the AI provider's own dashboard: { \"by\": \"Lucky\", \"on\": \"YYYY-MM-DD\", \"usd\": 30 }. Claude cannot check the dashboard; this records that Lucky did. Until it is filled in, live turns are refused.",
-  "session_cap_micro_usd": 250000,
-  "session_cap_status": "test value",
+  "session_cap_micro_usd": 500000,
+  "session_cap_status": "test value: 0.50 USD per session (Lucky, Oct 12 2026, slice 7a)",
+  "attempt_timeout_ms": 30000,
+  "turn_timeout_ms": 45000,
+  "timeouts_status": "first-live-run values (Lucky, Oct 12 2026, slice 7a): 30 s per provider attempt, 45 s per turn; measured latency is reported in the 7b results",
   "bakeoff_cap_micro_usd": 3000000,
   "bakeoff_cap_status": "3 USD for one whole bake-off run, set by Lucky (Oct 12 2026, slice 7a); checked before every turn"
 }

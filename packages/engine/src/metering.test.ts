@@ -137,9 +137,9 @@ describe("config/ai.json validation", () => {
     c.models.professor.price_micro_usd_per_million_tokens.input = input;
     return c;
   };
-  it("the real config is valid and its prices are labelled as test values", () => {
-    expect(REAL.models.professor.pricing_status).toMatch(/test values, not real pricing; re-verify before any real key/);
-    expect(REAL.models.router.pricing_status).toMatch(/test values, not real pricing/);
+  it("the real config is valid and its prices say when and where they were verified", () => {
+    expect(REAL.models.professor.pricing_status).toMatch(/^verified \d{4}-\d{2}-\d{2}/);
+    expect(REAL.models.router.pricing_status).toMatch(/^verified \d{4}-\d{2}-\d{2}/);
     expect(REAL.voice.status).toBe("not metered yet");
     expect(REAL.hosting.status).toBe("not metered yet");
     expect([REAL.voice.micro_usd_per_second, REAL.hosting.micro_usd_per_turn]).toEqual([0, 0]);

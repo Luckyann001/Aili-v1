@@ -31,6 +31,8 @@ function config(o: { thinking?: "adaptive"; effort?: "medium"; provider?: string
   for (const m of ["professor", "router"] as const) {
     c.models[m].provider = o.provider ?? "anthropic";
     c.models[m].model = "fixture-model";
+    delete c.models[m].thinking; // each test sets these itself
+    delete c.models[m].effort;
     if (o.thinking) c.models[m].thinking = o.thinking;
     if (o.effort) c.models[m].effort = o.effort;
   }
