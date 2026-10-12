@@ -17,7 +17,7 @@ async function turnEvents(o: { case?: string; rev?: number } = {}): Promise<Turn
   const res = await handleTurn(
     new Request("http://localhost/api/turn", {
       method: "POST",
-      body: JSON.stringify({ state_rev: rev, case: o.case ?? "valid", input: { text: "hi", reply: { answered_prompt: false } }, state: { history: committed.history, active_scene: "fx-lever" } }),
+      body: JSON.stringify({ session_id: "client-test-0001", state_rev: rev, case: o.case ?? "valid", input: { text: "hi", reply: { answered_prompt: false } }, state: { history: committed.history, active_scene: "fx-lever" } }),
     }),
   );
   const events: TurnEvent[] = [];

@@ -14,7 +14,9 @@ const load = async (flag: "1" | undefined) => {
 afterEach(() => vi.unstubAllEnvs());
 
 const post = (body: unknown) => new Request("http://localhost/api/turn", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+const SID = "test-session-a";
 const turnBody = (o: object = {}) => ({
+  session_id: SID,
   state_rev: 5,
   case: "valid",
   input: { text: "Why is it hard to hold?", reply: { answered_prompt: false } },
@@ -38,7 +40,7 @@ describe("flag off (production): not found", () => {
   it("both routes return 404 and load nothing", async () => {
     const { handleTurn, handleInterrupt } = await load(undefined);
     expect((await handleTurn(post(turnBody()))).status).toBe(404);
-    expect((await handleInterrupt(post({ request_id: "turn_5", state_rev: 5 }))).status).toBe(404);
+    expect((await handleInterrupt(post({ session_id: SID, request_id: "turn_5", state_rev: 5 }))).status).toBe(404);
   });
 });
 
@@ -67,6 +69,7 @@ describe("flag on: POST /api/turn", () => {
     expect(await bad({ input: { text: "x".repeat(501), reply: { answered_prompt: false } } })).toMatch(/^input\.text: /m);
     expect(await bad({ case: "real-model" })).toMatch(/^case: /m);
     expect(await bad({ extra: 1 })).toMatch(/Unrecognized key/);
+    expect(await bad({ session_id: "x" })).toMatch(/^session_id: /m);
     const many = Array.from({ length: 201 }, () => ({ kind: "learner", answered_prompt: true }));
     expect(await bad({ state: { history: { posture: "learning", learner_level: "some_knowledge", entries: many } } })).toMatch(/history is too long/);
     const notJson = await handleTurn(new Request("http://localhost/api/turn", { method: "POST", body: "{" }));
@@ -80,12 +83,23 @@ describe("flag on: interrupt", () => {
     const res = await handleTurn(post(turnBody({ case: "slow", state_rev: 7 })));
     const reading = readAll(res);
     await new Promise((r) => setTimeout(r, 50));
-    expect(await (await handleInterrupt(post({ request_id: "turn_7", state_rev: 6 }))).json()).toEqual({ stopped: false }); // wrong revision
-    expect(await (await handleInterrupt(post({ request_id: "turn_7", state_rev: 7 }))).json()).toEqual({ stopped: true });
+    expect(await (await handleInterrupt(post({ session_id: SID, request_id: "turn_7", state_rev: 6 }))).json()).toEqual({ stopped: false }); // wrong revision
+    expect(await (await handleInterrupt(post({ session_id: SID, request_id: "turn_7", state_rev: 7 }))).json()).toEqual({ stopped: true });
     const t0 = Date.now();
     const events = await reading;
     expect(Date.now() - t0).toBeLessThan(1000);
     expect(events.map((e) => e.type)).toEqual(["turn.started"]);
+  });
+
+  it("turns from two pages with the same turn ID are kept apart: one page's interrupt never stops the other's", async () => {
+    const { handleTurn, handleInterrupt } = await load("1");
+    const a = readAll(await handleTurn(post(turnBody({ case: "slow", state_rev: 3, session_id: "page-a-0001" }))));
+    const b = readAll(await handleTurn(post(turnBody({ case: "valid", state_rev: 3, session_id: "page-b-0002" }))));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await (await handleInterrupt(post({ session_id: "page-b-0002", request_id: "turn_3", state_rev: 3 }))).json()).toEqual({ stopped: false }); // b already finished; a untouched
+    expect((await b).at(-1)!.type).toBe("turn.done");
+    expect(await (await handleInterrupt(post({ session_id: "page-a-0001", request_id: "turn_3", state_rev: 3 }))).json()).toEqual({ stopped: true });
+    expect((await a).map((e) => e.type)).toEqual(["turn.started"]);
   });
 
   it("closing the stream (a dropped connection or the client's own cancel) stops the turn", async () => {
@@ -95,7 +109,7 @@ describe("flag on: interrupt", () => {
     await reader.read(); // turn.started
     await reader.cancel();
     await new Promise((r) => setTimeout(r, 20));
-    expect(await (await handleInterrupt(post({ request_id: "turn_9", state_rev: 9 }))).json()).toEqual({ stopped: false }); // already gone
+    expect(await (await handleInterrupt(post({ session_id: SID, request_id: "turn_9", state_rev: 9 }))).json()).toEqual({ stopped: false }); // already gone
   });
 });
 

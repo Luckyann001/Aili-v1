@@ -11,8 +11,12 @@ import { SessionHistory } from "./session";
 export const FAKE_CASES = ["valid", "invalid-id", "out-of-bounds", "hard-coded-number", "pedagogy-violation", "solver-failure", "slow"] as const;
 export type FakeCase = (typeof FAKE_CASES)[number];
 
+/** A random ID per page (client session). Turn IDs repeat across pages; this keeps them apart. */
+export const ClientSessionId = z.string().regex(/^[A-Za-z0-9-]{8,64}$/, "session_id is 8–64 letters, digits or dashes");
+
 export const TurnRequest = z
   .object({
+    session_id: ClientSessionId,
     /** The client's revision for this turn (its gate's new revision). */
     state_rev: z.number().int().min(1).max(1_000_000_000),
     case: z.enum(FAKE_CASES).default("valid"),
@@ -28,5 +32,5 @@ export const TurnRequest = z
   .refine((r) => r.state.history.entries.length <= 200, { message: "history is too long (at most 200 entries)", path: ["state", "history", "entries"] });
 export type TurnRequest = z.infer<typeof TurnRequest>;
 
-export const InterruptRequest = z.object({ request_id: z.string().min(1).max(64), state_rev: z.number().int().min(1) }).strict();
+export const InterruptRequest = z.object({ session_id: ClientSessionId, request_id: z.string().min(1).max(64), state_rev: z.number().int().min(1) }).strict();
 export type InterruptRequest = z.infer<typeof InterruptRequest>;

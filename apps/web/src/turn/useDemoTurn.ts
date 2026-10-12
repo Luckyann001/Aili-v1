@@ -29,6 +29,9 @@ export interface StageSnapshot {
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
 const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy" };
 
+/** This page's client session ID: turn IDs repeat across pages, so the server keys turns by both. */
+const SESSION_ID = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s-${Math.random().toString(36).slice(2, 12)}-${Date.now().toString(36)}`;
+
 const START: SessionState = { history: { posture: "learning", learner_level: "some_knowledge", entries: [] } };
 
 export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dispatch: (a: TurnClientAction<StageSnapshot>) => TurnClientState<StageSnapshot> }>()((set, get) => ({
@@ -92,7 +95,7 @@ export function useDemoTurn(voice: Voice) {
     void fetch("/api/turn/interrupt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ request_id: `turn_${t.rev}`, state_rev: t.rev }),
+      body: JSON.stringify({ session_id: SESSION_ID, request_id: `turn_${t.rev}`, state_rev: t.rev }),
       keepalive: true,
     }).catch(() => {});
     const next = useTurnClient.getState().dispatch({ type: "interrupt" });
@@ -150,6 +153,7 @@ export function useDemoTurn(voice: Voice) {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
+            session_id: SESSION_ID,
             state_rev: rev,
             case: fakeCase,
             input: { text: text.slice(0, 500), reply: { answered_prompt: answered } },

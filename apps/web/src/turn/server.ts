@@ -14,7 +14,10 @@ const loadFixtureRegistry = FAKE_DIRECTOR ? () => import("aili-turn-fixtures") :
 export const SLOW_MS = 3000;
 const TIMEOUT_MS = 10_000;
 
-/** Turns in flight on THIS server instance (an interrupt on another instance cannot reach them). */
+/**
+ * Turns in flight on THIS server instance, keyed by client session and turn ID (turn IDs repeat
+ * across pages). An interrupt on another instance cannot reach them.
+ */
 const running = new Map<string, TurnSession>();
 
 const notFound = () => new Response("Not found", { status: 404 });
@@ -45,11 +48,11 @@ export async function handleTurn(request: Request): Promise<Response> {
     timeoutMs: TIMEOUT_MS,
     includeStateInDone: true,
   });
-  const turnId = `turn_${req.state_rev}`;
+  const key = `${req.session_id}/turn_${req.state_rev}`;
   const enc = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      running.set(turnId, session);
+      running.set(key, session);
       const emit = (e: TurnEvent) => {
         try {
           controller.enqueue(enc.encode(encodeEvent(e)));
@@ -60,7 +63,7 @@ export async function handleTurn(request: Request): Promise<Response> {
       try {
         await session.run(req.input, emit);
       } finally {
-        running.delete(turnId);
+        running.delete(key);
         try {
           controller.close();
         } catch {
@@ -71,7 +74,7 @@ export async function handleTurn(request: Request): Promise<Response> {
     cancel() {
       // The client closed the stream (an interrupt or a dropped connection).
       session.interrupt();
-      running.delete(turnId);
+      running.delete(key);
     },
   });
   return new Response(stream, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" } });
@@ -87,9 +90,10 @@ export async function handleInterrupt(request: Request): Promise<Response> {
   }
   const parsed = InterruptRequest.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.issues.map((i) => `${i.path.join(".") || "(body)"}: ${i.message}`));
-  const s = running.get(parsed.data.request_id);
-  if (!s || s.revision !== parsed.data.state_rev) return Response.json({ stopped: false }); // finished, unknown or another instance
+  const key = `${parsed.data.session_id}/${parsed.data.request_id}`;
+  const s = running.get(key);
+  if (!s || s.revision !== parsed.data.state_rev) return Response.json({ stopped: false }); // finished, unknown, another session or instance
   s.interrupt();
-  running.delete(parsed.data.request_id);
+  running.delete(key);
   return Response.json({ stopped: true });
 }

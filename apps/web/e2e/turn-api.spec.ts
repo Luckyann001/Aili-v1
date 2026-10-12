@@ -5,6 +5,7 @@ import { filesWithFixtureText } from "./fixture-text";
 // The UI wiring is slice 6b; these call the route directly.
 
 const body = (o: object = {}) => ({
+  session_id: "e2e-route-0001",
   state_rev: 3,
   case: "valid",
   input: { text: "Why is it hard to hold?", reply: { answered_prompt: false } },
@@ -27,7 +28,7 @@ test.describe("fake-director turn route (demo flag on)", () => {
 
   test("rejects bad input and answers an interrupt for an unknown turn plainly", async ({ request }) => {
     expect((await request.post("/api/turn", { data: body({ case: "real-model" }) })).status()).toBe(400);
-    const stop = await request.post("/api/turn/interrupt", { data: { request_id: "turn_99", state_rev: 99 } });
+    const stop = await request.post("/api/turn/interrupt", { data: { session_id: "e2e-route-0001", request_id: "turn_99", state_rev: 99 } });
     expect(await stop.json()).toEqual({ stopped: false });
   });
 
