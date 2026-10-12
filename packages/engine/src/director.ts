@@ -263,14 +263,15 @@ const COMMON = new Set(["the", "your", "how", "far", "from", "own", "you", "weig
  * Whether narration seems to describe an analogy (a WARNING heuristic, Lucky's decision 2026-10-12):
  * it names something distinctive from the analogy (a word from its title or either side of its
  * mapping, such as "wrench", "bag" or "shoulder") AND says where it breaks down ("breaks down",
- * "unlike", "differs", "doesn't hold", "not like"). It cannot judge whether the description is right.
+ * "unlike", "differs", "doesn't hold", "not like", "but a servo", "whereas"). It cannot judge whether
+ * the description is right.
  */
 export function analogyExplained(narration: string, an: { title: string; mapping: ReadonlyArray<{ source: string; target: string }> }): boolean {
   const said = narration.toLowerCase();
   const text = [an.title, ...an.mapping.flatMap((m) => [m.source, m.target])].join(" ").toLowerCase();
   const words = (text.match(/[a-z]{3,}/g) ?? []).filter((w) => !COMMON.has(w));
   const mapped = words.some((w) => new RegExp(`\\b${w}`).test(said));
-  const breaks = /\bbreaks? down\b|\bunlike\b|\bdiffers?\b|\bdoesn['’]t (hold|work|apply)\b|\bnot like\b/.test(said);
+  const breaks = /\bbreaks? down\b|\bunlike\b|\bdiffers?\b|\bdoesn['’]t (hold|work|apply)\b|\bnot like\b|\bbut a servo\b|\bwhereas\b/.test(said);
   return mapped && breaks;
 }
 

@@ -259,6 +259,12 @@ describe("an analogy's mapping and breakdown in the narration: a WARNING, never 
     expect(r.response).not.toBeNull();
   });
 
+  it("the wrench answer of the live run (2026-10-12, 20:00), breakdown with \"But a servo\", passes with no warning; \"whereas\" counts too", () => {
+    const r = said(wrench, "Like a long wrench: push is force, distance from the bolt is moment arm. But a servo carries its load constantly, and tilting the arm changes the moment arm.");
+    expect([r.errors, r.warnings]).toEqual([[], []]);
+    expect(said(wrench, "Like a long wrench on a bolt, whereas a servo holds its load all the time.").warnings).toEqual([]);
+  });
+
   it("the shopping-bag answer with its breakdown passes with no warning", () => {
     const r = said(bag, "Try the shopping bag: the bag is the load, your shoulder is the servo.", "The bag analogy breaks down: a shoulder tires, but a servo has a fixed rated torque.");
     expect([r.errors, r.warnings]).toEqual([[], []]);
