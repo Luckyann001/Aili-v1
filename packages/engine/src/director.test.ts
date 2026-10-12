@@ -329,8 +329,13 @@ describe("mild praise is a warning only (config flattery_warn; Lucky's decision 
       const r = run({ narration: [{ id: "n1", text }] });
       expect(r.errors).toEqual([]);
       expect(r.response).not.toBeNull();
-      expect(r.warnings).toEqual([`narration[0].text says "that's a fine start" (mild praise; for review, not a rejection)`]);
+      expect(r.warnings).toEqual([`narration[0].text says "a fine start" (mild praise; for review, not a rejection)`]);
     }
+  });
+  it("\"a fine start\" in general warns too (the live s02 answer said \"A Lego car is a fine start\"), never a rejection", () => {
+    const r = run({ narration: [{ id: "n1", text: "A Lego car is a fine start. Let's try a ruler." }] });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([`narration[0].text says "a fine start" (mild praise; for review, not a rejection)`]);
   });
 });
 
