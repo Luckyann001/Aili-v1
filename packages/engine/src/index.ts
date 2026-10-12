@@ -17,3 +17,4 @@ export * from "./recordedProvider";
 export * from "./providerDirector";
 export * from "./prompt";
 export * from "./teaching";
+export * from "./providers";
