@@ -87,6 +87,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     ...(meta.note ? [`- Note: ${meta.note}`] : []),
     `- Total cost: ${usd(result.total_micro_usd)} of the ${usd(result.cap_micro_usd)} bake-off cap (at config prices, from the ledger)`,
     `- Stopped early: ${result.stopped ?? "no"}`,
+    ...result.records.filter((r) => r.diverged).map((r) => `- Script diverged (not a professor failure): ${r.scenario.id} run ${r.run}, turn ${r.diverged!.turn}: ${r.diverged!.reason}`),
     "",
     "## Overall",
     "",
@@ -132,6 +133,7 @@ export function transcriptMarkdown(r: ScenarioRecord, mode: "recorded" | "live")
     `**Reviewer checks:** ${s.reviewer_notes}`,
     "",
   ];
+  const diverged = r.diverged;
   for (const t of r.turns) {
     out.push(`## Turn ${t.index}`, "", `**Learner:** ${t.learner}`, "");
     for (const e of t.events) {
@@ -155,5 +157,6 @@ export function transcriptMarkdown(r: ScenarioRecord, mode: "recorded" | "live")
       "",
     );
   }
+  if (diverged) out.push(`## Turn ${diverged.turn}: script diverged (skipped; not a professor failure)`, "", diverged.reason, "", `The scripted reply was: "${s.turns[diverged.turn - 1]!.text}"`, "");
   return out.join("\n");
 }

@@ -15,10 +15,16 @@
       "text": "Why is it harder to hold the weight further out?"
     },
     {
-      "text": "I don't know."
+      "text": "I don't know.",
+      "after": {
+        "asks": true
+      }
     },
     {
       "text": "I don't know.",
+      "after": {
+        "asks": true
+      },
       "expect": {
         "moves": [
           "explain",

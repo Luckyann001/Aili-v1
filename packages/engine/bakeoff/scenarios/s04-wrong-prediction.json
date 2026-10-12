@@ -15,7 +15,10 @@
       "text": "Does it matter how far out the weight sits?"
     },
     {
-      "text": "I think it makes no difference where the weight is."
+      "text": "I think it makes no difference where the weight is.",
+      "after": {
+        "asks": true
+      }
     },
     {
       "text": "Why was I wrong?",

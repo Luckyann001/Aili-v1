@@ -23,6 +23,11 @@
     },
     {
       "text": "It's about turning stuff.",
+      "after": {
+        "moves": [
+          "teach_back"
+        ]
+      },
       "expect": {
         "asks": true
       }

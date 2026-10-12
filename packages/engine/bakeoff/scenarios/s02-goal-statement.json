@@ -22,6 +22,12 @@
     },
     {
       "text": "Not much. I built a Lego car once.",
+      "after": {
+        "moves": [
+          "probe"
+        ],
+        "asks": true
+      },
       "expect": {
         "moves": [
           "explain"

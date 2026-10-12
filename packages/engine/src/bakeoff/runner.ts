@@ -4,7 +4,7 @@ import { InMemoryLedger, worstCaseTurnCost, type LedgerEntry } from "../metering
 import { PROMPT_BUDGET_TOKENS } from "../prompt";
 import type { Router } from "../router";
 import { ROUTER_INPUT_ALLOWANCE_TOKENS, TurnSession, type Director, type TurnEvent, type TurnFailure } from "../turn";
-import type { Scenario, ScenarioExpect } from "./scenario";
+import type { Scenario, ScenarioAfter, ScenarioExpect } from "./scenario";
 
 // The bake-off runner (docs/m3-plan.md slice 7a). Runs scenarios turn by turn through the real
 // TurnSession (router, director, validators, solvers, metering), and collects what the report needs.
@@ -47,6 +47,8 @@ export interface ScenarioRecord {
   cost_micro_usd: number;
   /** Why the scenario stopped early, if it did. */
   stopped?: string;
+  /** The script no longer fit what Aili asked: the turn and why (not a professor failure). */
+  diverged?: { turn: number; reason: string };
 }
 
 export interface RunDeps {
@@ -105,6 +107,16 @@ export function mentionsArmWeight(r: DirectorResponse): boolean {
   return ARM_WEIGHT.test(text) || calc;
 }
 
+/** Why a scripted reply does not fit Aili's previous answer, or null if it fits. */
+export function divergence(after: ScenarioAfter | undefined, prev: DirectorResponse | undefined): string | null {
+  if (!after || !prev) return null;
+  const got = `move ${prev.move}${prev.prompt ? `, a ${prev.prompt.kind} ("${prev.prompt.text}")` : ", no question"}`;
+  if (after.moves && !after.moves.includes(prev.move)) return `the script expects Aili's move to be ${after.moves.join(" or ")}; got ${got}`;
+  if (after.asks !== undefined && !!prev.prompt !== after.asks) return `the script expects Aili ${after.asks ? "to ask a question" : "not to ask"}; got ${got}`;
+  if (after.prompt_kind && (!prev.prompt || !after.prompt_kind.includes(prev.prompt.kind))) return `the script expects a ${after.prompt_kind.join(" or ")} prompt; got ${got}`;
+  return null;
+}
+
 export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps): Promise<RunResult> {
   const ledger = new InMemoryLedger();
   const sessions: string[] = [];
@@ -138,6 +150,13 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
       const turns = scenario.turns.slice(0, d.maxTurns ?? scenario.turns.length);
       const sl = shortlist(d.registry, { concepts: scenario.concepts, level: scenario.level });
       for (const [index, turn] of turns.entries()) {
+        // The scripted reply must still fit what Aili asked; if not, skip it and the rest (not a professor failure).
+        const why = index > 0 ? divergence(turn.after, record.turns.at(-1)?.response) : null;
+        if (why) {
+          record.diverged = { turn: index + 1, reason: why };
+          record.stopped = `script diverged at turn ${index + 1}`;
+          break;
+        }
         // The run's hard cap: everything spent so far plus this turn's worst case must fit.
         // This turn's own prompt estimate (as the turn's session check uses); the prompt budget if the
         // director gives none. worstCaseTurnCost pads both by input_estimate_factor.

@@ -32,6 +32,20 @@ export const ScenarioExpect = z
   .strict();
 export type ScenarioExpect = z.infer<typeof ScenarioExpect>;
 
+/**
+ * What Aili's previous answer must have been for this scripted reply to make sense (Lucky's decision
+ * 2026-10-12). If it does not fit, the runner reports "script diverged" and skips the rest of the
+ * scenario: not a professor failure.
+ */
+export const ScenarioAfter = z
+  .object({
+    moves: z.array(Move).min(1).optional(),
+    asks: z.boolean().optional(),
+    prompt_kind: z.array(z.enum(["question", "prediction", "acknowledgement"])).min(1).optional(),
+  })
+  .strict();
+export type ScenarioAfter = z.infer<typeof ScenarioAfter>;
+
 export const Scenario = z
   .object({
     id: z.string().regex(/^[a-z][a-z0-9-]*$/),
@@ -45,7 +59,7 @@ export const Scenario = z
     concepts: z.array(z.string().min(1)).min(1),
     level: z.enum(["L1", "L2", "L3"]),
     active_scene: z.string().min(1).optional(),
-    turns: z.array(z.object({ text: z.string().min(1), expect: ScenarioExpect.optional() }).strict()).min(1).max(8),
+    turns: z.array(z.object({ text: z.string().min(1), after: ScenarioAfter.optional(), expect: ScenarioExpect.optional() }).strict()).min(1).max(8),
     /** What the human reviewer checks in the transcript (what code cannot). */
     reviewer_notes: z.string().min(1),
   })

@@ -15,7 +15,10 @@
       "text": "Why does the servo work harder when the arm is out?"
     },
     {
-      "text": "idk"
+      "text": "idk",
+      "after": {
+        "asks": true
+      }
     },
     {
       "text": "This is pointless.",

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
 import { fixtureRegistry } from "../__fixtures__/registry";
 import { directorResponseJsonSchema, professorPrompt, shortlist, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
-import { CapGuardProvider, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
+import { CapGuardProvider, divergence, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
 
 // The bake-off harness (docs/m3-plan.md slice 7a), in recorded mode only: no model, key or network.
 
@@ -197,5 +197,29 @@ describe("arm_weight expectation (Lucky's decision 2026-10-12)", () => {
   });
   it("fails for the live repair of 2026-10-12, which explained torque without the arm's own weight", () => {
     expect(mentionsArmWeight(r({ narration: [{ id: "n3", text: "Torque is force times the moment arm, the sideways distance from the pivot." }] }))).toBe(false);
+  });
+});
+
+describe("script diverged (Lucky's decision 2026-10-12)", () => {
+  it("compares the scripted reply's after-condition with Aili's previous answer", () => {
+    const prev = { move: "explain", prompt: { kind: "prediction", text: "What happens?", chips: [] } } as never;
+    expect(divergence({ moves: ["probe"] }, prev)).toMatch(/expects Aili's move to be probe; got move explain, a prediction \("What happens\?"\)/);
+    expect(divergence({ asks: true }, prev)).toBeNull();
+    expect(divergence({ prompt_kind: ["question"] }, prev)).toMatch(/expects a question prompt/);
+    expect(divergence(undefined, prev)).toBeNull();
+  });
+
+  it("a diverged script skips the rest of that scenario, is reported, is not a failure, and the run goes on", async () => {
+    const s03 = byId("s03-true-beginner");
+    // turn 2 only fits if Aili's first move was a probe; the recorded first answer is an explain
+    const scripted = { ...s03, turns: [s03.turns[0]!, { text: "Not much. I built a Lego car once.", after: { moves: ["probe" as const] } }] };
+    const r = await runBakeoff([scripted, byId("o1-inverse-kinematics")], 1, deps({ "s03-true-beginner": recording("s03-true-beginner"), "o1-inverse-kinematics": recording("o1-inverse-kinematics") }));
+    expect(r.stopped).toBeUndefined();
+    expect(r.records[0]!.turns).toHaveLength(1);
+    expect(r.records[0]!.diverged).toEqual({ turn: 2, reason: expect.stringMatching(/expects Aili's move to be probe; got move explain/) });
+    expect(r.records[1]!.turns).toHaveLength(1); // the next scenario still ran
+    expect(metrics(r.records.flatMap((x) => x.turns)).failures).toEqual({});
+    expect(transcriptMarkdown(r.records[0]!, "recorded")).toContain("## Turn 2: script diverged (skipped; not a professor failure)");
+    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/Script diverged \(not a professor failure\): s03-true-beginner run 1, turn 2/);
   });
 });
