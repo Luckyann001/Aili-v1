@@ -121,7 +121,7 @@ describe("A14 #10 invented reference: 'I can't verify that' (CI checks only the 
 
 describe("A14 #11 unsupported topic: say so, nothing on stage, state kept", () => {
   it("an empty shortlist needs coverage 'unsupported'; acting on the stage is rejected; the scene stays", async () => {
-    const t = scriptedSession(registry, [{ move: "answer", coverage: "unsupported", concepts: ["mech.torque.static"], narration: say("Drones aren't supported yet. The nearest supported topic is holding torque.") }], { concepts: ["mech.nothing-covered"] });
+    const t = scriptedSession(registry, [{ move: "answer", coverage: "unsupported", concepts: [], narration: say("Drones aren't supported yet. The nearest supported topic is holding torque.") }], { concepts: ["mech.nothing-covered"] });
     done(await t.reply("Teach me drone flight control"));
     expect(t.s.state.activeScene).toBe("fx-lever");
     const bad = scriptedSession(registry, [{ move: "explain", narration: say("Drones use propellers.") }], { concepts: ["mech.nothing-covered"] });

@@ -145,6 +145,11 @@ export interface Shortlist {
   sources: SourceManifest[];
   /** Every ID above, for the validator's "is it in this turn's shortlist" check. */
   ids: Set<string>;
+  /**
+   * The concept IDs a response may name in "concepts" this turn: the requested concepts that exist in
+   * the registry, plus every concept a shortlisted item teaches. Empty when the shortlist is empty.
+   */
+  concepts: string[];
 }
 
 export function shortlist(reg: Registry, q: { concepts: readonly ConceptId[]; level: "L1" | "L2" | "L3" }): Shortlist {
@@ -164,7 +169,12 @@ export function shortlist(reg: Registry, q: { concepts: readonly ConceptId[]; le
   const sources = reg.sources.filter((s) => srcIds.has(s.id));
 
   const ids = new Set([...scenes, ...runnable, ...solvers, ...analogies, ...readings, ...sources].map((x) => x.id));
-  return { scenes, simulations: runnable, solvers, analogies, readings, sources, ids };
+  const known = new Set(reg.concepts.map((c) => c.id));
+  const concepts =
+    ids.size === 0
+      ? []
+      : [...new Set([...q.concepts.filter((c) => known.has(c)), ...[...scenes, ...runnable, ...solvers, ...analogies, ...readings].flatMap((x) => x.teaches)])].sort();
+  return { scenes, simulations: runnable, solvers, analogies, readings, sources, ids, concepts };
 }
 
 /** The label an item carries in the UI. Test fixtures always say so, whatever their status. */

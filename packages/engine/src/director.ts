@@ -4,8 +4,11 @@ import { checkNarration } from "./narration";
 
 // Structural validator for the director's response (docs/m2-plan.md §2, slice 3). Checks, with
 // every error naming the exact field and the offending value:
-// - every ID (scene, part, setting, animation, solver, simulation, evidence) is in THIS turn's
-//   shortlist, not merely somewhere in the registry;
+// - every ID (scene, part, setting, animation, solver, simulation, evidence, concept) is in THIS
+//   turn's shortlist, not merely somewhere in the registry; concept and evidence errors list the
+//   valid IDs so one repair can fix them;
+// - when the format check fails, the shape checks (narration length, concepts, evidence) still run,
+//   so the repair hears every error at once;
 // - action values and calculation inputs are inside the manifest bounds, under the right unit field;
 // - evidence comes only from verified library items (published readings in the shortlist whose
 //   source a person has verified);
@@ -33,13 +36,53 @@ export interface TurnContext {
   safetyCritical?: ReadonlySet<string>;
 }
 
+/** The valid IDs for a field, for the repair: "valid: a, b" or "none this turn (leave it empty)". */
+const valid = (ids: readonly string[]) => (ids.length ? `valid: ${ids.join(", ")}` : "none this turn (leave it empty)");
+
+/**
+ * Checks that need only the raw shape, so they also run when the format check fails and the repair
+ * gets every error at once: narration count and length; concepts and evidence against this turn's
+ * shortlist (indexes the format check already flagged are skipped, so nothing is reported twice).
+ */
+function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> = new Set()): string[] {
+  const errors: string[] = [];
+  const r = (raw && typeof raw === "object" ? raw : {}) as { narration?: unknown; concepts?: unknown; evidence?: unknown };
+  if (Array.isArray(r.narration)) {
+    if (r.narration.length > NARRATION_MAX_SEGMENTS) errors.push(`narration: ${r.narration.length} segments, at most ${NARRATION_MAX_SEGMENTS}`);
+    r.narration.forEach((n, i) => {
+      const text = (n as { text?: unknown } | null)?.text;
+      if (typeof text === "string" && text.length > NARRATION_MAX_CHARS) errors.push(`narration[${i}].text: ${text.length} characters, at most ${NARRATION_MAX_CHARS}`);
+    });
+  }
+  if (Array.isArray(r.concepts))
+    r.concepts.forEach((c, i) => {
+      if (flagged.has(`concepts[${i}]`) || typeof c !== "string" || sl.concepts.includes(c)) return;
+      errors.push(`concepts[${i}]: "${c}" is not a concept in this turn's shortlist (${valid(sl.concepts)})`);
+    });
+  const readings = sl.readings.map((x) => x.id);
+  if (Array.isArray(r.evidence))
+    r.evidence.forEach((id, i) => {
+      if (flagged.has(`evidence[${i}]`) || typeof id !== "string" || readings.includes(id)) return;
+      errors.push(`evidence[${i}]: "${id}" is not a reading in this turn's shortlist (only published, verified library items can be cited; ${valid(readings)})`);
+    });
+  return errors;
+}
+
 export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[] } {
+  const sl = ctx.shortlist;
   const parsed = DirectorResponse.safeParse(raw);
   if (!parsed.success) {
-    return { response: null, errors: parsed.error.issues.map((i) => `${fieldPath(i.path) || "(response)"}: ${i.message}`) };
+    // Every format error, each concepts/evidence one with the valid IDs, then the shape checks.
+    const flagged = new Set<string>();
+    const formatErrors = parsed.error.issues.map((i) => {
+      const field = fieldPath(i.path);
+      flagged.add(field);
+      const hint = i.path[0] === "concepts" ? ` (${valid(sl.concepts)})` : i.path[0] === "evidence" ? ` (${valid(sl.readings.map((x) => x.id))})` : "";
+      return `${field || "(response)"}: ${i.message}${hint}`;
+    });
+    return { response: null, errors: [...formatErrors, ...shapeChecks(raw, sl, flagged)] };
   }
   const r = parsed.data;
-  const sl = ctx.shortlist;
   const errors: string[] = [];
   const notInShortlist = (field: string, id: string) => errors.push(`${field}: "${id}" is not in this turn's shortlist`);
 
@@ -48,10 +91,10 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     if (r.state_rev !== ctx.expected.state_rev) errors.push(`state_rev: ${r.state_rev} does not match this turn (${ctx.expected.state_rev})`);
   }
 
-  // Narration: count, length, unique IDs.
-  if (r.narration.length > NARRATION_MAX_SEGMENTS) errors.push(`narration: ${r.narration.length} segments, at most ${NARRATION_MAX_SEGMENTS}`);
+  // Narration count and length, concepts and evidence in this turn's shortlist (shared with the
+  // format-failure path); then narration IDs unique.
+  errors.push(...shapeChecks(r, sl));
   r.narration.forEach((n, i) => {
-    if (n.text.length > NARRATION_MAX_CHARS) errors.push(`narration[${i}].text: ${n.text.length} characters, at most ${NARRATION_MAX_CHARS}`);
     if (r.narration.findIndex((o) => o.id === n.id) !== i) errors.push(`narration[${i}].id: duplicate "${n.id}"`);
   });
 
@@ -184,10 +227,10 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     if (!r.safety) errors.push(`${t} is safety-critical: set "safety": true`);
   }
 
-  // Evidence: verified library items in this turn's shortlist only.
+  // Evidence: verified library items in this turn's shortlist only (membership is in shapeChecks).
   r.evidence.forEach((id, i) => {
     const reading = sl.readings.find((x) => x.id === id);
-    if (!reading) return errors.push(`evidence[${i}]: "${id}" is not in this turn's shortlist (only published, verified library items can be cited)`);
+    if (!reading) return;
     const source = sl.sources.find((s) => s.id === reading.source);
     if (!source || (!source.verified && !source.test_fixture)) errors.push(`evidence[${i}]: "${id}" — its source "${reading.source}" has not been verified by a person`);
   });

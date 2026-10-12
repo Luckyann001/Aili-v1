@@ -99,7 +99,7 @@ describe("rule: values and calculation inputs within manifest bounds, under the 
 
 describe("rule: evidence only from verified library items", () => {
   it("a draft reading is not in the shortlist, so it cannot be cited", () => {
-    expect(errs({ evidence: ["read.fx-draft"] })).toContain(`evidence[0]: "read.fx-draft" is not in this turn's shortlist (only published, verified library items can be cited)`);
+    expect(errs({ evidence: ["read.fx-draft"] })).toContain(`evidence[0]: "read.fx-draft" is not a reading in this turn's shortlist (only published, verified library items can be cited; valid: read.fx-moments)`);
   });
 
   it("a reading whose source no person has verified is refused", () => {
@@ -204,5 +204,38 @@ describe("actions: the provider schema is flattened (any field on any action), o
   it("an unknown action type, or none, is rejected", () => {
     expect(errs({ actions: [{ type: "teleport", scene: "fx-lever" }] })).not.toEqual([]);
     expect(errs({ actions: [{ scene: "fx-lever" }] })).not.toEqual([]);
+  });
+});
+
+describe("concepts and evidence against this turn's shortlist; every error at once (first live run, 2026-10-12)", () => {
+  const LONG = "x".repeat(NARRATION_MAX_CHARS + 63);
+
+  it("the shortlist names its valid concepts: the requested ones in the registry plus what its items teach", () => {
+    expect(SL.concepts).toEqual(["mech.moment-arm", "mech.torque.static"]);
+  });
+
+  it("an invented concept ID in the right format is rejected, with the valid IDs listed", () => {
+    expect(errs({ concepts: ["mech.servo.basics"] })).toEqual([`concepts[0]: "mech.servo.basics" is not a concept in this turn's shortlist (valid: mech.moment-arm, mech.torque.static)`]);
+    expect(errs({ concepts: ["mech.torque.static", "mech.moment-arm"] })).toEqual([]);
+  });
+
+  it("with an empty shortlist no concept is valid", () => {
+    const empty: Shortlist = { scenes: [], simulations: [], solvers: [], analogies: [], readings: [], sources: [], ids: new Set(), concepts: [] };
+    expect(errs({ concepts: ["mech.torque.static"], coverage: "unsupported", actions: [] }, { shortlist: empty })).toContain(`concepts[0]: "mech.torque.static" is not a concept in this turn's shortlist (none this turn (leave it empty))`);
+  });
+
+  it("evidence that is not a shortlist reading is rejected with the valid reading IDs (an analogy ID fails the format check, also with the list)", () => {
+    expect(errs({ evidence: ["read.not-here"] }).join("\n")).toMatch(/evidence\[0\]: "read.not-here" is not a reading in this turn's shortlist .*valid: read.fx-moments/);
+    expect(errs({ evidence: ["analogy.fx-shopping-bag"] }).join("\n")).toMatch(/^evidence\[0\]: .*\(valid: read.fx-moments\)$/m);
+  });
+
+  it("when the format check fails, the repair still hears about narration length, concepts and evidence, each once", () => {
+    // The first live answer's mistakes: plain-word concepts, an analogy as evidence, long narration.
+    const e = errs({ concepts: ["servo", "mech.servo.basics"], evidence: ["analogy.fx-shopping-bag"], narration: [{ id: "n1", text: LONG }] });
+    expect(e.filter((x) => x.startsWith("concepts[0]"))).toHaveLength(1); // format error, not also a membership error
+    expect(e.find((x) => x.startsWith("concepts[0]"))).toMatch(/valid: mech.moment-arm, mech.torque.static/);
+    expect(e).toContain(`concepts[1]: "mech.servo.basics" is not a concept in this turn's shortlist (valid: mech.moment-arm, mech.torque.static)`);
+    expect(e.find((x) => x.startsWith("evidence[0]"))).toMatch(/valid: read.fx-moments/);
+    expect(e).toContain(`narration[0].text: ${LONG.length} characters, at most ${NARRATION_MAX_CHARS}`);
   });
 });

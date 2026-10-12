@@ -252,6 +252,21 @@ describe("interrupt and leaks", () => {
   });
 });
 
+describe("repair feedback", () => {
+  it("the repair request carries every error of the failed answer: format, concepts, evidence and narration length", async () => {
+    const bad = { ...(VALID_JSON as object), concepts: ["servo"], evidence: ["analogy.fx-shopping-bag"], narration: [{ id: "n1", text: "y".repeat(223) }] };
+    const provider = recorded(ok(bad), ok());
+    const t = turn(provider);
+    await t.run();
+    expect(t.events.at(-1)!.type).toBe("turn.done");
+    const repair = provider.requests[1]!.input;
+    expect(repair).toContain("concepts[0]:");
+    expect(repair).toContain("evidence[0]:");
+    expect(repair).toContain("narration[0].text: 223 characters, at most 160");
+    expect(repair).toContain("valid: mech.moment-arm, mech.torque.static");
+  });
+});
+
 describe("config: provider fields", () => {
   it("timeouts come from config: the attempt limit and the whole turn's budget (slice 7a)", async () => {
     // One hung step. With the config's 150 ms turn budget there is no time to retry: "timeout" after one
