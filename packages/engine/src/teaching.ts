@@ -43,5 +43,17 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
   if (r.reading && (safetyCritical.has(r.reading) || readingTeaches.some((c) => safetyCritical.has(c))) && !safety_acks.some((a) => a.ref === r.reading && a.acknowledged))
     safety_acks = [...safety_acks.filter((a) => a.ref !== r.reading), { ref: r.reading, turn, acknowledged: null }];
   if (r.analogy) analogies_used = [...analogies_used, r.analogy];
-  return { predictions, open_items, waivers, analogies_used, safety_acks };
+  // Teach-back: asked (pending), then graded against the guide (evidence, never mastery).
+  let pending_teach_back = t.pending_teach_back ?? null;
+  let evidence = t.evidence ?? [];
+  if (r.move === "teach_back" && r.reading && r.prompt && !r.teach_back_check) pending_teach_back = r.reading;
+  if (r.teach_back_check) {
+    const tb = r.teach_back_check;
+    evidence = [...evidence, { reading: tb.reading, turn, claims_covered: tb.claims_covered, misconceptions_seen: tb.misconceptions_seen }];
+    if (tb.next === "application_question") pending_teach_back = null;
+  }
+  // Debate: rounds while the move stays "debate"; any other move ends it.
+  const prev = t.debate ?? { active: false, rounds: 0 };
+  const debate = r.move === "debate" ? { active: true, rounds: prev.active ? prev.rounds + 1 : 1 } : { active: false, rounds: 0 };
+  return { predictions, open_items, waivers, analogies_used, safety_acks, pending_teach_back, evidence, debate };
 }

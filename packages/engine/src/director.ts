@@ -148,6 +148,29 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
   }
   if (r.analogy && !sl.analogies.some((a) => a.id === r.analogy)) notInShortlist("analogy", r.analogy);
 
+  // A teach-back is graded ONLY against the reading's human-written guide (spec A8).
+  if (r.teach_back_check) {
+    const tb = r.teach_back_check;
+    const rd = sl.readings.find((x) => x.id === tb.reading);
+    if (!rd) notInShortlist("teach_back_check.reading", tb.reading);
+    else {
+      tb.claims_covered.forEach((c, i) => {
+        if (!rd.guide.key_claims.includes(c)) errors.push(`teach_back_check.claims_covered[${i}]: "${c}" is not one of the guide's key claims (grade only against the guide)`);
+      });
+      tb.misconceptions_seen.forEach((m, i) => {
+        if (!rd.guide.misconceptions.includes(m)) errors.push(`teach_back_check.misconceptions_seen[${i}]: "${m}" is not one of the guide's misconceptions`);
+      });
+      if (tb.next === "application_question" && r.prompt?.text !== rd.guide.application_question)
+        errors.push(`prompt.text: after a teach-back that covers the guide, ask the guide's application question: "${rd.guide.application_question}"`);
+    }
+    if (tb.next === "follow_up" && !r.prompt) errors.push(`prompt: a vague teach-back gets a follow-up question, not a verdict`);
+  }
+
+  // Nothing in the shortlist: say it is not supported (coverage "unsupported"), and do nothing on stage.
+  if (sl.ids.size === 0 && r.coverage !== "unsupported") errors.push(`coverage: the shortlist is empty for this topic; set coverage "unsupported" and say so plainly`);
+  if (r.coverage === "unsupported" && (r.actions.length > 0 || r.calc_requests.length > 0))
+    errors.push(`coverage: an unsupported topic changes nothing on stage and calculates nothing (actions ${r.actions.length}, calc_requests ${r.calc_requests.length})`);
+
   // Safety-critical concepts and items need explicit acknowledgement, whatever the director declares.
   const critical = ctx.safetyCritical ?? new Set<string>();
   const touches: string[] = [];

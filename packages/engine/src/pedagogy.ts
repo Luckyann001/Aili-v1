@@ -35,12 +35,26 @@ export function openPrompt(h: SessionHistory): { turn: number } | null {
   return open === null ? null : { turn: open };
 }
 
-const NO_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [] };
+const NO_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
 
 /** Open items allowed at once before new ones must wait (spec A5: "do not pile on new ones"). */
 export const MAX_OPEN_ITEMS = 3;
 
-export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teaching: TeachingState = NO_TEACHING, phrases = BANNED_PHRASES): string[] {
+/** Facts about this turn that the history does not hold (worked out by the turn, from the registry). */
+export interface PedagogyContext {
+  /** A source the learner named that is not in the verified library. */
+  unlistedSource?: string;
+  /** Whether the shortlist has any verified reading to point to. */
+  libraryAvailable?: boolean;
+  phrases?: { flattery: readonly string[]; mastery: readonly string[] };
+}
+
+/** Rounds a debate may run before it stops (spec A7: "limit the number of rounds"). */
+export const MAX_DEBATE_ROUNDS = 3;
+
+export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachingIn: Partial<TeachingState> = NO_TEACHING, ctx: PedagogyContext = {}): string[] {
+  const teaching: TeachingState = { ...NO_TEACHING, ...teachingIn };
+  const phrases = ctx.phrases ?? BANNED_PHRASES;
   const errors: string[] = [];
   const ailiTurns = h.entries.filter((e): e is Aili => e.kind === "aili");
   const turn = ailiTurns.length + 1;
@@ -152,6 +166,39 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   const pendingAck = (teaching.safety_acks ?? []).find((a) => a.acknowledged === null);
   if (pendingAck && !pending && r.prompt?.kind !== "acknowledgement")
     fail("waiver-acknowledgement", `"${pendingAck.ref}" is safety-critical and still awaits the learner's explicit acknowledgement; ask for it before going on`);
+
+  // ── Slice 5b: teach-back, unverifiable sources, debate, answer posture ──
+
+  // 16. A teach-back answer is graded against the guide (teach_back_check), never left ungraded.
+  const answeredTeachBack = teaching.pending_teach_back && lastEntry?.kind === "learner" && lastEntry.answered_prompt;
+  if (answeredTeachBack && !r.safety && r.teach_back_check?.reading !== teaching.pending_teach_back)
+    fail("teach-back-graded", `the learner answered the teach-back on "${teaching.pending_teach_back}"; grade it against that reading's guide (teach_back_check)`);
+  if (r.teach_back_check && !teaching.pending_teach_back) fail("teach-back-graded", `teach_back_check without a teach-back to grade`);
+
+  // 17. A source not in the library: say "I can't verify that", and point to the nearest library item.
+  if (ctx.unlistedSource) {
+    const text = [...r.narration.map((n) => n.text), r.prompt?.text ?? ""].join(" ").replace(/\u2019/g, "'");
+    if (!/\b(can't|cannot|can not) verify\b/i.test(text)) fail("unverified-source", `"${ctx.unlistedSource}" is not in the verified library; say plainly "I can't verify that"`);
+    if (ctx.libraryAvailable && !r.reading && r.evidence.length === 0) fail("unverified-source", `offer the nearest verified library item instead (reading or evidence)`);
+  }
+
+  // 18. Debate (spec A7): announced as a side argued on purpose; limited rounds; stops on request;
+  //     concedes (stops arguing) when the learner brings valid evidence.
+  if (r.move === "debate") {
+    const said = r.narration.map((n) => n.text).join(" ");
+    if (!teaching.debate.active && !/\bon purpose\b/i.test(said)) fail("debate-announce", `say that you are arguing a side on purpose before debating`);
+    if (teaching.debate.active && teaching.debate.rounds >= MAX_DEBATE_ROUNDS) fail("debate-rounds", `the debate has had ${teaching.debate.rounds} rounds (at most ${MAX_DEBATE_ROUNDS}); stop and sum up`);
+    if (teaching.debate.active && lastEntry?.kind === "learner" && lastEntry.wants_stop) fail("debate-stop", `the learner asked to stop; stop debating`);
+    if (teaching.debate.active && lastEntry?.kind === "learner" && lastEntry.new_evidence) fail("debate-concede", `the learner brought evidence; concede openly instead of arguing on`);
+  }
+
+  // 19. Answer posture (spec A2, A14 test 1): a direct answer, no prediction quiz; a calculated
+  //     answer states its assumptions and cites a source when the library has one.
+  if (h.posture === "answer") {
+    if (r.prompt?.kind === "prediction") fail("answer-posture", `no prediction quiz in the Answer posture`);
+    if (r.calc_requests.length > 0 && r.assumptions.length === 0) fail("answer-posture", `a calculated answer states its assumptions`);
+    if (r.calc_requests.length > 0 && ctx.libraryAvailable && r.evidence.length === 0) fail("answer-posture", `a calculated answer cites a source from the library (evidence)`);
+  }
 
   return errors;
 }

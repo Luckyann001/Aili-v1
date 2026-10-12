@@ -126,7 +126,7 @@ export interface SessionState {
   teaching?: TeachingState;
 }
 
-const EMPTY_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [] };
+const EMPTY_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
 
 /** What the learner sent. How to read it (answered, pushback, evidence) is decided by the router. */
 export interface LearnerInput {
@@ -262,12 +262,26 @@ export class TurnSession {
       ...before.history,
       entries: [
         ...before.history.entries,
-        { kind: "learner", answered_prompt: c.answered_prompt, pushback: c.pushback, new_evidence: c.new_evidence, frustrated: c.frustrated, wants_another_example: c.wants_another_example, acknowledged: c.acknowledged },
+        {
+          kind: "learner",
+          answered_prompt: c.answered_prompt,
+          pushback: c.pushback,
+          new_evidence: c.new_evidence,
+          frustrated: c.frustrated,
+          wants_another_example: c.wants_another_example,
+          acknowledged: c.acknowledged,
+          wants_stop: c.wants_stop,
+          asks_for_source: c.asks_for_source,
+        },
       ],
     };
     // What the reply changes (a prediction's guess, a waiver acknowledged): pending until the turn completes.
     const today = (this.opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
-    const teaching = applyLearnerReply(before.teaching ?? EMPTY_TEACHING, c, today);
+    const teaching = applyLearnerReply({ ...EMPTY_TEACHING, ...before.teaching }, c, today);
+    // A source the learner named that is not in the library (spec A8, A10: "I can't verify that").
+    const asked = c.asks_for_source?.toLowerCase();
+    const listed = asked ? reg.sources.some((s) => s.title.toLowerCase().includes(asked) || asked.includes(s.title.toLowerCase())) : true;
+    const pedagogyContext = { unlistedSource: asked && !listed ? c.asks_for_source! : undefined, libraryAvailable: sl.readings.length > 0 };
 
     // Director, then the checks; one repair attempt (with the errors fed back) if the checks fail.
     // Every attempt is metered, whether or not its answer passes.
@@ -304,7 +318,7 @@ export class TurnSession {
     const check = (raw: unknown): { r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] } => {
       const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
       if (!v.response) return { reason: "validation", errors: v.errors };
-      const p = validatePedagogy(v.response, history, teaching);
+      const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       return p.length ? { reason: "pedagogy", errors: p } : { r: v.response };
     };
 
