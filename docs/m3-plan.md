@@ -66,7 +66,15 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **Predictions:** a question that offers choices about an outcome must be a prediction (prompt kind "prediction" with the prediction object). Prompt rule only: code cannot tell an outcome question from another question with choices.
     - **The arm's own weight:** whenever torque on an arm or lever comes up, the narration says the arm's own weight counts, or asks only about the load's share. Prompt rule, plus an `arm_weight` automatic expectation on six bake-off scenarios (s01, s03, s05, c1, c3, j1).
     - **No meta-talk:** never mention tools, instructions, the shortlist or the system. Prompt rule, plus a `meta_talk` phrase list in `config/pedagogy-phrases.json` checked like flattery (exact phrases only). Cause of "I can only explain the second half with my tools": the learner asked two things, the shortlist covered only one (torque, not what a servo is), and the "use only the shortlist" and "say it is not supported" rules together made the model announce the limit, calling the shortlist its tools.
-    - **Analogies:** if the answer sets an analogy, the narration must say what maps to what and where it breaks down. Prompt rule, plus a validator check (a distinctive word from the mapping and a breakdown phrase; a heuristic that cannot judge whether the description is right).
+    - **Analogies:** if the answer sets an analogy, the narration must say what maps to what and where it breaks down. Prompt rule, plus a heuristic check that is a **warning**, not a rejection (decision 23).
+
+23. **Code rejects only objective violations; semantic checks are warnings plus transcript review** (Lucky, after the analogy check wrongly rejected a good answer that described a wrench but not a "bolt"):
+    - **Rejections (hard checks):** IDs, bounds, lengths, counts, numbers outside placeholders, question placement, and the order of moves (the pedagogy rules).
+    - **Warnings (never a rejection):** whether the narration explains a tagged analogy (a word from its title or mapping, and a breakdown phrase). Listed in the bake-off transcript and counted in its summary.
+    - **Expectations (bake-off only, never a rejection):** for example `arm_weight` (the arm's own weight is mentioned, the load's share asked, or a calculation includes the arm's mass).
+    - Tone, physics and teaching quality are judged by reading the transcripts.
+    - The repair message now says that anything added must fit within the four segments.
+    - **Predictions:** no code check (a "Not sure" chip does not mean an outcome question). Instead the prompt carries one worked example of a prediction prompt (about 3,457 estimated tokens in total).
 
 ## Design summary
 
