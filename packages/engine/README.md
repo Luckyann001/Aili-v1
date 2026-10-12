@@ -52,6 +52,27 @@ solvers → compile (placeholders filled, three significant figures) → events.
   The current recording is hand-written; real recordings come in slice 7, reviewed before they are kept.
   The real HTTP adapters are slice 6.
 
+## Anthropic adapter (`src/providers/`, slice 6; code only, no real call yet)
+- `createProfessorProvider(config, model, env)` picks the adapter named in `config/ai.json`; an
+  unknown provider answers `not_configured`. Provider names may appear only in `src/providers/`;
+  model IDs appear nowhere in code (both checked by a test).
+- **Plain `fetch`, no SDK.** `POST /v1/messages` with `x-api-key`, `anthropic-version: 2023-06-01`.
+  The key is read from the variable NAMED in config at call time and goes only into that header;
+  redirects are refused; a non-https address is refused unless it is this computer (tests).
+- **Structured output** (`output_config.format`, `json_schema`): the director schema is sent in a
+  reduced form, because the API rejects some JSON Schema features (lengths, numeric bounds, `minItems`
+  above 1, open objects). The calc `inputs` map goes as `{ name, value }` pairs and is turned back.
+  Our validators still enforce the full rules. `thinking` and `effort` are sent only if config sets
+  them (thinking tokens count toward `max_output_tokens`).
+- **Errors**: 401/403 `key_rejected`; a monthly spending limit (HTTP 400 "You have reached your
+  specified … API usage limits", or 429 with `enforced_spend_limit_reached`) `spend_limit`, not
+  retried; other 429, 5xx and 529 retried once; other 4xx `bad_request` (turn reason `director`);
+  `stop_reason: "refusal"` is `refused` (billed, metered). The response body never leaves the adapter.
+- **Usage**: input (including cache reads and writes) and output tokens as reported; absent, the
+  attempt is metered conservatively. Invalid or truncated JSON returns `null`, so the repair runs.
+- **Tests** run against a local mock server on 127.0.0.1 with hand-written fixtures derived from
+  the docs (`src/providers/__fixtures__/`), not real responses.
+
 ## Prompt (`src/prompt.ts`, `content/prompts/professor.v1.md`)
 - **System prompt**: the versioned template with its review comments (one per rule, naming the spec
   section) removed. The template is a draft for Lucky's review.
