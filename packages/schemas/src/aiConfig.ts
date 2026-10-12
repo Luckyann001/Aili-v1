@@ -27,6 +27,15 @@ export const AiConfig = z
     models: z.object({ professor: ModelPricing, router: ModelPricing }).strict(),
     voice: z.object({ micro_usd_per_second: MicroUsd, status: z.string().min(1) }).strict(),
     hosting: z.object({ micro_usd_per_turn: MicroUsd, status: z.string().min(1) }).strict(),
+    /**
+     * Recorded by Lucky after setting a monthly limit in the provider's dashboard. Null: live turns
+     * are refused. Nobody but Lucky can confirm the dashboard; this field only records that Lucky did.
+     */
+    provider_monthly_limit_set: z
+      .object({ by: z.string().min(1), on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "on is a date, YYYY-MM-DD"), usd: z.number().positive() })
+      .strict()
+      .nullable(),
+    provider_monthly_limit_set_about: z.string().optional(),
     session_cap_micro_usd: MicroUsd.refine((n) => n > 0, "the session cap must be above 0"),
     session_cap_status: z.string().min(1),
   })

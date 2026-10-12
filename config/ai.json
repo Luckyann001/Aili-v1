@@ -21,6 +21,8 @@
   },
   "voice": { "micro_usd_per_second": 0, "status": "not metered yet" },
   "hosting": { "micro_usd_per_turn": 0, "status": "not metered yet" },
+  "provider_monthly_limit_set": null,
+  "provider_monthly_limit_set_about": "Filled in by Lucky ONLY after setting a monthly spending limit in the AI provider's own dashboard: { \"by\": \"Lucky\", \"on\": \"YYYY-MM-DD\", \"usd\": 30 }. Claude cannot check the dashboard; this records that Lucky did. Until it is filled in, live turns are refused.",
   "session_cap_micro_usd": 250000,
   "session_cap_status": "test value"
 }
