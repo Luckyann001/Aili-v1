@@ -147,13 +147,15 @@ describe("revision from the client", () => {
 
 describe("the router classifies the reply on the server", () => {
   it("its classification, not anything the client sent, becomes the learner's history entry", async () => {
+    // Pushback needs an earlier Aili turn (Lucky's decision 2026-10-12), so the session starts after one.
+    const afterAili = (): SessionState => ({ ...start(), history: { ...start().history, entries: [{ kind: "aili", move: "explain", asked: false, gave_back: true, concepts: ["mech.torque.static"], safety: false }] } });
     const router = createFakeRouter({ script: [{ answered_prompt: true, pushback: true, new_evidence: true }] });
-    const s = new TurnSession({ registry, director: createFakeDirector("valid"), router, state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    const s = new TurnSession({ registry, director: createFakeDirector("valid"), router, state: afterAili(), concepts: ["mech.torque.static"], level: "L2" });
     await s.run({ text: "No, I measured it" }, () => {});
     expect(router.calls).toBe(1);
-    expect(s.state.history.entries[0]).toMatchObject({ kind: "learner", answered_prompt: true, pushback: true, new_evidence: true });
+    expect(s.state.history.entries[1]).toMatchObject({ kind: "learner", answered_prompt: true, pushback: true, new_evidence: true });
     // Pushback WITHOUT evidence makes the pedagogy validator demand "hold": the director's explain is rejected.
-    const held = new TurnSession({ registry, director: createFakeDirector("valid"), router: createFakeRouter({ script: [{ pushback: true, new_evidence: false }] }), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    const held = new TurnSession({ registry, director: createFakeDirector("valid"), router: createFakeRouter({ script: [{ pushback: true, new_evidence: false }] }), state: afterAili(), concepts: ["mech.torque.static"], level: "L2" });
     const { events, emit } = collect();
     await held.run({ text: "No, that's wrong" }, emit);
     expect((events.at(-1) as Extract<TurnEvent, { type: "turn.error" }>).details.join()).toMatch(/hold-under-pushback/);
@@ -330,5 +332,28 @@ describe("the turn passes the open question to the router (Lucky's decision 2026
     const p = VALID.prompt as { text: string; chips: string[]; kind?: string };
     expect(seen[0]!.open_question).toBeUndefined();
     expect(seen[1]!.open_question).toEqual({ text: p.text, kind: p.kind ?? "question", choices: p.chips });
+  });
+});
+
+describe("no pushback on a first turn (Lucky's decision 2026-10-12)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const session = (script: Array<Partial<import("@aili/schemas").ReplyClassification>>) => {
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, prompt: undefined } }; } };
+    return new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+  };
+  it("a router pushback flag on the first turn does not force a hold: an explain is shown", async () => {
+    const s = session([{ pushback: true, new_evidence: false }]);
+    const events: TurnEvent[] = [];
+    await s.run({ text: "The arm's own weight doesn't matter, only the payload counts." }, (e) => events.push(e));
+    expect(events.at(-1)).toMatchObject({ type: "turn.done", move: "explain" });
+    expect(s.state.history.entries[0]).toMatchObject({ kind: "learner", pushback: false });
+  });
+  it("from the second turn, pushback without new evidence still requires a hold", async () => {
+    const s = session([{}, { pushback: true, new_evidence: false }]);
+    await s.run({ text: "Why is it hard?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "No, the arm doesn't matter." }, (e) => events.push(e));
+    expect(events.at(-1)).toMatchObject({ type: "turn.error", reason: "pedagogy" });
+    expect(JSON.stringify(events.at(-1))).toMatch(/hold-under-pushback/);
   });
 });
