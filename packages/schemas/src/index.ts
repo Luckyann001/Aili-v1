@@ -5,3 +5,4 @@ export * from "./capabilities";
 export * from "./director";
 export * from "./session";
 export * from "./turnRequest";
+export * from "./aiConfig";
