@@ -152,3 +152,15 @@ describe("rule 8: hold under pushback without new evidence (structure only)", ()
     // classification made outside the validator), and whether the narration keeps the position.
   });
 });
+
+describe("no meta-talk (config/pedagogy-phrases.json meta_talk; Lucky's decision 2026-10-12)", () => {
+  it("rejects talk about tools, instructions or the shortlist anywhere Aili speaks or writes", () => {
+    const said = (text: string) => validatePedagogy(resp({ move: "explain", narration: [{ id: "n1", text }] }), hist([]));
+    expect(said("I can only explain the second half with my tools: why an outstretched arm loads a holder more.").join()).toMatch(/rule no-meta-talk .*"my tools"/);
+    expect(said("My instructions say I should not answer that.").join()).toMatch(/no-meta-talk/);
+    expect(said("That isn't in the shortlist.").join()).toMatch(/no-meta-talk/);
+    // the subject itself is fine: robotics talks about control systems and hand tools
+    expect(said("A servo is a small control system: a motor, a sensor and a controller.")).toEqual([]);
+    expect(said("Hold the ruler like hand tools are held.")).toEqual([]);
+  });
+});

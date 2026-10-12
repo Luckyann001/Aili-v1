@@ -10,7 +10,7 @@ import PHRASES from "../../../config/pedagogy-phrases.json";
 // Aili's earlier position was correct, and whether the narration really keeps it, is left to the
 // M3 professor tests (behavior spec test 5).
 
-export const BANNED_PHRASES: { flattery: readonly string[]; mastery: readonly string[] } = { flattery: PHRASES.flattery, mastery: PHRASES.mastery };
+export const BANNED_PHRASES: { flattery: readonly string[]; mastery: readonly string[]; meta_talk?: readonly string[] } = { flattery: PHRASES.flattery, mastery: PHRASES.mastery, meta_talk: PHRASES.meta_talk };
 
 /** Moves that quiz or challenge; none of them belongs in the Answer posture (spec A2). */
 const NOT_IN_ANSWER_POSTURE = new Set(["probe", "challenge", "demand_evidence", "debate", "assign", "teach_back", "review"]);
@@ -46,7 +46,7 @@ export interface PedagogyContext {
   unlistedSource?: string;
   /** Whether the shortlist has any verified reading to point to. */
   libraryAvailable?: boolean;
-  phrases?: { flattery: readonly string[]; mastery: readonly string[] };
+  phrases?: { flattery: readonly string[]; mastery: readonly string[]; meta_talk?: readonly string[] };
 }
 
 /** Rounds a debate may run before it stops (spec A7: "limit the number of rounds"). */
@@ -107,6 +107,7 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   for (const [field, text] of said) {
     for (const p of findPhrases(text, phrases.flattery)) fail("no-flattery", `${field} says "${p}"`);
     for (const p of findPhrases(text, phrases.mastery)) fail("no-mastery-claim", `${field} says "${p}"; never declare mastery from one answer`);
+    for (const p of findPhrases(text, phrases.meta_talk ?? [])) fail("no-meta-talk", `${field} says "${p}"; talk about the subject, never about tools, instructions or the system`);
   }
 
   // 8. Hold under pushback without new evidence (structure only: the move, not the content).
