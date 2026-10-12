@@ -11,7 +11,14 @@ export interface Caption {
   text: string;
   rev: number;
   seq: number;
+  /** Where the line came from; captions carry the matching badge. Absent means "prepared". */
+  source?: "prepared" | "fixture";
+  /** The line split so calculated values can be marked (fake-director turns). */
+  parts?: CaptionPart[];
 }
+
+/** Plain text, or a value a solver calculated. */
+export type CaptionPart = { text: string } | { value: string };
 
 export interface VoiceState {
   status: VoiceStatus;
@@ -28,7 +35,7 @@ export type VoiceEvent =
   | { type: "listen" }
   | { type: "listenEnd"; rev: number }
   | { type: "submit" }
-  | { type: "speak"; rev: number; seq: number; text: string }
+  | { type: "speak"; rev: number; seq: number; text: string; source?: Caption["source"]; parts?: CaptionPart[] }
   | { type: "done"; rev: number; chips?: string[] }
   | { type: "error"; rev: number; message: string }
   | { type: "interrupt" }
@@ -56,7 +63,7 @@ export function voiceReducer(state: VoiceState, event: VoiceEvent): VoiceState {
       if (isStale(state, event.rev)) return state;
       if (state.status !== "thinking" && state.status !== "speaking") return state;
       if (state.caption && state.caption.rev === event.rev && event.seq <= state.caption.seq) return state;
-      return { ...state, status: "speaking", caption: { text: event.text, rev: event.rev, seq: event.seq } };
+      return { ...state, status: "speaking", caption: { text: event.text, rev: event.rev, seq: event.seq, source: event.source, parts: event.parts } };
     }
 
     case "done":

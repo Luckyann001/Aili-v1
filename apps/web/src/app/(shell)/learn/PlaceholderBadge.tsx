@@ -4,9 +4,15 @@ import { useId, useState } from "react";
 import { isDraft, reviewLabelOf } from "@/scene/manifests";
 import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
+import { FlaskIcon } from "@/components/ContentBadge";
+import { useStageContent } from "@/turn/stageContent";
 import styles from "./learn.module.css";
 
 /**
+ * The stage badge shows what is on the stage now: "Prepared · …" for the scene and lesson (always),
+ * and beside it "Test fixture · …" while a fake-director turn's content is on stage. The captions,
+ * labels and text-panel toggles do not affect it, so it cannot be hidden.
+ *
  * "Prepared · …" badge for the scene on the stage. A draft scene always says
  * "Draft (not expert-reviewed)". Tap for the full wording; keyboard focus shows it too.
  */
@@ -14,9 +20,11 @@ export function PlaceholderBadge() {
   const [open, setOpen] = useState(false);
   const id = useId();
   const activeScene = useScene((s) => s.activeScene);
+  const fixture = useStageContent((s) => s.fixture);
   const status = isDraft(activeScene) ? reviewLabelOf(activeScene) : "placeholder";
   const full = `Prepared content, written in advance. Not a live AI response. ${isDraft(activeScene) ? `${reviewLabelOf(activeScene)}. ` : ""}${MODELS[activeScene].note}`;
   return (
+    <>
     <span className={styles.badgeWrap}>
       <button
         type="button"
@@ -48,5 +56,13 @@ export function PlaceholderBadge() {
         {full}
       </span>
     </span>
+    {fixture && (
+      <span className={`${styles.badgePill} ${styles.badgeFixture}`} data-badge="fixture">
+        <FlaskIcon />
+        Test fixture · Fake director, not live AI
+        <span className={styles.srOnly}>. A scripted turn for testing; no AI model is connected.</span>
+      </span>
+    )}
+    </>
   );
 }
