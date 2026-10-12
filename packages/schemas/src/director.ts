@@ -63,6 +63,23 @@ export const DirectorResponse = z
     reading: ReadingId.optional(),
     /** The analogy this turn uses, so "another example" can be told apart (behavior spec B4). */
     analogy: AnalogyId.optional(),
+    /**
+     * Grading a teach-back, ONLY against the reading's human-written guide (spec A8): which of its key
+     * claims the learner covered and which of its misconceptions showed, as the guide's exact words.
+     * Then a follow-up question (vague answer) or the guide's application question. There is no
+     * verdict, score or mastery field, on purpose: one answer is evidence, never mastery.
+     */
+    teach_back_check: z
+      .object({
+        reading: ReadingId,
+        claims_covered: z.array(z.string().min(1)).default([]),
+        misconceptions_seen: z.array(z.string().min(1)).default([]),
+        next: z.enum(["follow_up", "application_question"]),
+      })
+      .strict()
+      .optional(),
+    /** "unsupported": nothing in the shortlist covers what was asked (spec A4, A14 test 11). */
+    coverage: z.enum(["supported", "unsupported"]).default("supported"),
   })
   .strict();
 export type DirectorResponse = z.infer<typeof DirectorResponse>;

@@ -43,6 +43,10 @@ export const LearnerTurn = z
     wants_another_example: z.boolean().default(false),
     /** An explicit acknowledgement (for a safety-critical waiver). */
     acknowledged: z.boolean().default(false),
+    /** Asked to stop (a debate, for example). */
+    wants_stop: z.boolean().default(false),
+    /** A source the learner named ("chapter 7 of X"), for the "I can't verify that" check. */
+    asks_for_source: z.string().min(1).nullable().default(null),
   })
   .strict();
 
@@ -72,6 +76,8 @@ export const ReplyClassification = z
     acknowledged: z.boolean().default(false),
     /** For an open prediction: the choice the learner picked (its exact chip text), else null. */
     guess: z.string().min(1).nullable().default(null),
+    wants_stop: z.boolean().default(false),
+    asks_for_source: z.string().min(1).nullable().default(null),
   })
   .strict();
 export type ReplyClassification = z.infer<typeof ReplyClassification>;
@@ -114,6 +120,14 @@ export const TeachingState = z
     open_items: z.array(OpenItem).default([]),
     waivers: z.array(Waiver).default([]),
     analogies_used: z.array(z.string().min(1)).default([]),
+    /** A teach-back asked and not yet graded (the reading's ID). */
+    pending_teach_back: z.string().min(1).nullable().default(null),
+    /** Graded teach-backs: evidence of understanding, never a mastery verdict (spec A8). */
+    evidence: z
+      .array(z.object({ reading: z.string().min(1), turn: z.number().int().positive(), claims_covered: z.array(z.string()), misconceptions_seen: z.array(z.string()) }).strict())
+      .default([]),
+    /** A debate in progress (spec A7): how many rounds so far. */
+    debate: z.object({ active: z.boolean(), rounds: z.number().int().nonnegative() }).strict().default({ active: false, rounds: 0 }),
     /** Safety-critical items the learner was asked to acknowledge (a flagged reading, for example). */
     safety_acks: z
       .array(z.object({ ref: z.string().min(1), turn: z.number().int().positive(), acknowledged: z.object({ by: z.literal("learner"), on: z.string() }).strict().nullable() }).strict())
