@@ -8,8 +8,7 @@ const body = (o: object = {}) => ({
   session_id: "e2e-route-0001",
   state_rev: 3,
   case: "valid",
-  input: { text: "Why is it hard to hold?", reply: { answered_prompt: false } },
-  state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, active_scene: "fx-lever" },
+  input: { text: "Why is it hard to hold?" },
   ...o,
 });
 
@@ -26,8 +25,9 @@ test.describe("fake-director turn route (demo flag on)", () => {
     expect(text).toContain('"value":"0.637"'); // the solver's number, marked as calculated
   });
 
-  test("rejects bad input and answers an interrupt for an unknown turn plainly", async ({ request }) => {
+  test("rejects bad input (including any attempt to send history) and answers an interrupt for an unknown turn plainly", async ({ request }) => {
     expect((await request.post("/api/turn", { data: body({ case: "real-model" }) })).status()).toBe(400);
+    expect((await request.post("/api/turn", { data: body({ state: { history: { posture: "answer", learner_level: "true_beginner", entries: [] } } }) })).status()).toBe(400);
     const stop = await request.post("/api/turn/interrupt", { data: { session_id: "e2e-route-0001", request_id: "turn_99", state_rev: 99 } });
     expect(await stop.json()).toEqual({ stopped: false });
   });

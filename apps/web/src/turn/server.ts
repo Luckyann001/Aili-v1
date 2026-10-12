@@ -1,4 +1,4 @@
-import { createFakeDirector, encodeEvent, InMemoryLedger, killSwitchFromEnv, TurnSession, type TurnEvent } from "@aili/engine";
+import { createFakeDirector, createFakeRouter, encodeEvent, InMemoryLedger, InMemorySessionStore, killSwitchFromEnv, TurnSession, type SessionState, type TurnEvent } from "@aili/engine";
 import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
@@ -19,6 +19,16 @@ const aiConfig = AiConfig.safeParse(aiConfigJson);
  * instance. Per-user and global caps need the database (deferred stage).
  */
 export const ledger = new InMemoryLedger();
+
+/**
+ * Session state lives HERE, never in the client (M3 hard rule): history, open prompt, scene on
+ * stage. In memory only: lost on restart and separate per server instance (database stage later).
+ */
+export const sessions = new InMemorySessionStore();
+const fresh = (): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: [] } });
+
+/** The turn in flight for each page session: a newer turn stops the older one. */
+const inFlight = new Map<string, TurnSession>();
 
 /** How long the "slow" case waits, so a person (or a test) can interrupt it. */
 export const SLOW_MS = 3000;
@@ -49,15 +59,18 @@ export async function handleTurn(request: Request): Promise<Response> {
   const { registry, errors } = (await loadFixtureRegistry()).fixtureTurnRegistry();
   if (errors.length) return Response.json({ error: "the test-fixture registry did not load", issues: errors }, { status: 500 });
 
+  // A newer turn from the same page stops the older one (its state is never committed).
+  inFlight.get(req.session_id)?.interrupt();
+  const start = sessions.get(req.session_id) ?? fresh();
   const session = new TurnSession({
     registry,
     director: createFakeDirector(req.case, { slowMs: SLOW_MS }),
-    state: { history: req.state.history, activeScene: req.state.active_scene },
+    router: createFakeRouter(),
+    state: start,
     concepts: ["mech.torque.static"],
     level: "L2",
     startRev: req.state_rev - 1,
     timeoutMs: TIMEOUT_MS,
-    includeStateInDone: true,
     // The kill switch is read on every request (server-only env, so it can be flipped without a rebuild).
     meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env) },
   });
@@ -66,6 +79,7 @@ export async function handleTurn(request: Request): Promise<Response> {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       running.set(key, session);
+      inFlight.set(req.session_id, session);
       const emit = (e: TurnEvent) => {
         try {
           controller.enqueue(enc.encode(encodeEvent(e)));
@@ -75,8 +89,11 @@ export async function handleTurn(request: Request): Promise<Response> {
       };
       try {
         await session.run(req.input, emit);
+        // Only a completed turn changes the session's state; an older turn finishing late cannot.
+        if (session.state !== start) sessions.commit(req.session_id, req.state_rev, session.state);
       } finally {
         running.delete(key);
+        if (inFlight.get(req.session_id) === session) inFlight.delete(req.session_id);
         try {
           controller.close();
         } catch {

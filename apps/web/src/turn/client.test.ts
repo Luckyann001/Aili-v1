@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSseParser, type SessionState, type TurnEvent } from "@aili/engine";
+import { createSseParser, type TurnEvent } from "@aili/engine";
 import { DROPPED_MESSAGE, STOPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 
 // The client reducer, fed with real events from the route handler through the SSE parser.
 
 type Snap = { selected: string | null; weight_distance_m: number };
 const SNAP: Snap = { selected: null, weight_distance_m: 0.05 };
-const committed: SessionState = { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" };
 
 afterEach(() => vi.unstubAllEnvs());
 async function turnEvents(o: { case?: string; rev?: number } = {}): Promise<TurnEvent[]> {
@@ -17,7 +16,7 @@ async function turnEvents(o: { case?: string; rev?: number } = {}): Promise<Turn
   const res = await handleTurn(
     new Request("http://localhost/api/turn", {
       method: "POST",
-      body: JSON.stringify({ session_id: "client-test-0001", state_rev: rev, case: o.case ?? "valid", input: { text: "hi", reply: { answered_prompt: false } }, state: { history: committed.history, active_scene: "fx-lever" } }),
+      body: JSON.stringify({ session_id: "client-test-0001", state_rev: rev, case: o.case ?? "valid", input: { text: "hi" } }),
     }),
   );
   const events: TurnEvent[] = [];
@@ -31,11 +30,11 @@ async function turnEvents(o: { case?: string; rev?: number } = {}): Promise<Turn
   }
   return events;
 }
-const play = (actions: TurnClientAction<Snap>[], from: TurnClientState<Snap> = initialTurnClient<Snap>(committed)) => actions.reduce(turnClientReducer<Snap>, from);
+const play = (actions: TurnClientAction<Snap>[], from: TurnClientState<Snap> = initialTurnClient<Snap>()) => actions.reduce(turnClientReducer<Snap>, from);
 const ev = (event: TurnEvent): TurnClientAction<Snap> => ({ type: "event", event });
 
 describe("in order", () => {
-  it("a valid turn fills narration, actions, results and the prompt, then commits the new state", async () => {
+  it("a valid turn fills narration, actions, results and the prompt, then is done", async () => {
     const events = await turnEvents();
     const s = play([{ type: "begin", rev: 4, snapshot: SNAP }, ...events.map(ev)]);
     expect(s.status).toBe("done");
@@ -44,7 +43,6 @@ describe("in order", () => {
     expect(s.actions.map((a) => a.type)).toEqual(["select_scene", "highlight_part", "set_parameter"]);
     expect(s.calcs).toHaveLength(1);
     expect(s.prompt?.chips).toEqual(["Closer to my hand", "Not sure"]);
-    expect(s.committed.history.entries.map((e) => e.kind)).toEqual(["learner", "aili"]);
     expect(s.restoreTo).toBeNull();
     expect(s.message).toBeNull();
   });
@@ -65,7 +63,7 @@ describe("stale and out-of-order events are dropped", () => {
 
   it("events before begin, or after the turn finished, are ignored", async () => {
     const events = await turnEvents();
-    const idle = initialTurnClient<Snap>(committed);
+    const idle = initialTurnClient<Snap>();
     expect(turnClientReducer(idle, ev(events[1]!))).toBe(idle);
     const done = play([{ type: "begin", rev: 4, snapshot: SNAP }, ...events.map(ev)]);
     expect(turnClientReducer(done, ev(events[1]!))).toBe(done);
@@ -80,7 +78,6 @@ describe("failures restore the stage and say so plainly", () => {
     expect(s.message).toMatch(/Nothing on the stage changed\.$/);
     expect(s.restoreTo).toEqual(SNAP);
     expect([s.narration, s.actions, s.calcs, s.prompt]).toEqual([[], [], [], null]);
-    expect(s.committed).toBe(committed);
   });
 
   it("interrupt mid-turn: Stopped., the stage restored, and the rest of that turn is dropped", async () => {
@@ -90,7 +87,6 @@ describe("failures restore the stage and say so plainly", () => {
     const stopped = turnClientReducer(mid, { type: "interrupt" });
     expect(stopped).toMatchObject({ status: "stopped", message: STOPPED_MESSAGE, restoreTo: SNAP, actions: [], prompt: null });
     expect(play(events.slice(4).map(ev), stopped)).toBe(stopped); // late events from the stopped turn
-    expect(stopped.committed).toBe(committed);
   });
 
   it("a stream that ends without done or error is a dropped connection", async () => {

@@ -1,4 +1,4 @@
-import { admit, nextRevision, type GateState, type SessionState, type TextPart, type TurnEvent } from "@aili/engine";
+import { admit, nextRevision, type GateState, type TextPart, type TurnEvent } from "@aili/engine";
 
 // Client side of a fake-director turn (M2 slice 6). Pure: the hook in 6b feeds it stream events and
 // applies what it returns (speech, captions, stage actions, a restore). Every event passes the
@@ -19,8 +19,6 @@ export interface TurnClientState<Snapshot> {
   snapshot: Snapshot | null;
   /** Set when the stage must go back to `snapshot` (the hook applies it, then the next action clears it). */
   restoreTo: Snapshot | null;
-  /** The last session state a completed turn produced (fake-director round trip). */
-  committed: SessionState;
   narration: Array<{ id: string; text: string; parts: TextPart[] }>;
   actions: Array<Extract<TurnEvent, { type: "action" }>["action"]>;
   calcs: Array<{ calc_id: string; outputs: Record<string, number> }>;
@@ -35,8 +33,8 @@ export type TurnClientAction<Snapshot> =
   | { type: "interrupt" }
   | { type: "streamEnded" };
 
-export function initialTurnClient<S>(committed: SessionState): TurnClientState<S> {
-  return { gate: { rev: 0, lastSeq: -1 }, status: "idle", turnId: null, snapshot: null, restoreTo: null, committed, narration: [], actions: [], calcs: [], prompt: null, message: null };
+export function initialTurnClient<S>(): TurnClientState<S> {
+  return { gate: { rev: 0, lastSeq: -1 }, status: "idle", turnId: null, snapshot: null, restoreTo: null, narration: [], actions: [], calcs: [], prompt: null, message: null };
 }
 
 const cleared = (): Pick<TurnClientState<unknown>, "narration" | "actions" | "calcs" | "prompt"> => ({ narration: [], actions: [], calcs: [], prompt: null });
@@ -64,7 +62,7 @@ export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<
         case "prompt":
           return { ...t, prompt: { text: e.text, parts: e.parts, chips: e.chips } };
         case "turn.done":
-          return { ...t, status: "done", snapshot: null, committed: e.state ?? t.committed };
+          return { ...t, status: "done", snapshot: null };
         case "turn.error":
           return { ...t, ...cleared(), status: "error", restoreTo: t.snapshot, snapshot: null, message: e.message };
       }

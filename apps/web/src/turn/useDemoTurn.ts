@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { create } from "zustand";
-import { createSseParser, type SessionState, type TurnEvent } from "@aili/engine";
+import { createSseParser, type TurnEvent } from "@aili/engine";
 import type { FakeCase } from "@aili/schemas";
 import { MODELS, type SceneId } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
@@ -32,10 +32,8 @@ const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analog
 /** This page's client session ID: turn IDs repeat across pages, so the server keys turns by both. */
 const SESSION_ID = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s-${Math.random().toString(36).slice(2, 12)}-${Date.now().toString(36)}`;
 
-const START: SessionState = { history: { posture: "learning", learner_level: "some_knowledge", entries: [] } };
-
 export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dispatch: (a: TurnClientAction<StageSnapshot>) => TurnClientState<StageSnapshot> }>()((set, get) => ({
-  state: initialTurnClient<StageSnapshot>(START),
+  state: initialTurnClient<StageSnapshot>(),
   dispatch: (a) => {
     const next = turnClientReducer(get().state, a);
     if (next !== get().state) set({ state: next });
@@ -115,14 +113,12 @@ export function useDemoTurn(voice: Voice) {
 
   const start = useCallback(
     async (fakeCase: FakeCase, text: string) => {
-      const answered = useVoice.getState().prompt !== null; // a reply to Aili's open question
       stop(); // a new turn replaces one still in flight (its changes are undone first)
       const rev = voice.beginTurn();
       const abort = new AbortController();
       current.current = { rev, abort };
       const turnClient = useTurnClient.getState();
       turnClient.dispatch({ type: "begin", rev, snapshot: snapshotStage() });
-      const committed = turnClient.state.committed;
       const mine = () => current.current?.rev === rev;
 
       const fail = (message: string) => {
@@ -156,8 +152,8 @@ export function useDemoTurn(voice: Voice) {
             session_id: SESSION_ID,
             state_rev: rev,
             case: fakeCase,
-            input: { text: text.slice(0, 500), reply: { answered_prompt: answered } },
-            state: { history: committed.history, ...(committed.activeScene ? { active_scene: committed.activeScene } : {}) },
+            // Only the text: the server keeps the history and decides how to read the reply.
+            input: { text: text.slice(0, 500) },
           }),
           signal: abort.signal,
         });

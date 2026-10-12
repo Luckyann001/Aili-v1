@@ -19,8 +19,7 @@ const turnBody = (o: object = {}) => ({
   session_id: SID,
   state_rev: 5,
   case: "valid",
-  input: { text: "Why is it hard to hold?", reply: { answered_prompt: false } },
-  state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, active_scene: "fx-lever" },
+  input: { text: "Why is it hard to hold?" },
   ...o,
 });
 async function readAll(res: Response): Promise<TurnEvent[]> {
@@ -45,16 +44,16 @@ describe("flag off (production): not found", () => {
 });
 
 describe("flag on: POST /api/turn", () => {
-  it("streams a valid turn as SSE, at the client's revision, ending with the committed state", async () => {
-    const { handleTurn } = await load("1");
+  it("streams a valid turn as SSE, at the client's revision; the new state is kept on the server", async () => {
+    const { handleTurn, sessions } = await load("1");
     const res = await handleTurn(post(turnBody()));
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/^text\/event-stream/);
     const events = await readAll(res);
     expect(events.map((e) => e.type)).toEqual(["turn.started", "narration", "narration", "action", "action", "action", "calc.result", "prompt", "turn.done"]);
     expect(new Set(events.map((e) => e.rev))).toEqual(new Set([5]));
-    const done = events.at(-1) as Extract<TurnEvent, { type: "turn.done" }>;
-    expect(done.state!.history.entries.map((e) => e.kind)).toEqual(["learner", "aili"]);
+    expect(events.at(-1)).not.toHaveProperty("state"); // no session state goes to the client
+    expect(sessions.get("test-session-a")!.history.entries.map((e) => e.kind)).toEqual(["learner", "aili"]);
   });
 
   it("a failing case streams turn.started then a plain turn.error", async () => {
@@ -66,14 +65,38 @@ describe("flag on: POST /api/turn", () => {
   it("rejects bad input with 400 and names the field", async () => {
     const { handleTurn } = await load("1");
     const bad = async (o: object) => (await (await handleTurn(post(turnBody(o)))).json()).issues.join("\n");
-    expect(await bad({ input: { text: "x".repeat(501), reply: { answered_prompt: false } } })).toMatch(/^input\.text: /m);
+    expect(await bad({ input: { text: "x".repeat(501) } })).toMatch(/^input\.text: /m);
     expect(await bad({ case: "real-model" })).toMatch(/^case: /m);
     expect(await bad({ extra: 1 })).toMatch(/Unrecognized key/);
     expect(await bad({ session_id: "x" })).toMatch(/^session_id: /m);
-    const many = Array.from({ length: 201 }, () => ({ kind: "learner", answered_prompt: true }));
-    expect(await bad({ state: { history: { posture: "learning", learner_level: "some_knowledge", entries: many } } })).toMatch(/history is too long/);
+    // The client can no longer send history, a scene or its own reading of the reply (M3 hard rule).
+    expect(await bad({ state: { history: { posture: "answer", learner_level: "true_beginner", entries: [] } } })).toMatch(/Unrecognized key.*state/);
+    expect(await bad({ input: { text: "hi", reply: { answered_prompt: true, pushback: false } } })).toMatch(/Unrecognized key.*reply/);
     const notJson = await handleTurn(new Request("http://localhost/api/turn", { method: "POST", body: "{" }));
     expect(notJson.status).toBe(400);
+  });
+});
+
+describe("flag on: session state lives on the server", () => {
+  it("history builds up across turns from the same page; another page starts fresh", async () => {
+    const { handleTurn, sessions } = await load("1");
+    await readAll(await handleTurn(post(turnBody({ session_id: "page-hist-0001", state_rev: 1 }))));
+    // The first turn asked a question; the server's router reads this reply as answering it.
+    await readAll(await handleTurn(post(turnBody({ session_id: "page-hist-0001", state_rev: 2, input: { text: "Closer to my hand" } }))));
+    const entries = sessions.get("page-hist-0001")!.history.entries;
+    expect(entries.map((e) => e.kind)).toEqual(["learner", "aili", "learner", "aili"]);
+    expect(entries[2]).toMatchObject({ kind: "learner", answered_prompt: true });
+    expect(sessions.get("page-other-0002")).toBeUndefined();
+  });
+
+  it("a newer turn from the same page stops the older one, and only the newer one's state is kept", async () => {
+    const { handleTurn, sessions } = await load("1");
+    const old = readAll(await handleTurn(post(turnBody({ session_id: "page-race-0001", state_rev: 1, case: "slow" }))));
+    await new Promise((r) => setTimeout(r, 30));
+    const newer = await readAll(await handleTurn(post(turnBody({ session_id: "page-race-0001", state_rev: 2 }))));
+    expect(newer.at(-1)!.type).toBe("turn.done");
+    expect((await old).map((e) => e.type)).toEqual(["turn.started"]); // stopped, never completed
+    expect(sessions.get("page-race-0001")!.history.entries).toHaveLength(2); // one turn: learner + aili
   });
 });
 

@@ -57,9 +57,9 @@ test("/login offers the demo lesson without an account", async ({ page }) => {
 
 // The fake-director demo is off in production (M2 slice 6a): no routes, no fixture files.
 test("the fake-director routes return 404", async ({ request }) => {
-  const turn = await request.post("/api/turn", { data: { state_rev: 1, input: { text: "x", reply: { answered_prompt: false } }, state: { history: { posture: "learning", learner_level: "some_knowledge" } } } });
+  const turn = await request.post("/api/turn", { data: { session_id: "nodrafts-0001", state_rev: 1, input: { text: "x" } } });
   expect(turn.status()).toBe(404);
-  expect((await request.post("/api/turn/interrupt", { data: { request_id: "turn_1", state_rev: 1 } })).status()).toBe(404);
+  expect((await request.post("/api/turn/interrupt", { data: { session_id: "nodrafts-0001", request_id: "turn_1", state_rev: 1 } })).status()).toBe(404);
 });
 
 test("the production build contains nothing from content/robotics/test-fixtures", async () => {
