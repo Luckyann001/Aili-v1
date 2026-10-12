@@ -290,3 +290,11 @@ describe("the prediction example in professor.v1.md (Lucky's decision 2026-10-12
     expect(errs(example)).toEqual([]);
   });
 });
+
+describe("narration hard limit (Lucky's decision 2026-10-12: 180; the prompt asks for 140)", () => {
+  it("180 characters pass, 181 are rejected with the limit named", () => {
+    expect(NARRATION_MAX_CHARS).toBe(180);
+    expect(errs({ narration: [{ id: "n1", text: "a".repeat(180) }] })).toEqual([]);
+    expect(errs({ narration: [{ id: "n1", text: "a".repeat(181) }] })).toEqual(["narration[0].text: 181 characters, at most 180"]);
+  });
+});

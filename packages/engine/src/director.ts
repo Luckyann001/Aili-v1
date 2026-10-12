@@ -21,8 +21,11 @@ import { checkNarration } from "./narration";
 
 /** Behavior spec A5: about 30–40 s of narration without learner input, in short segments. */
 export const NARRATION_MAX_SEGMENTS = 4;
-/** About 160 characters ≈ 25 words ≈ 10 s of speech; four segments ≈ 40 s. */
-export const NARRATION_MAX_CHARS = 160;
+/**
+ * Hard limit per segment: 180 characters ≈ 28 words ≈ 11 s of speech; four segments ≈ 45 s. Raised from
+ * 160 by Lucky (2026-10-12) after live answers kept landing just over it; the prompt still asks for 140.
+ */
+export const NARRATION_MAX_CHARS = 180;
 
 const QUESTION = /[?？]/g;
 
