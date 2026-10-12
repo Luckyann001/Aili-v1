@@ -1,4 +1,4 @@
-import type { DirectorResponse, SessionHistory } from "@aili/schemas";
+import type { DirectorResponse, SessionHistory, TeachingState } from "@aili/schemas";
 import PHRASES from "../../../config/pedagogy-phrases.json";
 
 // Pedagogy validator (docs/m2-plan.md slice 4; behavior spec A1a, A2, A3–A5, A8, A11, A12).
@@ -35,7 +35,12 @@ export function openPrompt(h: SessionHistory): { turn: number } | null {
   return open === null ? null : { turn: open };
 }
 
-export function validatePedagogy(r: DirectorResponse, h: SessionHistory, phrases = BANNED_PHRASES): string[] {
+const NO_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [] };
+
+/** Open items allowed at once before new ones must wait (spec A5: "do not pile on new ones"). */
+export const MAX_OPEN_ITEMS = 3;
+
+export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teaching: TeachingState = NO_TEACHING, phrases = BANNED_PHRASES): string[] {
   const errors: string[] = [];
   const ailiTurns = h.entries.filter((e): e is Aili => e.kind === "aili");
   const turn = ailiTurns.length + 1;
@@ -93,6 +98,57 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, phrases
   // 8. Hold under pushback without new evidence (structure only: the move, not the content).
   if (lastEntry?.kind === "learner" && lastEntry.pushback && !lastEntry.new_evidence && r.move !== "hold")
     fail("hold-under-pushback", `the learner pushed back without new evidence; the move must be "hold", not "${r.move}"`);
+
+  // ── Slice 5a: prediction → test → reveal, waivers, open items, frustration, another example ──
+
+  // 9. After the learner commits a guess, the next turn tests it: a calculation, the result shown
+  //    against the guess (reveal), and the mechanism explained (spec A1a, B2: predict before showing).
+  const guessed = teaching.predictions.find((p) => p.status === "guessed");
+  if (guessed && !r.safety) {
+    if (r.reveal?.prediction !== guessed.id) fail("test-after-prediction", `the learner predicted "${guessed.guess}" for "${guessed.id}"; this turn must reveal the result against it (reveal.prediction "${guessed.id}")`);
+    if (r.calc_requests.length === 0) fail("test-after-prediction", `the prediction "${guessed.id}" must be tested: request the calculation in this turn`);
+    if (r.move !== "explain") fail("test-after-prediction", `after the result, explain the mechanism: the move must be "explain", not "${r.move}"`);
+  }
+
+  // 10. A reveal only after the learner committed, and only once.
+  if (r.reveal) {
+    const p = teaching.predictions.find((x) => x.id === r.reveal!.prediction);
+    if (!p) fail("reveal-after-guess", `reveal refers to "${r.reveal.prediction}", which was never asked as a prediction`);
+    else if (p.status === "open") fail("reveal-after-guess", `"${p.id}" is revealed before the learner has committed a guess (predict before showing)`);
+    else if (p.status === "revealed") fail("reveal-after-guess", `"${p.id}" was already revealed`);
+  }
+
+  // 11. At most one probe before an explanation on the same concept (spec A1a hard limit).
+  if (r.move === "probe") {
+    const lastOnConcept = [...ailiTurns].reverse().find((t) => t.concepts.some((c) => r.concepts.includes(c)));
+    if (lastOnConcept?.move === "probe") fail("one-probe-before-explain", `the last turn on ${r.concepts.join(", ")} was already a probe; explain before probing again`);
+  }
+
+  // 12. Frustration: explain or answer (the help ladder), not another question or challenge (spec A5, A6).
+  if (lastEntry?.kind === "learner" && lastEntry.frustrated && !r.safety && r.move !== "explain" && r.move !== "answer")
+    fail("back-off-on-frustration", `the learner is frustrated ("I don't know", "just tell me"); explain or answer, not "${r.move}"`);
+
+  // 13. "Another example": a different analogy, with its own mapping (spec B4, A14 test 17).
+  if (lastEntry?.kind === "learner" && lastEntry.wants_another_example) {
+    if (!r.analogy) fail("another-example", `the learner asked for another example; use an analogy from the shortlist and name it in "analogy"`);
+    else if (teaching.analogies_used.includes(r.analogy)) fail("another-example", `"${r.analogy}" was already used; use a different analogy`);
+  }
+
+  // 14. Do not pile on open items (spec A5): a new prediction or reading waits while too many are open.
+  const opensItem = r.prompt?.kind === "prediction" || (r.move === "assign" && r.reading !== undefined);
+  if (opensItem && teaching.open_items.length >= MAX_OPEN_ITEMS)
+    fail("open-items", `${teaching.open_items.length} items are already open (at most ${MAX_OPEN_ITEMS}); close one before opening another`);
+  if (r.move === "assign" && r.reading && teaching.open_items.some((o) => o.kind === "reading"))
+    fail("open-items", `a reading is already assigned and open; resume it (teach_back) before assigning another`);
+
+  // 15. Safety-critical waivers need explicit acknowledgement (spec A9, architecture §8).
+  if (r.waiver?.safety_critical) {
+    if (r.prompt?.kind !== "acknowledgement") fail("waiver-acknowledgement", `skipping "${r.waiver.concept}" is safety-critical: ask for explicit acknowledgement (prompt kind "acknowledgement")`);
+    if (!r.safety) fail("waiver-acknowledgement", `a safety-critical waiver must set "safety": true`);
+  }
+  const pending = teaching.waivers.find((w) => w.acknowledged === null);
+  if (pending && !r.waiver && r.prompt?.kind !== "acknowledgement")
+    fail("waiver-acknowledgement", `skipping "${pending.concept}" still awaits the learner's explicit acknowledgement; ask for it before going on`);
 
   return errors;
 }

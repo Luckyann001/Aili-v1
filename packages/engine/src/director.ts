@@ -128,6 +128,24 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     }
   }
 
+  // Slice 5a shapes: prediction prompts, reveals, readings and analogies.
+  if (r.prompt?.kind === "prediction") {
+    if (!r.prediction) errors.push(`prediction: missing; a prediction prompt says what is being predicted ({ id, concept })`);
+    if (r.prompt.chips.length < 2) errors.push(`prompt.chips: a prediction needs at least two choices (got ${r.prompt.chips.length})`);
+    if (!r.prompt.chips.some((c) => /^not sure$/i.test(c))) errors.push(`prompt.chips: a prediction offers "Not sure"`);
+  } else if (r.prediction) errors.push(`prediction: "${r.prediction.id}" needs a prompt of kind "prediction"`);
+  if (r.reveal && !r.calc_requests.some((c) => c.id === r.reveal!.calc)) errors.push(`reveal.calc: "${r.reveal.calc}" is not a calculation requested in this turn`);
+  if (r.reading) {
+    const rd = sl.readings.find((x) => x.id === r.reading);
+    if (!rd) errors.push(`reading: "${r.reading}" is not in this turn's shortlist (only published, verified library items can be assigned)`);
+    else {
+      const src = sl.sources.find((s) => s.id === rd.source);
+      if (!src || (!src.verified && !src.test_fixture)) errors.push(`reading: "${r.reading}" — its source "${rd.source}" has not been verified by a person`);
+    }
+    if (r.move !== "assign" && r.move !== "teach_back") errors.push(`reading: set only with move "assign" or "teach_back", not "${r.move}"`);
+  }
+  if (r.analogy && !sl.analogies.some((a) => a.id === r.analogy)) notInShortlist("analogy", r.analogy);
+
   // Evidence: verified library items in this turn's shortlist only.
   r.evidence.forEach((id, i) => {
     const reading = sl.readings.find((x) => x.id === id);
