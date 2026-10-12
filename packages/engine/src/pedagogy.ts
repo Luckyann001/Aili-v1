@@ -67,8 +67,12 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   const lastEntry = h.entries.at(-1);
 
   // 1. One open question at a time.
+  // Exception (Lucky's decision 2026-10-12): re-offering the SAME open prediction (prompt kind
+  // "prediction" with the same prediction id, asked in the open turn) keeps it open; it is not a new question.
   const open = openPrompt(h);
-  if (asks && open) fail("one-open-question", `a prompt is still open from turn ${open.turn} and unanswered; answer or close it before asking another`);
+  const reoffer = !!open && r.prompt?.kind === "prediction" && !!r.prediction && teaching.predictions.some((p) => p.id === r.prediction!.id && p.status === "open" && p.turn === open.turn);
+  if (asks && open && !reoffer)
+    fail("one-open-question", `a prompt is still open from turn ${open.turn} and unanswered; answer or close it before asking another (or re-offer that same prediction, with its id)`);
 
   // 2. Never two questions in a row without giving something back.
   if (asks && previous?.asked && !givesBack(r)) fail("give-before-asking-again", `turn ${turn - 1} asked a question and this turn asks again without giving anything back (narration, a result or a visual)`);

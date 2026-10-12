@@ -28,8 +28,14 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
     open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === id));
   }
   if (r.prediction && r.prompt?.kind === "prediction") {
-    predictions = [...predictions, { id: r.prediction.id, concept: r.prediction.concept, turn, choices: r.prompt.chips, question: r.prompt.text, guess: null, status: "open" }];
-    open_items = [...open_items, { kind: "prediction", ref: r.prediction.id, opened_turn: turn }];
+    const again = predictions.find((p) => p.id === r.prediction!.id && p.status === "open");
+    if (again) {
+      // Re-offered (more simply): the same prediction, asked again this turn; never a duplicate.
+      predictions = predictions.map((p) => (p === again ? { ...p, turn, choices: r.prompt!.chips, question: r.prompt!.text } : p));
+    } else {
+      predictions = [...predictions, { id: r.prediction.id, concept: r.prediction.concept, turn, choices: r.prompt.chips, question: r.prompt.text, guess: null, status: "open" }];
+      open_items = [...open_items, { kind: "prediction", ref: r.prediction.id, opened_turn: turn }];
+    }
   }
   if (r.reading && r.move === "assign") open_items = [...open_items, { kind: "reading", ref: r.reading, opened_turn: turn }];
   if (r.reading && r.move === "teach_back") open_items = open_items.filter((o) => !(o.kind === "reading" && o.ref === r.reading));

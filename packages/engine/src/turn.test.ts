@@ -251,3 +251,14 @@ describe("the teaching state travels to the director (Lucky's decision 2026-10-1
     expect(t.last_prompt).toEqual(expect.objectContaining({ turn: 1, kind: "prediction" }));
   });
 });
+
+describe("a re-offered prediction is not duplicated", () => {
+  it("applyResponse updates the open prediction's question and turn instead of adding a second", async () => {
+    const { applyResponse } = await import("./teaching");
+    const base = { predictions: [{ id: "weight-out", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], question: "What happens?", guess: null, status: "open" as const }], open_items: [{ kind: "prediction" as const, ref: "weight-out", opened_turn: 1 }], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
+    const r = { move: "explain", prompt: { kind: "prediction", text: "Farther out: more twist or less?", chips: ["More", "Less", "Not sure"] }, prediction: { id: "weight-out", concept: "mech.torque.static" } } as never;
+    const t = applyResponse(base, r, 2, "2026-10-12");
+    expect(t.predictions).toEqual([expect.objectContaining({ id: "weight-out", turn: 2, question: "Farther out: more twist or less?", status: "open" })]);
+    expect(t.open_items).toHaveLength(1);
+  });
+});

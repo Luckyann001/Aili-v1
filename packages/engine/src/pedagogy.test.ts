@@ -18,7 +18,7 @@ describe("rule 1: one open question at a time", () => {
   it("a new prompt while one is open and unanswered is rejected; once answered, it is fine", () => {
     const openH = hist([aili("probe", { asked: true }), learner({ answered_prompt: false })]);
     expect(openPrompt(openH)).toEqual({ turn: 1 });
-    expect(validatePedagogy(resp(ask), openH)).toContain("rule one-open-question (turn 2): a prompt is still open from turn 1 and unanswered; answer or close it before asking another");
+    expect(validatePedagogy(resp(ask), openH)).toContain("rule one-open-question (turn 2): a prompt is still open from turn 1 and unanswered; answer or close it before asking another (or re-offer that same prediction, with its id)");
     expect(validatePedagogy(resp(ask), hist([aili("probe", { asked: true }), learner()]))).toEqual([]);
   });
 });
@@ -170,5 +170,18 @@ describe("learner level unknown (Lucky's decision 2026-10-12, scenario s02)", ()
     const probe = resp({ move: "probe", prompt: { text: "What have you built so far?", chips: [], kind: "question" } });
     expect(validatePedagogy(probe, hist([], { learner_level: "unknown" })).join()).not.toMatch(/explain-first-for-beginners/);
     expect(validatePedagogy(probe, hist([], { learner_level: "true_beginner" })).join()).toMatch(/explain-first-for-beginners/);
+  });
+});
+
+describe("re-offering the open prediction (Lucky's decision 2026-10-12)", () => {
+  const openH = hist([aili("explain", { asked: true }), learner({ answered_prompt: false })]);
+  const teaching = { predictions: [{ id: "weight-out", concept: C, turn: 1, choices: ["More", "Less", "Not sure"], question: "What happens?", guess: null, status: "open" as const }] };
+  const reask = (id: string, kind = "prediction") => resp({ move: "explain", narration: [{ id: "n1", text: "Fair enough, let's try it another way." }], prompt: { text: "Farther out: more twist or less?", chips: ["More", "Less", "Not sure"], kind }, ...(kind === "prediction" ? { prediction: { id, concept: C } } : {}) });
+  it("the same prediction id, as a prediction prompt, keeps it open: allowed", () => {
+    expect(validatePedagogy(reask("weight-out"), openH, teaching).join()).not.toMatch(/one-open-question/);
+  });
+  it("a different prediction, or a plain new question, is still rejected", () => {
+    expect(validatePedagogy(reask("another-one"), openH, teaching).join()).toMatch(/one-open-question/);
+    expect(validatePedagogy(reask("weight-out", "question"), openH, teaching).join()).toMatch(/one-open-question/);
   });
 });
