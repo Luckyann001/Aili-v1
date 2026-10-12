@@ -9,9 +9,9 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
 
 1. **Keys:** a real AI key may be used on Lucky's laptop only, never deployed and never on any hosting service, until the database stage. This is recorded in CLAUDE.md and the milestones doc.
 2. **Budget:**
-   - Provider monthly limit: **30 USD**, set by Lucky in the provider's dashboard and recorded in config.
-   - Bake-off cap: **25 USD** in config.
-   - The bake-off runs every scenario **once** on two pairings. The 3-run consistency check runs only for the winner, and only on the confident-but-wrong scenarios.
+   - Provider monthly limit: ~~30 USD~~ **5 USD** for the first test (decision 10), set by Lucky in the provider's dashboard and recorded in config.
+   - Bake-off cap: ~~25 USD~~ **3 USD** in config (`bakeoff_cap_micro_usd`, decision 13).
+   - The bake-off runs every scenario **once**. ~~on two pairings~~ The first test is **Anthropic only** (decision 8); pairing (a) comes later. The 3-run consistency check runs only for the chosen pairing, and only on the confident-but-wrong scenarios.
 3. **Models to compare:**
    - (a) GPT-6.1 Sol (professor) + GPT-6 Luna (router);
    - (b) Claude Sonnet 5.5 (professor) + Claude Haiku 4.5 (router). *Superseded by decision 7: Haiku 5.5.*
@@ -33,13 +33,21 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
 10. **Provider monthly limit for the first test: 5 USD** (replaces 30 USD in decision 2). Lucky sets it in Anthropic's dashboard and records it in `provider_monthly_limit_set`; Claude never fills that field in.
 11. **Slice 6 builds the Anthropic adapter first** (plain HTTP, decision 4); the OpenAI adapter follows later.
 
+### Update (Oct 12 2026, after slice 7a): settings for the first live run
+
+12. **Config filled in** (model IDs and prices verified on Anthropic's models and pricing pages on 2026-10-12): provider `anthropic`, professor `claude-sonnet-5-5`, router `claude-haiku-5-5`. `provider_monthly_limit_set` stays Lucky's to fill in; it takes an optional `note` (for example, that the real protection is a prepaid balance).
+13. **Caps:** session cap **0.50 USD** (test value); bake-off cap **3 USD** for a whole run, checked before every turn.
+14. **Thinking and effort** (both models think adaptively by default, and thinking counts toward `max_output_tokens`): router `thinking: disabled`, `effort: low`, 200 output tokens; professor `thinking: adaptive`, `effort: low`, 3,000 output tokens.
+15. **Timeouts are config values:** 30 s per provider attempt, 45 s per turn, labelled as first-live-run values. The 7b results report measured latency.
+16. **Bake-off scenarios: 28**, the approved list of about 30 less spec tests 12 (interruption) and 14 (hard-coded number), which code checks fully and which need no model. The milestones doc's "~30 scenarios" refers to the same list.
+
 ## Design summary
 
 - **Provider adapter:**
   - Interface: `ProfessorProvider.complete({ system, input, outputSchema, maxOutputTokens, signal })` returns `{ json, usage, latencyMs }`.
   - Provider, model, `api_key_env` (the variable *name*) and `max_output_tokens` live only in `config/ai.json`. A grep test keeps provider and model names out of code.
   - Structured output uses the director schema as JSON Schema, and our validators still run on everything.
-  - One 20-second budget per turn:
+  - One budget per turn, from config (`turn_timeout_ms`, 45 s for the first live run; each attempt at most `attempt_timeout_ms`, 30 s):
     - network errors, timeouts, 429 and 5xx get one retry with jittered back-off if time remains;
     - 401/403 means "key rejected", with no retry;
     - other 4xx map to `director`, with no retry;
@@ -57,9 +65,9 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
   - The kill switch stops the router too.
 - **Teaching:**
   - Server-side session state (slice 1).
-  - A router classifies each reply: answered, pushback, new evidence, intent or posture, "just tell me", and safety.
+  - A router classifies each reply (`ReplyClassification`): whether it answers the open question, pushback, new evidence, frustration (including "just tell me"), a request for another example, an explicit acknowledgement, the guess for an open prediction, a request to stop, and a source the learner names.
   - Posture is chosen from the first message and confirmed with one tap.
-  - The prompt template, `content/prompts/professor.v1.md`, is reviewed by Lucky; input is budgeted at about 6k tokens.
+  - The prompt template, `content/prompts/professor.v1.md`, is reviewed by Lucky; input is budgeted at 5,000 *estimated* tokens (characters ÷ 3.5), so about 6k by a real tokenizer.
   - Prediction → test → reveal order, teach-back against the human-written guide, verified readings only, waivers, and open items.
 
 ## Slices
@@ -72,7 +80,8 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
 | 4 | Worst-case spend check, key-presence check, no-key refusal, provider-limit gate, key-leak tests | — |
 | 5 | Prediction→test→reveal, teach-back, readings, waivers, open items, validator extensions, the 17 CI tests (two sessions) | — |
 | 6 | Real provider adapters with plain HTTP, code only, no key | Approval if an SDK turns out to be needed |
-| 7 | Local-only live run, bake-off harness, results report | Model names and prices re-checked; key in `.env.local`; provider limit set and recorded |
+| 7a | Provider-backed router, dry run, bake-off harness (recorded and live modes), config for the first live run; no key, no call | Approve the config and the dry-run printout |
+| 7b | Local-only live run: smoke test (1 turn), then up to 5 turns, then the bake-off; results report with measured latency; stop at any unexpected error | Key in `.env.local`; provider limit set and recorded |
 
 ## Gaps (stated plainly)
 
