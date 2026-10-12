@@ -30,6 +30,19 @@ solvers → compile (placeholders filled, three significant figures) → events.
 - **State** (`SessionState`: history and the scene on stage) is in memory; saving it waits for the
   database (deferred stage).
 
+## Metering, cap and kill switch (`src/metering.ts`)
+- **Prices only from `config/ai.json`** (validated by `AiConfig`): integer micro-USD per million
+  tokens for the professor and the router. The current prices are **test values, not real pricing**.
+  A test greps every source file for the configured numbers.
+- **Cost** is exact integer arithmetic, rounded up per direction, so a cap is never passed by rounding.
+- **Before each turn**: `AILI_AI_KILL_SWITCH=1` (server env, read per request) refuses it; then a
+  page session that has reached `session_cap_micro_usd` is refused. Both say so in plain words and
+  keep the last valid state; the director is not called.
+- **After the director answers**, its token usage is recorded, even if the response then fails a check.
+- **The ledger is in memory only**: lost on restart, separate per server instance, keyed by page
+  session. **Per-user and global caps (and daily limits, rate limits, spike alerts) need the
+  database** (deferred stage) and M7. Voice and hosting costs are 0 in config: not metered yet.
+
 ## Pedagogy validator (`src/pedagogy.ts`)
 `validatePedagogy(response, history)` checks a response against the session history
 (`SessionHistory` in `@aili/schemas`). Errors read `rule <name> (turn N): …`.
