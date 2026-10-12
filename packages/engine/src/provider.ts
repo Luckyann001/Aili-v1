@@ -8,9 +8,10 @@ import type { TokenUsage } from "./metering";
 // - network error, attempt timeout, 429, 5xx: ONE retry after a jittered pause, only if time remains;
 // - 401/403: no retry, "key rejected";  other 4xx: no retry;
 // - an interrupt aborts at once, with no retry;
-// - every attempt is reported for metering, even a failed one. An attempt that timed out or was
-//   aborted after it started is metered CONSERVATIVELY (estimated input + max output), because the
-//   provider may still bill it; other failures are metered at zero.
+// - every attempt is reported for metering, even a failed one. An attempt that timed out, was
+//   aborted, or lost its connection after the request was sent is metered CONSERVATIVELY (estimated
+//   input + max output), because the provider may still bill it; a request that never left
+//   ("unreachable") and the provider's own refusals (429, 4xx, 5xx) are metered at zero.
 // Errors carry a kind and a status code only, never a response body or a key.
 
 export interface CompletionRequest {
@@ -32,7 +33,11 @@ export interface ProfessorProvider {
   complete(req: CompletionRequest): Promise<CompletionResult>;
 }
 
-export type ProviderErrorKind = "network" | "timeout" | "rate_limited" | "server" | "key_rejected" | "bad_request" | "not_configured" | "aborted";
+/**
+ * "unreachable": the request never left (connection refused, DNS failure): billed nothing.
+ * "network": the connection failed AFTER the request was sent: the provider may still bill it.
+ */
+export type ProviderErrorKind = "unreachable" | "network" | "timeout" | "rate_limited" | "server" | "key_rejected" | "bad_request" | "not_configured" | "aborted";
 
 /** A provider failure. Its message is built from the kind and status only (never a body or key). */
 export class ProviderError extends Error {
@@ -53,7 +58,9 @@ export function kindOfStatus(status: number): ProviderErrorKind {
   return "bad_request";
 }
 
-const RETRYABLE: ReadonlySet<ProviderErrorKind> = new Set(["network", "timeout", "rate_limited", "server"]);
+const RETRYABLE: ReadonlySet<ProviderErrorKind> = new Set(["unreachable", "network", "timeout", "rate_limited", "server"]);
+/** Failures after the request was sent, which a provider may still bill: metered conservatively. */
+const MAY_BE_BILLED: ReadonlySet<ProviderErrorKind> = new Set(["network", "timeout", "aborted"]);
 
 /** One call to the provider, for metering: its usage (zero when nothing was billed) and outcome. */
 export interface Attempt {
@@ -116,7 +123,7 @@ export async function completeWithPolicy(provider: ProfessorProvider, req: Compl
             ? err
             : new ProviderError("network");
       // The request was sent: a timeout or an abort may still be billed, so charge the most it could cost.
-      o.onAttempt({ usage: failure.kind === "timeout" || failure.kind === "aborted" ? conservative : zero, outcome: failure.kind });
+      o.onAttempt({ usage: MAY_BE_BILLED.has(failure.kind) ? conservative : zero, outcome: failure.kind });
     } finally {
       clearTimeout(timer);
       req.signal.removeEventListener("abort", onAbort);

@@ -89,7 +89,11 @@ solvers → compile (placeholders filled, three significant figures) → events.
 - **Each provider attempt is metered as it ends**, even after the turn has timed out or been
   interrupted. A timed-out or aborted attempt is charged its estimated input + max output (the
   provider may still bill it); 429, 5xx and other refusals are charged zero; a request that never
-  reached a provider (no key, no config) is not metered at all.
+  reached a provider (no key, no config) is not metered at all. A connection lost *after* the request
+  was sent (`network`) is charged like a timeout; one that never left (`unreachable`: refused, DNS) is zero.
+- **Why the pre-turn check counts two attempts, not four**: a transport retry inside either call is
+  metered when it happens, so the ledger stays right; and the provider's own monthly limit, set by
+  Lucky, is the real ceiling.
 - **The ledger is in memory only**: lost on restart, separate per server instance, keyed by page
   session. **Per-user and global caps (and daily limits, rate limits, spike alerts) need the
   database** (deferred stage) and M7. Voice and hosting costs are 0 in config: not metered yet.

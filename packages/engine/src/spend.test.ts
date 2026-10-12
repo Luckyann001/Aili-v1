@@ -160,6 +160,15 @@ describe("metering attempts that may still be billed", () => {
     expect(p.map((e) => e.output_tokens)).toEqual([max]);
   });
 
+  it("a connection lost AFTER the request was sent is metered conservatively; one that never left is zero", async () => {
+    const sent = liveTurn([{ network_error: true }, { network_error: true }]);
+    await sent.run();
+    expect(sent.ledger.entries("p").filter((e) => e.model === "professor").map((e) => e.output_tokens)).toEqual([max, max]);
+    const never = liveTurn([{ unreachable: true }, { unreachable: true }]);
+    await never.run();
+    expect(never.ledger.entries("p").filter((e) => e.model === "professor").map((e) => e.cost_micro_usd)).toEqual([0, 0]); // both tried (retried once), nothing billed
+  });
+
   it("a refused 429 or 5xx is metered at zero; a request that never reached the provider is not metered", async () => {
     const t = liveTurn([{ status: 429 }, { status: 503 }]);
     await t.run();

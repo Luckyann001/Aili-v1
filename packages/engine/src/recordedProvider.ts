@@ -8,7 +8,10 @@ import { ProviderError, kindOfStatus, type CompletionRequest, type CompletionRes
 export type RecordedStep =
   | { ok: { json: unknown; input_tokens: number; output_tokens: number; latency_ms?: number } }
   | { status: number }
+  /** The connection failed after the request was sent. */
   | { network_error: true }
+  /** The request never left (connection refused, DNS failure). */
+  | { unreachable: true }
   /** Never answers until aborted (a hung connection). */
   | { hang: true };
 
@@ -44,6 +47,7 @@ export class RecordedProvider implements ProfessorProvider {
       throw new ProviderError("aborted");
     }
     if ("network_error" in step) throw new ProviderError("network");
+    if ("unreachable" in step) throw new ProviderError("unreachable");
     if ("status" in step) throw new ProviderError(kindOfStatus(step.status), step.status);
     await wait(step.ok.latency_ms ?? 0);
     return {
