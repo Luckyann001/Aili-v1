@@ -24,8 +24,17 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 | evidence | error | each ID is a shortlist reading; the error lists the valid reading IDs |
 | prediction needs its prompt | error | a `prediction` with no `prompt` (`prompt: missing …`), or with a prompt not of kind `prediction` (`prompt.kind …`) |
 | actions | error | the provider schema is flattened, so the strict action union checks each action's required fields, field types, no foreign fields, no unknown type |
+| mild praise | **warning** | `flattery_warn` phrases in `config/pedagogy-phrases.json` ("a fine start"); never a rejection |
+| prompt re-attached | **warning** (engine fallback) | an answer that re-offers an ALREADY-OPEN prediction id without its prompt gets the stored question and choices attached verbatim, before validation; counted in the bake-off summary. Never for a new prediction id |
+| one open question | error (pedagogy) | no new prompt while one is open; the one exception is re-offering the SAME open prediction (prompt kind `prediction`, same id), which updates it, never duplicates it |
 | analogy explained | **warning** | a tagged analogy's narration has a word from its title or mapping and a breakdown phrase (breaks down, unlike, differs, doesn't hold, not like, but a servo, whereas) |
-| every error at once | — | when the format check fails, narration length, concepts and evidence are still checked; the repair gets every error and the previous answer |
+| every error at once | — | when the format check fails, narration length, concepts and evidence are still checked; the repair gets every error and the previous answer, and is told to keep the content but add what the errors name, within four segments |
+
+The professor's `<session_state>` carries the real teaching state: open predictions (id, question,
+choices, status, guess), open items, waivers, and the open prompt's text, kind and choices.
+Learner level `unknown` (a goal statement) is not a true beginner: one plain baseline question first.
+In the bake-off, a scripted reply can declare what Aili's previous answer must be (`after`); if it
+no longer fits, the scenario reports "script diverged" and skips the rest (not a professor failure).
 
 ## One turn (`src/turn.ts`, `src/fakeDirector.ts`)
 `TurnSession.run(input, emit)`: shortlist → director → structural validator → pedagogy validator →
