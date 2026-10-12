@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "aili-turn-fixtures": [
+        "./src/turn/fixtureRegistry.ts"
       ]
     }
   },

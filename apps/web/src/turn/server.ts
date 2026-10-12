@@ -6,7 +6,9 @@ import { FAKE_DIRECTOR } from "./flags";
 // no provider, no key, no network. Without NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1 both return 404, and
 // the fixture registry import below is folded away at build time.
 
-const loadFixtureRegistry = FAKE_DIRECTOR ? () => import("./fixtureRegistry") : null;
+// "aili-turn-fixtures" is a build-time alias (next.config.ts): the real fixture registry only when the
+// flag is set, otherwise a stub with no fixture data, so production builds never contain the files.
+const loadFixtureRegistry = FAKE_DIRECTOR ? () => import("aili-turn-fixtures") : null;
 
 /** How long the "slow" case waits, so a person (or a test) can interrupt it. */
 export const SLOW_MS = 3000;
