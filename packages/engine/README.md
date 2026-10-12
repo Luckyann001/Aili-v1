@@ -24,7 +24,7 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 | evidence | error | each ID is a shortlist reading; the error lists the valid reading IDs |
 | prediction needs its prompt | error | a `prediction` with no `prompt` (`prompt: missing …`), or with a prompt not of kind `prediction` (`prompt.kind …`) |
 | actions | error | the provider schema is flattened, so the strict action union checks each action's required fields, field types, no foreign fields, no unknown type |
-| mild praise | **warning** | `flattery_warn` phrases in `config/pedagogy-phrases.json` ("a fine start"); never a rejection |
+| mild praise | **warning** | `flattery_warn` phrases in `config/pedagogy-phrases.json` ("a fine start"); never a rejection. The prompt also says not to open with a judgement of the learner's background or answer |
 | prompt re-attached | **warning** (engine fallback) | an answer that re-offers an ALREADY-OPEN prediction id without its prompt gets the stored question and choices attached verbatim, before validation; counted in the bake-off summary. Never for a new prediction id |
 | one open question | error (pedagogy) | no new prompt while one is open; the one exception is re-offering the SAME open prediction (prompt kind `prediction`, same id), which updates it, never duplicates it |
 | analogy explained | **warning** | a tagged analogy's narration has a word from its title or mapping and a breakdown phrase (breaks down, unlike, differs, doesn't hold, not like, but a servo, whereas) |
@@ -33,6 +33,9 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 The professor's `<session_state>` carries the real teaching state: open predictions (id, question,
 choices, status, guess), open items, waivers, and the open prompt's text, kind and choices.
 Learner level `unknown` (a goal statement) is not a true beginner: one plain baseline question first.
+The router also sees the open question (text, kind, choices) and is told that a short or partial reply
+on its topic counts as an answer. The bake-off logs the router's `answered_prompt` verdict on every
+turn and counts turns where it called a scripted direct answer (`direct_answer`) unanswered.
 In the bake-off, a scripted reply can declare what Aili's previous answer must be (`after`); if it
 no longer fits, the scenario reports "script diverged" and skips the rest (not a professor failure).
 
