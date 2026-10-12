@@ -272,7 +272,7 @@ describe("config: provider fields", () => {
 
 describe("no provider or model name in code", () => {
   // Names that would mean a provider or model was hard-coded. "CLAUDE.md" (the instructions file) is allowed.
-  const NAMES = /\b(openai|anthropic|gemini|mistral|llama|gpt-?\d|claude(?!\.md)|sonnet|haiku|opus)\b/i;
+  const NAMES = /\b(openai|anthropic|gemini|mistral|llama|gpt-?\d|claude(?!\\?\.md)|sonnet|haiku|opus)\b/i;
   const files = (dir: string): string[] =>
     readdirSync(dir).flatMap((name) => {
       const p = join(dir, name);
@@ -292,5 +292,7 @@ describe("no provider or model name in code", () => {
   it("the check itself catches a name (so it is not passing by accident)", () => {
     expect("const model = 'gpt-6.1-sol';").toMatch(NAMES);
     expect("// see CLAUDE.md").not.toMatch(NAMES);
+    expect("/CLAUDE\\.md/").not.toMatch(NAMES); // the file name inside a regex
+    expect("model: 'claude-x'").toMatch(NAMES);
   });
 });
