@@ -268,6 +268,7 @@ describe("repair feedback", () => {
     expect(repair).toContain("<previous_answer>");
     expect(repair).toContain('"concepts":["servo"]');
     expect(repair).toContain("Keep its content and change only what these errors name");
+    expect(repair).toContain("If you add anything, fit it within the four segments (at most 160 characters each)");
   });
 });
 

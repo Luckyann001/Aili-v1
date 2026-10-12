@@ -1,7 +1,11 @@
 import type { AiConfig } from "@aili/schemas";
 import { completeWithPolicy, ProviderError, type Attempt, type ProfessorProvider } from "./provider";
 import { padEstimate } from "./metering";
+import { NARRATION_MAX_CHARS, NARRATION_MAX_SEGMENTS } from "./director";
 import { block, estimateTokens } from "./prompt";
+
+/** The narration segment limit in words, for the repair message ("within the four segments"). */
+const SEGMENTS = ["zero", "one", "two", "three", "four", "five", "six"][NARRATION_MAX_SEGMENTS] ?? String(NARRATION_MAX_SEGMENTS);
 import { DirectorCallFailed, type Director, type DirectorReply, type DirectorRequest } from "./turn";
 
 // A Director backed by a model provider (docs/m3-plan.md slice 2). Provider, model and the key's
@@ -38,7 +42,7 @@ export class ProviderDirector implements Director {
     // The repair shows the previous answer (as escaped DATA) and every error, so the model can keep the
     // content and change only what the errors name (Lucky's decision 2026-10-12).
     const repair = req.repair
-      ? `\n\n${block("previous_answer", JSON.stringify(req.repair.previous))}\n\nYour previous answer (above) failed these checks. Keep its content and change only what these errors name:\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
+      ? `\n\n${block("previous_answer", JSON.stringify(req.repair.previous))}\n\nYour previous answer (above) failed these checks. Keep its content and change only what these errors name. If you add anything, fit it within the ${SEGMENTS} segments (at most ${NARRATION_MAX_CHARS} characters each):\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
       : "";
     const estimatedInputTokens = padEstimate(this.o.config, estimateTokens(system) + estimateTokens(input + repair));
     const attempts: Attempt[] = [];
