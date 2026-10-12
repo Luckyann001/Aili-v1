@@ -73,6 +73,43 @@ solvers → compile (placeholders filled, three significant figures) → events.
 - **Tests** run against a local mock server on 127.0.0.1 with hand-written fixtures derived from
   the docs (`src/providers/__fixtures__/`), not real responses.
 
+## Provider-backed router (`src/providerRouter.ts`, `content/prompts/router.v1.md`; slice 7a)
+- The router model from `config/ai.json`, through the same adapters and retry rules as the director.
+  Classification output only (`ReplyClassification` as JSON Schema); the learner's text and a small
+  session state go in escaped DATA blocks. No repair attempt: an invalid classification fails the
+  turn as `router`. Each attempt is metered at router prices as it ends. A rejected key, a spending
+  limit or a refusal keep their own reason. `router.v1.md` is a draft for Lucky's review.
+- The fake router stays for CI and the demo.
+
+## Dry run (`scripts/dryRun.ts`; slice 7a)
+`npm run dry-run -w @aili/engine -- [--text "…"] [--show-prompt] [--preview-provider NAME] [--professor-model ID] [--router-model ID]`
+builds the router's and the professor's request for one turn through the real adapter, with a
+fetch that records and stops: nothing is sent, no key is read (a placeholder goes in, and the
+`x-api-key` header is masked in the output). Prints the model, max_tokens, thinking, effort, the
+estimated input tokens, the headers and the reduced output schema. The preview flags show the
+request as if config held those values; config is not changed.
+
+## Bake-off (`src/bakeoff/`, `scripts/bakeoff.ts`, `bakeoff/`; slice 7a)
+- **Scenarios** (`bakeoff/scenarios/`, 28): behavior spec A14 tests 1–11, 13 and 15–17 (12 and 14
+  are fully checked by code and need no model), 5 confident-but-wrong, 3 frustration, 2 out of
+  coverage, 2 safety, 1 "just tell me". Each has the few expectations code can check (move,
+  question, coverage, safety flag, reading) and `reviewer_notes` for the rest. They run against
+  the **test-fixture registry** (two concepts, one reading, no analogies), so many exercise the
+  "not supported yet" path.
+- **Recorded mode** (`npm run bakeoff -w @aili/engine`): replays `bakeoff/recordings/<id>.json`;
+  no model, key or network. Only two hand-written recordings exist; other scenarios are skipped.
+- **Live mode** (`npm run bakeoff:live -w @aili/engine -- …`): node loads
+  `apps/web/.env.local` itself (the script never reads, prints or stores a key). Refuses to start
+  without `provider_monthly_limit_set`, both models and both keys, or with the kill switch on.
+  `--record` keeps the answers (never requests or keys) in `recordings-for-review/`, kept only after review.
+- **Hard cap**: `bakeoff_cap_micro_usd` (3 USD), checked before every turn against everything spent
+  plus the next turn's worst case. A transport retry inside a turn can still add a little beyond it;
+  the provider's own monthly limit is the real ceiling. **Stops at the first unexpected failure**
+  unless `--keep-going`. `--scenario a,b`, `--category`, `--runs N`, `--max-turns N`.
+- **Output** (`bakeoff-runs/<time>-<mode>/`, git-ignored): `summary.md` (pass rates first try and
+  after repair, expectations, latency median and slowest 5%, cost from the ledger, moves, explains
+  per question, most questions in a row), `results.json`, one transcript per scenario run.
+
 ## Prompt (`src/prompt.ts`, `content/prompts/professor.v1.md`)
 - **System prompt**: the versioned template with its review comments (one per rule, naming the spec
   section) removed. The template is a draft for Lucky's review.
