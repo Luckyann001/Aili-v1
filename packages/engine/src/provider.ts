@@ -24,8 +24,10 @@ export interface CompletionRequest {
 }
 
 export interface CompletionResult {
+  /** The parsed answer, or null when the output was not valid JSON (the validators then reject it). */
   json: unknown;
-  usage: TokenUsage;
+  /** Tokens the provider reported. Absent: metered conservatively (estimated input + max output). */
+  usage?: TokenUsage;
   latencyMs: number;
 }
 
@@ -37,13 +39,19 @@ export interface ProfessorProvider {
  * "unreachable": the request never left (connection refused, DNS failure): billed nothing.
  * "network": the connection failed AFTER the request was sent: the provider may still bill it.
  */
-export type ProviderErrorKind = "unreachable" | "network" | "timeout" | "rate_limited" | "server" | "key_rejected" | "bad_request" | "not_configured" | "aborted";
+/**
+ * "spend_limit": a monthly spending limit was reached (the one Lucky set, or the provider tier's
+ * cap); retrying cannot help. "refused": the model declined the request (billed, not retried).
+ */
+export type ProviderErrorKind = "spend_limit" | "refused" | "unreachable" | "network" | "timeout" | "rate_limited" | "server" | "key_rejected" | "bad_request" | "not_configured" | "aborted";
 
 /** A provider failure. Its message is built from the kind and status only (never a body or key). */
 export class ProviderError extends Error {
   constructor(
     readonly kind: ProviderErrorKind,
     readonly status?: number,
+    /** Tokens the provider reported for this failed call (a refusal is billed), if it reported any. */
+    readonly usage?: TokenUsage,
   ) {
     super(status === undefined ? `provider: ${kind}` : `provider: ${kind} (HTTP ${status})`);
     this.name = "ProviderError";
@@ -111,7 +119,7 @@ export async function completeWithPolicy(provider: ProfessorProvider, req: Compl
     let failure: ProviderError;
     try {
       const result = await provider.complete({ ...req, signal: ac.signal });
-      o.onAttempt({ usage: result.usage, outcome: "ok" });
+      o.onAttempt({ usage: result.usage ?? conservative, outcome: "ok" });
       return result;
     } catch (err) {
       // The turn's interrupt wins; then this attempt's own timer; then the provider's own error.
@@ -123,7 +131,7 @@ export async function completeWithPolicy(provider: ProfessorProvider, req: Compl
             ? err
             : new ProviderError("network");
       // The request was sent: a timeout or an abort may still be billed, so charge the most it could cost.
-      o.onAttempt({ usage: MAY_BE_BILLED.has(failure.kind) ? conservative : zero, outcome: failure.kind });
+      o.onAttempt({ usage: failure.usage ?? (MAY_BE_BILLED.has(failure.kind) ? conservative : zero), outcome: failure.kind });
     } finally {
       clearTimeout(timer);
       req.signal.removeEventListener("abort", onAbort);

@@ -37,10 +37,12 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
  */
 export type TextPart = { text: string } | { value: string; calc_id: string; output: string };
 
-export type TurnFailure = "limit_not_recorded" | "not_configured" | "key_rejected" | "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
+export type TurnFailure = "spend_limit" | "refused" | "limit_not_recorded" | "not_configured" | "key_rejected" | "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
 
 /** Plain words for the learner. Details go to the event's `details` for developers and logs. */
 export const FAILURE_MESSAGES: Record<TurnFailure, string> = {
+  spend_limit: "The monthly spending limit for live answers has been reached. Prepared lessons still work. Nothing on the stage changed.",
+  refused: "The AI model declined to answer this. Prepared lessons still work. Nothing on the stage changed.",
   limit_not_recorded: "Live answers are off until a monthly spending limit is set with the AI provider and recorded. Prepared lessons still work. Nothing on the stage changed.",
   not_configured: "Live answers aren't set up on this computer. Prepared lessons still work. Nothing on the stage changed.",
   key_rejected: "The AI provider didn't accept the key set up on this computer. Prepared lessons still work. Nothing on the stage changed.",
@@ -311,7 +313,8 @@ export class TurnSession {
         }
         if (rev !== this.rev) return "stale"; // interrupted: nothing more to say for this turn
         if (err instanceof TimeoutError) return "timeout";
-        if (err instanceof DirectorCallFailed) return err.kind === "not_configured" || err.kind === "key_rejected" || err.kind === "timeout" ? err.kind : "director";
+        if (err instanceof DirectorCallFailed)
+          return err.kind === "not_configured" || err.kind === "key_rejected" || err.kind === "timeout" || err.kind === "spend_limit" || err.kind === "refused" ? err.kind : "director";
         return "director";
       }
     };

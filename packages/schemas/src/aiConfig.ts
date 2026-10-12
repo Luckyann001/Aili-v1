@@ -14,6 +14,12 @@ const ModelPricing = z
     api_key_env: z.string().regex(/^AILI_[A-Z0-9_]+_API_KEY$/, "api_key_env is a variable NAME like AILI_PROFESSOR_API_KEY, never a key"),
     /** The most output tokens one call may produce (also used for the worst-case spend check). */
     max_output_tokens: z.number().int().positive().max(16_000),
+    /**
+     * Optional request settings passed to the provider's adapter as they are (a thinking type and
+     * an effort level). Unset: the provider's default. Thinking tokens count toward max_output_tokens.
+     */
+    thinking: z.enum(["adaptive", "between_tools", "disabled"]).optional(),
+    effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
     price_micro_usd_per_million_tokens: z.object({ input: MicroUsd, output: MicroUsd }).strict(),
     pricing_status: z.string().min(1),
   })

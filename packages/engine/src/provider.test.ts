@@ -272,8 +272,11 @@ describe("config: provider fields", () => {
 });
 
 describe("no provider or model name in code", () => {
-  // Names that would mean a provider or model was hard-coded. "CLAUDE.md" (the instructions file) is allowed.
-  const NAMES = /\b(openai|anthropic|gemini|mistral|llama|gpt-?\d|claude(?!\\?\.md)|sonnet|haiku|opus)\b/i;
+  // Provider names may appear only in the provider adapters (src/providers/), which are provider
+  // code by nature. Model IDs may appear nowhere in code: they live only in config/ai.json.
+  // "CLAUDE.md" (the instructions file) is allowed.
+  const PROVIDER_NAMES = /\b(openai|anthropic|gemini|mistral|llama|claude(?!\\?\.md)|sonnet|haiku|opus)\b/i;
+  const MODEL_IDS = /\b(gpt-?\d[\w.-]*|claude-[a-z]+-[\w.-]+|gemini-[\w.-]+|(sonnet|haiku|opus)-\d[\w.-]*)\b/i;
   const files = (dir: string): string[] =>
     readdirSync(dir).flatMap((name) => {
       const p = join(dir, name);
@@ -281,19 +284,27 @@ describe("no provider or model name in code", () => {
       if (statSync(p).isDirectory()) return files(p);
       return /\.(ts|tsx|js|mjs)$/.test(name) && !p.endsWith("provider.test.ts") ? [p] : [];
     });
+  const root = new URL(".", ROOT).pathname;
+  const all = () => [...files(join(root, "packages")), ...files(join(root, "apps/web/src")), ...files(join(root, "apps/web/e2e"))];
+  const inProviders = (f: string) => f.includes("/packages/engine/src/providers/");
 
-  it("no source file in the packages or the web app names one (they live only in config/ai.json)", () => {
-    const root = new URL(".", ROOT).pathname;
-    const all = [...files(join(root, "packages")), ...files(join(root, "apps/web/src")), ...files(join(root, "apps/web/e2e"))];
-    expect(all.length).toBeGreaterThan(20);
-    const hits = all.flatMap((f) => (readFileSync(f, "utf8").match(NAMES) ? [`${f}: ${readFileSync(f, "utf8").match(NAMES)![0]}`] : []));
+  it("provider names appear only in the provider adapters", () => {
+    const list = all();
+    expect(list.length).toBeGreaterThan(20);
+    const hits = list.filter((f) => !inProviders(f)).flatMap((f) => (readFileSync(f, "utf8").match(PROVIDER_NAMES) ? [`${f}: ${readFileSync(f, "utf8").match(PROVIDER_NAMES)![0]}`] : []));
     expect(hits).toEqual([]);
   });
 
-  it("the check itself catches a name (so it is not passing by accident)", () => {
-    expect("const model = 'gpt-6.1-sol';").toMatch(NAMES);
-    expect("// see CLAUDE.md").not.toMatch(NAMES);
-    expect("/CLAUDE\\.md/").not.toMatch(NAMES); // the file name inside a regex
-    expect("model: 'claude-x'").toMatch(NAMES);
+  it("model IDs appear in no code at all, the adapters included", () => {
+    const hits = all().flatMap((f) => (readFileSync(f, "utf8").match(MODEL_IDS) ? [`${f}: ${readFileSync(f, "utf8").match(MODEL_IDS)![0]}`] : []));
+    expect(hits).toEqual([]);
+  });
+
+  it("the checks themselves catch a name and an ID (so they are not passing by accident)", () => {
+    expect("const provider = 'anthropic';").toMatch(PROVIDER_NAMES);
+    expect("// see CLAUDE.md").not.toMatch(PROVIDER_NAMES);
+    expect("/CLAUDE\\.md/").not.toMatch(PROVIDER_NAMES);
+    for (const id of ["claude-sonnet-5-5", "claude-haiku-5-5", "gpt-6.1-sol", "sonnet-5"]) expect(`model: "${id}"`, id).toMatch(MODEL_IDS);
+    expect("x-api-key header").not.toMatch(MODEL_IDS);
   });
 });
