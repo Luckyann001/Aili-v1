@@ -1,4 +1,5 @@
 import type { FakeCase } from "@aili/schemas";
+import type { TokenUsage } from "./metering";
 import type { Director, DirectorRequest } from "./turn";
 
 // A scripted stand-in for the professor model (docs/m2-plan.md slice 5). No provider, no key, no
@@ -61,11 +62,17 @@ export function fakeResponse(c: FakeCase, req: DirectorRequest): unknown {
  * A director that plays `cases` in order, one per turn (the last one repeats). The "slow" case
  * waits `slowMs` and gives up as soon as the turn is interrupted.
  */
-export function createFakeDirector(cases: FakeCase | FakeCase[], opts: { slowMs?: number } = {}): Director & { calls: number } {
+/**
+ * Token counts the fake director reports for every turn (a scripted field, so tests can cross the
+ * session cap). Counts only: prices come from config.
+ */
+export const FAKE_USAGE: TokenUsage = { model: "professor", input_tokens: 1500, output_tokens: 400 };
+
+export function createFakeDirector(cases: FakeCase | FakeCase[], opts: { slowMs?: number; usage?: TokenUsage } = {}): Director & { calls: number } {
   const list = Array.isArray(cases) ? cases : [cases];
   const d = {
     calls: 0,
-    async respond(req: DirectorRequest, signal: AbortSignal): Promise<unknown> {
+    async respond(req: DirectorRequest, signal: AbortSignal) {
       const c = list[Math.min(d.calls, list.length - 1)]!;
       d.calls++;
       if (c === "slow") {
@@ -77,7 +84,7 @@ export function createFakeDirector(cases: FakeCase | FakeCase[], opts: { slowMs?
           }, { once: true });
         });
       }
-      return fakeResponse(c, req);
+      return { response: fakeResponse(c, req), usage: opts.usage ?? FAKE_USAGE };
     },
   };
   return d;

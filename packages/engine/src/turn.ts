@@ -4,6 +4,8 @@ import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
 import { validateDirectorResponse } from "./director";
 import { givesBack, validatePedagogy } from "./pedagogy";
+import type { AiConfig } from "@aili/schemas";
+import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
 
 // One turn, end to end (docs/m2-plan.md slice 5):
 //   shortlist → director → validateDirectorResponse → validatePedagogy → solver → compile → events.
@@ -30,7 +32,7 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
  */
 export type TextPart = { text: string } | { value: string; calc_id: string; output: string };
 
-export type TurnFailure = "director" | "timeout" | "validation" | "pedagogy" | "solver";
+export type TurnFailure = "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
 
 /** Plain words for the learner. Details go to the event's `details` for developers and logs. */
 export const FAILURE_MESSAGES: Record<TurnFailure, string> = {
@@ -39,6 +41,8 @@ export const FAILURE_MESSAGES: Record<TurnFailure, string> = {
   validation: "Aili's answer didn't pass its checks, so it wasn't shown. Nothing on the stage changed.",
   pedagogy: "Aili's answer broke a teaching rule, so it wasn't shown. Nothing on the stage changed.",
   solver: "A calculation couldn't run, so nothing was shown. Nothing on the stage changed.",
+  kill_switch: "Aili's live answers are switched off right now. Prepared lessons still work. Nothing on the stage changed.",
+  session_cap: "This session has reached its limit for live answers. Prepared lessons still work. Nothing on the stage changed.",
 };
 
 export interface DirectorRequest {
@@ -50,9 +54,15 @@ export interface DirectorRequest {
   learner_text: string;
 }
 
-/** The professor model in M3; a scripted fake in M2. Returns raw JSON, which is validated here. */
+/** What a director call returns: the raw response (validated here) and the tokens it used. */
+export interface DirectorReply {
+  response: unknown;
+  usage?: TokenUsage;
+}
+
+/** The professor model in M3; a scripted fake in M2. */
 export interface Director {
-  respond(req: DirectorRequest, signal: AbortSignal): Promise<unknown>;
+  respond(req: DirectorRequest, signal: AbortSignal): Promise<DirectorReply>;
 }
 
 /** A solver as the pipeline calls it: unit-named inputs in, unit-named numeric outputs out. */
@@ -102,6 +112,11 @@ export interface TurnSessionOptions {
    * server can hand it back to the client for the next turn. M3 keeps state on the server instead.
    */
   includeStateInDone?: boolean;
+  /**
+   * Metering (slice 7): the kill switch and this session's cap are checked before the director is
+   * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
+   */
+  meter?: { ledger: Ledger; sessionId: string; config: AiConfig; killSwitch: boolean };
 }
 
 /** Numbers shown to learners: three significant figures, no exponent for ordinary values. */
@@ -153,10 +168,17 @@ export class TurnSession {
     };
     const sl = shortlist(this.opts.registry, { concepts: this.opts.concepts, level: this.opts.level });
 
+    // Refused before it starts: the kill switch, or this session's cap already reached.
+    const meter = this.opts.meter;
+    if (meter) {
+      const refusal = refuseTurn({ killSwitch: meter.killSwitch, ledger: meter.ledger, sessionId: meter.sessionId, config: meter.config });
+      if (refusal) return fail(refusal, [refusal === "kill_switch" ? "AILI_AI_KILL_SWITCH=1" : `spent ${meter.ledger.spent(meter.sessionId)} of ${meter.config.session_cap_micro_usd} micro-USD`]);
+    }
+
     // Director (with a timeout and the interrupt signal).
-    let raw: unknown;
+    let reply: DirectorReply;
     try {
-      raw = await withTimeout(
+      reply = await withTimeout(
         this.opts.director.respond({ request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text }, abort.signal),
         this.opts.timeoutMs ?? 20_000,
         abort.signal,
@@ -165,7 +187,10 @@ export class TurnSession {
       if (rev !== this.rev) return; // interrupted: nothing more to say for this turn
       return fail(err instanceof TimeoutError ? "timeout" : "director", [errorText(err)]);
     }
+    // Tokens were spent whether or not the response passes the checks: record them first.
+    if (meter && reply.usage) meter.ledger.record(meter.sessionId, { ...reply.usage, turn_id, cost_micro_usd: costMicroUsd(reply.usage, meter.config) });
     if (rev !== this.rev) return;
+    const raw = reply.response;
 
     // Validate: structure, then pedagogy.
     const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev } });
