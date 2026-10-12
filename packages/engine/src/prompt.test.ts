@@ -208,7 +208,8 @@ describe("first live run fixes (2026-10-12)", () => {
     const s = systemPrompt(TEMPLATE);
     expect(s).toContain("Aim for at most 140 characters each");
     expect(s).toContain(`${NARRATION_MAX_CHARS} is the hard limit`);
-    expect(s).toMatch(/keep its content and change only what the errors name/);
+    expect(s).toMatch(/keep its content and change only what the errors name; add what the errors name, even if that changes the answer/);
+    expect(s).toMatch(/If learner_level is "unknown" .*first ask one plain question \(prompt kind "question", not a prediction\) about what the learner already knows or has built/);
     expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction"/);
     expect(s).toMatch(/A prediction always comes with its prompt: never send "prediction" without "prompt"/);
     expect(s).toMatch(/When a prediction is still open .* re-offer the same question more simply, as prompt kind "prediction" with the same "prediction" id\. Never ask a new question while it is open\./);

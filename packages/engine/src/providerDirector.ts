@@ -42,7 +42,7 @@ export class ProviderDirector implements Director {
     // The repair shows the previous answer (as escaped DATA) and every error, so the model can keep the
     // content and change only what the errors name (Lucky's decision 2026-10-12).
     const repair = req.repair
-      ? `\n\n${block("previous_answer", JSON.stringify(req.repair.previous))}\n\nYour previous answer (above) failed these checks. Keep its content and change only what these errors name. If you add anything, fit it within the ${SEGMENTS} segments (at most ${NARRATION_MAX_CHARS} characters each):\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
+      ? `\n\n${block("previous_answer", JSON.stringify(req.repair.previous))}\n\nYour previous answer (above) failed these checks. Keep its content and change only what these errors name; add what the errors name, even if that changes the answer. If you add anything, fit it within the ${SEGMENTS} segments (at most ${NARRATION_MAX_CHARS} characters each):\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
       : "";
     const estimatedInputTokens = padEstimate(this.o.config, estimateTokens(system) + estimateTokens(input + repair));
     const attempts: Attempt[] = [];

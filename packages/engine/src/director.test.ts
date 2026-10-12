@@ -333,3 +333,15 @@ describe("mild praise is a warning only (config flattery_warn; Lucky's decision 
     }
   });
 });
+
+describe("the re-offer example in professor.v1.md (Lucky's decision 2026-10-12)", () => {
+  it("is labelled format only, keeps the id, carries the full prompt, and passes the validator", () => {
+    const template = readFileSync(new URL("../../../content/prompts/professor.v1.md", import.meta.url), "utf8");
+    const line = template.split("\n").find((l) => l.startsWith("Example of a re-offer (format only; write your own wording):"))!;
+    const example = JSON.parse(`{${line.slice(line.indexOf('"prompt"'), line.indexOf("<!--")).trim()}}`);
+    expect(example.prediction.id).toBe("wrench-grip-distance");
+    expect(example.prompt).toEqual(expect.objectContaining({ kind: "prediction", chips: expect.arrayContaining(["Not sure"]) }));
+    expect(line).not.toMatch(/servo|ruler/i);
+    expect(errs(example)).toEqual([]);
+  });
+});

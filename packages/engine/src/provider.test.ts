@@ -267,7 +267,7 @@ describe("repair feedback", () => {
     // the previous answer travels with the errors, as escaped data, so the content can be kept
     expect(repair).toContain("<previous_answer>");
     expect(repair).toContain('"concepts":["servo"]');
-    expect(repair).toContain("Keep its content and change only what these errors name");
+    expect(repair).toContain("Keep its content and change only what these errors name; add what the errors name, even if that changes the answer.");
     expect(repair).toContain("If you add anything, fit it within the four segments (at most 180 characters each)");
   });
 });
