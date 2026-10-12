@@ -27,8 +27,13 @@ solvers → compile (placeholders filled, three significant figures) → events.
 - **Director**: an interface. M2 has only `createFakeDirector` (scripted cases: valid, invalid-id,
   out-of-bounds, hard-coded-number, pedagogy-violation, solver-failure, slow). It answers from the
   test-fixture shortlist, so it works only with the dev fixture registry. No provider, key or network.
-- **State** (`SessionState`: history and the scene on stage) is in memory; saving it waits for the
-  database (deferred stage).
+- **State** (`SessionState`: history, open prompt, scene on stage) lives on the **server**, in
+  `InMemorySessionStore` keyed by page session (bounded, idle sessions forgotten). Only a completed
+  turn commits, and never over a newer one. The client sends only its text (M3 hard rule). In
+  memory only: lost on restart and separate per server instance until the database stage.
+- **Router** (`src/router.ts`): classifies each reply on the server (answered, pushback, new
+  evidence); its output is validated and metered at router prices. M3 slice 1 has only the fake
+  router, with fixed rules; the real one is a cheap model.
 
 ## Metering, cap and kill switch (`src/metering.ts`)
 - **Prices only from `config/ai.json`** (validated by `AiConfig`): integer micro-USD per million
