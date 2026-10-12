@@ -185,7 +185,7 @@ describe("the router classifies the reply on the server", () => {
 });
 
 describe("session store (in memory)", () => {
-  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false })) } });
+  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null })) } });
 
   it("commits only a newer revision; an older turn finishing late cannot overwrite it", () => {
     const st = new InMemorySessionStore();

@@ -12,7 +12,7 @@ const history: SessionHistory = {
   posture: "learning",
   learner_level: "some_knowledge",
   entries: [
-    { kind: "learner", answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false },
+    { kind: "learner", answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null },
     { kind: "aili", move: "explain", asked: true, gave_back: true, concepts: ["mech.torque.static"], safety: false },
   ],
 };
