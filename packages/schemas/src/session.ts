@@ -48,3 +48,19 @@ export const SessionHistory = z
   })
   .strict();
 export type SessionHistory = z.infer<typeof SessionHistory>;
+
+/**
+ * The router's classification of one learner reply (a cheap model in M3; a fake in tests).
+ * Validated like any model output before the pedagogy validator reads it.
+ */
+export const ReplyClassification = z
+  .object({
+    /** The reply answers the open prompt ("Not sure" counts). */
+    answered_prompt: z.boolean(),
+    /** The learner disagrees with Aili's position. */
+    pushback: z.boolean(),
+    /** The disagreement brings new evidence (a source, a measurement, a valid calculation). */
+    new_evidence: z.boolean(),
+  })
+  .strict();
+export type ReplyClassification = z.infer<typeof ReplyClassification>;
