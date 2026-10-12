@@ -59,7 +59,20 @@ export const Scenario = z
     concepts: z.array(z.string().min(1)).min(1),
     level: z.enum(["L1", "L2", "L3"]),
     active_scene: z.string().min(1).optional(),
-    turns: z.array(z.object({ text: z.string().min(1), after: ScenarioAfter.optional(), expect: ScenarioExpect.optional() }).strict()).min(1).max(8),
+    turns: z
+      .array(
+        z
+          .object({
+            text: z.string().min(1),
+            after: ScenarioAfter.optional(),
+            /** The scripted reply is meant as a direct answer to Aili's open question (router check). */
+            direct_answer: z.literal(true).optional(),
+            expect: ScenarioExpect.optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(8),
     /** What the human reviewer checks in the transcript (what code cannot). */
     reviewer_notes: z.string().min(1),
   })

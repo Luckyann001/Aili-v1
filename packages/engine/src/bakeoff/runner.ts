@@ -31,6 +31,10 @@ export interface TurnRecord {
   move?: DirectorResponse["move"];
   response?: DirectorResponse;
   checks: CheckRecord[];
+  /** The router's verdict this turn: did the reply answer the open question, and was one open? */
+  router?: { answered_prompt: boolean; question_open: boolean };
+  /** The router said "unanswered" to a scripted direct answer while a question was open. */
+  router_missed_answer: boolean;
   /** Warnings on the answer that was shown (or the last one checked): never a rejection. */
   warnings: string[];
   /** Automatic expectations: each with its result. */
@@ -132,6 +136,7 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
       sessions.push(sessionId);
       const { director, router } = d.make(scenario, run, spent);
       const checks: CheckRecord[] = [];
+      const routed: { v?: TurnRecord["router"] } = {}; // set by onRoute during the turn
       const s = new TurnSession({
         registry: d.registry,
         director,
@@ -142,6 +147,7 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
         timeoutMs: d.timeoutMs,
         today: d.today,
         onCheck: (c) => checks.push(c),
+        onRoute: (r) => (routed.v = { answered_prompt: r.classification.answered_prompt, question_open: r.question_open }),
         meter: { ledger, sessionId, config: d.config, killSwitch: d.killSwitch?.() ?? false, live: d.live },
       });
       let response: DirectorResponse | undefined;
@@ -168,12 +174,14 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
           return { records, total_micro_usd: spent(), cap_micro_usd: cap, stopped: `bake-off cap: ${spent()} micro-USD spent + ${worst} worst case for the next turn would pass ${cap}` };
         }
         checks.length = 0;
+        routed.v = undefined;
         response = undefined;
         const before = ledger.entries(sessionId).length;
         const events: TurnEvent[] = [];
         const t0 = now();
         await s.run({ text: turn.text }, (e) => events.push(e));
         const latency_ms = now() - t0;
+        const verdict = routed.v as TurnRecord["router"]; // set by onRoute while the turn ran
         const lastEvent = events.at(-1);
         const outcome = lastEvent?.type === "turn.done" ? "done" : lastEvent?.type === "turn.error" ? lastEvent.reason : "director";
         const passed = checks.find((c) => c.outcome === "pass") as (CheckRecord & { response?: DirectorResponse }) | undefined;
@@ -190,6 +198,8 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
           ...partial,
           checks: checks.map(({ attempt, outcome, errors, warnings }) => ({ attempt, outcome, errors, warnings })),
           warnings: (passed ?? checks.at(-1))?.warnings ?? [],
+          router: verdict,
+          router_missed_answer: !!turn.direct_answer && !!verdict?.question_open && !verdict.answered_prompt,
           expectations,
           usage: [...usage],
           cost_micro_usd: usage.reduce((sum, e) => sum + e.cost_micro_usd, 0),

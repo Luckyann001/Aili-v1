@@ -28,12 +28,14 @@
           "teach_back"
         ]
       },
+      "direct_answer": true,
       "expect": {
         "asks": true
       }
     },
     {
-      "text": "A moment is force times the perpendicular distance from the pivot, so moving the load out raises the torque the servo must give."
+      "text": "A moment is force times the perpendicular distance from the pivot, so moving the load out raises the torque the servo must give.",
+      "direct_answer": true
     }
   ],
   "reviewer_notes": "The vague summary gets a follow-up question; the good one gets the guide's application question. No mastery claim, no verdict or score."

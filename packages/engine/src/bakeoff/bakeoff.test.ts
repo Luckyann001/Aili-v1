@@ -244,3 +244,30 @@ describe("the re-attach fallback is counted in the summary", () => {
     expect(summaryMarkdown(r as never, { mode: "recorded", started: "now", models: "x" })).toContain("| Prompts re-attached from stored state (engine fallback) | 1 |");
   });
 });
+
+describe("router verdicts in the bake-off (Lucky's decision 2026-10-12)", () => {
+  it("every turn logs the router's answered_prompt; a scripted direct answer called unanswered is counted", async () => {
+    const rec = recording("s03-true-beginner");
+    const cls = (answered: boolean) => ({ ok: { json: { answered_prompt: answered, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null }, input_tokens: 500, output_tokens: 40 } });
+    const valid = (rec.professor.steps[1] as { ok: { json: object } }).ok;
+    const two = { ...rec, router: { source: "test", steps: [cls(false), cls(false)] }, professor: { source: "test", steps: [{ ok: valid }, { ok: { ...valid, json: { ...valid.json, request_id: "turn_2", state_rev: 2 } } }] } };
+    const s03 = byId("s03-true-beginner");
+    const scripted = { ...s03, turns: [s03.turns[0]!, { text: "Closer to my hand.", direct_answer: true as const }] };
+    const r = await runBakeoff([scripted], 1, deps({ "s03-true-beginner": two as never }, { stopOnUnexpected: false }));
+    const [t1, t2] = r.records[0]!.turns;
+    expect(t1!.router).toEqual({ answered_prompt: false, question_open: false });
+    expect(t1!.router_missed_answer).toBe(false); // no question was open: "unanswered" is right
+    expect(t2!.router).toEqual({ answered_prompt: false, question_open: true });
+    expect(t2!.router_missed_answer).toBe(true);
+    expect(metrics(r.records[0]!.turns).router_missed).toBe(1);
+    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "x" })).toContain(`| Router said "unanswered" to a scripted direct answer | 1 |`);
+    const tr = transcriptMarkdown(r.records[0]!, "recorded");
+    expect(tr).toContain("*Router:* answered_prompt **false** (a question was not open)");
+    expect(tr).toContain("*Router:* answered_prompt **false** (a question was open) — **the script meant this as a direct answer**");
+  });
+
+  it("the scripted direct answers are marked in the scenario files", () => {
+    expect(byId("s02-goal-statement").turns[1]!.direct_answer).toBe(true);
+    expect(scenarios.filter((x) => x.s.turns.some((t) => t.direct_answer)).map((x) => x.s.id).sort()).toEqual(["f1-this-is-pointless", "s02-goal-statement", "s04-wrong-prediction", "s06-frustration", "s08-teach-back"]);
+  });
+});

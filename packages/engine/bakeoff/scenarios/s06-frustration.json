@@ -18,13 +18,15 @@
       "text": "I don't know.",
       "after": {
         "asks": true
-      }
+      },
+      "direct_answer": true
     },
     {
       "text": "I don't know.",
       "after": {
         "asks": true
       },
+      "direct_answer": true,
       "expect": {
         "moves": [
           "explain",

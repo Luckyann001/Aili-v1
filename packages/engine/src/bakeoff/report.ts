@@ -35,6 +35,8 @@ export interface Metrics {
   warnings: number;
   /** Turns whose prompt the engine re-attached from stored state (a re-offer without its prompt). */
   reattached: number;
+  /** Turns where the router said "unanswered" to a scripted direct answer while a question was open. */
+  router_missed: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -72,6 +74,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     expectations: [exp.filter((e) => e.pass).length, exp.length],
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
+    router_missed: turns.filter((t) => t.router_missed_answer).length,
     reattached: turns.filter((t) => t.warnings.some((w) => w.startsWith(PROMPT_REATTACHED))).length,
   };
 }
@@ -110,6 +113,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Failures | ${movesText(m.failures)} |`,
     `| Warnings (semantic, for review; never a rejection) | ${m.warnings} |`,
     `| Prompts re-attached from stored state (engine fallback) | ${m.reattached} |`,
+    `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
     "",
     "## Per scenario",
     "",
@@ -141,6 +145,8 @@ export function transcriptMarkdown(r: ScenarioRecord, mode: "recorded" | "live")
   const diverged = r.diverged;
   for (const t of r.turns) {
     out.push(`## Turn ${t.index}`, "", `**Learner:** ${t.learner}`, "");
+    if (t.router)
+      out.push(`*Router:* answered_prompt **${t.router.answered_prompt}** (a question was ${t.router.question_open ? "open" : "not open"})${t.router_missed_answer ? " — **the script meant this as a direct answer**" : ""}`, "");
     for (const e of t.events) {
       if (e.type === "narration") out.push(`**Aili:** ${e.text}`, "");
       else if (e.type === "prompt") out.push(`**Aili asks:** ${e.text}${e.chips.length ? `  \nChoices: ${e.chips.map((c) => `[${c}]`).join(" ")}` : ""}`, "");

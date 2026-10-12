@@ -31,6 +31,7 @@
           "question"
         ]
       },
+      "direct_answer": true,
       "expect": {
         "moves": [
           "explain"

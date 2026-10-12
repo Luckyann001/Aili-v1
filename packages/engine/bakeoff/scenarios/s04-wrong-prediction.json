@@ -18,7 +18,8 @@
       "text": "I think it makes no difference where the weight is.",
       "after": {
         "asks": true
-      }
+      },
+      "direct_answer": true
     },
     {
       "text": "Why was I wrong?",

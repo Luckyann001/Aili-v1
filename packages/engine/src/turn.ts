@@ -169,6 +169,8 @@ export interface TurnSessionOptions {
    * Observes each check of a director answer (the bake-off's first-try and after-repair pass rates):
    * attempt 1 is the first answer, attempt 2 the repair. On a pass, the validated response.
    */
+  /** Observes the router's validated classification each turn, and whether a question was open (bake-off logs). */
+  onRoute?: (r: { classification: ReplyClassification; question_open: boolean }) => void;
   onCheck?: (c: { attempt: 1 | 2; outcome: "pass" | "validation" | "pedagogy"; errors: string[]; warnings: string[]; response?: DirectorResponse }) => void;
   /**
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
@@ -289,6 +291,7 @@ export class TurnSession {
     const classified = ReplyClassification.safeParse(routed.classification);
     if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
     const c = classified.data;
+    this.opts.onRoute?.({ classification: c, question_open: openPrompt(before.history) !== null });
     const history: SessionHistory = {
       ...before.history,
       entries: [

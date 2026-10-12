@@ -18,7 +18,8 @@
       "text": "idk",
       "after": {
         "asks": true
-      }
+      },
+      "direct_answer": true
     },
     {
       "text": "This is pointless.",
