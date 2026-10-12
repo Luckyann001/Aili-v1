@@ -1,0 +1,74 @@
+{
+  "source": "hand-written for slice 2 (not from a real model): one valid explain turn on the test fixtures, as turn_1 at revision 1",
+  "steps": [
+    {
+      "ok": {
+        "json": {
+          "request_id": "turn_1",
+          "state_rev": 1,
+          "move": "explain",
+          "concepts": [
+            "mech.torque.static"
+          ],
+          "narration": [
+            {
+              "id": "n1",
+              "text": "Holding this arm level takes {{c1.torque_nm}} newton-metres."
+            },
+            {
+              "id": "n2",
+              "text": "The payload at the tip gives {{c1.payload_torque_nm}} of that; the arm's own mass gives the rest."
+            }
+          ],
+          "actions": [
+            {
+              "type": "select_scene",
+              "scene": "fx-lever"
+            },
+            {
+              "type": "highlight_part",
+              "part": "weight"
+            },
+            {
+              "type": "set_parameter",
+              "param": "weight_distance_m",
+              "value": 0.2
+            }
+          ],
+          "calc_requests": [
+            {
+              "id": "c1",
+              "solver": "solver.fx-torque",
+              "simulation": "sim.fx-servo-load",
+              "inputs": {
+                "arm_length_m": 0.2,
+                "payload_kg": 0.3,
+                "arm_kg_per_m": 0.25,
+                "angle_deg": 0
+              }
+            }
+          ],
+          "evidence": [
+            "read.fx-moments"
+          ],
+          "prompt": {
+            "text": "Where would you move the weight to make it easier to hold?",
+            "chips": [
+              "Closer to my hand",
+              "Not sure"
+            ]
+          },
+          "assumptions": [
+            "static hold only"
+          ],
+          "limitations": [
+            "does not cover acceleration"
+          ]
+        },
+        "input_tokens": 5200,
+        "output_tokens": 480,
+        "latency_ms": 5
+      }
+    }
+  ]
+}
