@@ -39,7 +39,7 @@ solvers → compile (placeholders filled, three significant figures) → events.
 - `ProfessorProvider.complete({ system, input, outputSchema, maxOutputTokens, signal })` →
   `{ json, usage, latencyMs }`. Provider, model, the key's variable NAME (`api_key_env`) and
   `max_output_tokens` live only in `config/ai.json`; a test greps the code for provider and model names.
-- **One 20 s budget per turn** (router, director, retries and the repair share it). Network error,
+- **One budget per turn** (`turn_timeout_ms` in config, 45 s; each attempt at most `attempt_timeout_ms`, 30 s; router, director, retries and the repair share it). Network error,
   attempt timeout, 429 and 5xx get ONE jittered retry (250–750 ms) if at least 2 s remain; 401/403
   is `key_rejected` and other 4xx fail at once; an interrupt aborts the request at once.
 - **One repair attempt**: an answer that fails the structural or pedagogy checks is sent back with
