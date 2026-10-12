@@ -28,7 +28,7 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
     open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === id));
   }
   if (r.prediction && r.prompt?.kind === "prediction") {
-    predictions = [...predictions, { id: r.prediction.id, concept: r.prediction.concept, turn, choices: r.prompt.chips, guess: null, status: "open" }];
+    predictions = [...predictions, { id: r.prediction.id, concept: r.prediction.concept, turn, choices: r.prompt.chips, question: r.prompt.text, guess: null, status: "open" }];
     open_items = [...open_items, { kind: "prediction", ref: r.prediction.id, opened_turn: turn }];
   }
   if (r.reading && r.move === "assign") open_items = [...open_items, { kind: "reading", ref: r.reading, opened_turn: turn }];
@@ -55,5 +55,7 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
   // Debate: rounds while the move stays "debate"; any other move ends it.
   const prev = t.debate ?? { active: false, rounds: 0 };
   const debate = r.move === "debate" ? { active: true, rounds: prev.active ? prev.rounds + 1 : 1 } : { active: false, rounds: 0 };
-  return { predictions, open_items, waivers, analogies_used, safety_acks, pending_teach_back, evidence, debate };
+  // The last prompt asked, so the next turn's director can see what is still open (and re-offer it).
+  const last_prompt = r.prompt ? { turn, text: r.prompt.text, kind: r.prompt.kind, chips: r.prompt.chips } : (t.last_prompt ?? null);
+  return { predictions, open_items, waivers, analogies_used, safety_acks, pending_teach_back, evidence, debate, last_prompt };
 }

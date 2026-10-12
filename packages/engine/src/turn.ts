@@ -67,6 +67,8 @@ export interface DirectorRequest {
   deadline_ms: number;
   /** Set on the one repair attempt: the previous answer and why it failed the checks. */
   repair?: { errors: string[]; previous: unknown };
+  /** The teaching state after the learner's reply (open predictions, open items, waivers, the last prompt). */
+  teaching?: TeachingState;
   /**
    * Called as each provider attempt ends, so it is metered even if the turn has already timed out
    * or been interrupted (the provider may still bill it).
@@ -314,7 +316,7 @@ export class TurnSession {
       let pending: Promise<DirectorReply> | undefined;
       try {
         pending = this.opts.director.respond(
-          { request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
+          { request_id: turn_id, state_rev: rev, shortlist: sl, history, teaching, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
           abort.signal,
         );
         const reply = await withTimeout(pending, remaining(), abort.signal);

@@ -228,3 +228,32 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(shortlistJson(tight.input).concept_ids).toEqual(["mech.moment-arm", "mech.torque.static"]);
   });
 });
+
+describe("the real teaching state reaches the professor (Lucky's decision 2026-10-12)", () => {
+  const stateOf = (input: string) => JSON.parse(blockOf(input, "session_state").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+  const teaching = {
+    predictions: [{ id: "ruler-weight-distance", concept: "mech.moment-arm", turn: 1, choices: ["It grows", "No change", "Not sure"], question: "If the weight slides farther out, what happens to the twist?", guess: null, status: "open" as const }],
+    open_items: [{ kind: "prediction" as const, ref: "ruler-weight-distance", opened_turn: 1 }],
+    waivers: [{ concept: "mech.torque.static", reason: "build first", safety_critical: false, turn: 1, acknowledged: { by: "learner" as const, on: "2026-10-12" } }],
+    analogies_used: [],
+    safety_acks: [],
+    pending_teach_back: null,
+    evidence: [],
+    debate: { active: false, rounds: 0 },
+    last_prompt: { turn: 1, text: "If the weight slides farther out, what happens to the twist?", kind: "prediction" as const, chips: ["It grows", "No change", "Not sure"] },
+  };
+
+  it("session_state carries the open prediction (id, question, choices), open items, waivers and the open prompt's text and kind", () => {
+    const a = assembleProfessorPrompt({ template: TEMPLATE, shortlist: fixtureShortlist(), request: { ...request(), teaching } });
+    const s = stateOf(a.input);
+    expect(s.predictions).toEqual([{ id: "ruler-weight-distance", concept: "mech.moment-arm", question: "If the weight slides farther out, what happens to the twist?", choices: ["It grows", "No change", "Not sure"], status: "open", guess: null }]);
+    expect(s.open_items).toEqual([{ kind: "prediction", ref: "ruler-weight-distance", opened_turn: 1 }]);
+    expect(s.waivers).toEqual([{ concept: "mech.torque.static", reason: "build first", safety_critical: false, acknowledged: true }]);
+    expect(s.open_prompt).toEqual({ from_turn: 1, kind: "prediction", text: "If the weight slides farther out, what happens to the twist?", choices: ["It grows", "No change", "Not sure"] });
+  });
+
+  it("no hard-coded empty teaching state is left in the prompt assembly", () => {
+    const src = readFileSync(new URL("./prompt.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/^\s*(predictions|open_items|waivers):\s*\[\]\s*,?\s*$/m);
+  });
+});

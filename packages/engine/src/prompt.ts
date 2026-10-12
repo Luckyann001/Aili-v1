@@ -92,13 +92,15 @@ export interface AssembledPrompt {
 export function assembleProfessorPrompt(o: {
   template: string;
   shortlist: Shortlist;
-  request: Pick<DirectorRequest, "request_id" | "state_rev" | "history" | "active_scene" | "learner_text">;
+  request: Pick<DirectorRequest, "request_id" | "state_rev" | "history" | "active_scene" | "learner_text" | "teaching">;
   budgetTokens?: number;
 }): AssembledPrompt {
   const budget = o.budgetTokens ?? PROMPT_BUDGET_TOKENS;
   const system = systemPrompt(o.template);
   const h = o.request.history;
   const open = openPrompt(h);
+  const teaching = o.request.teaching;
+  const lastPrompt = teaching?.last_prompt ?? null;
   const ailiTurns = h.entries.filter((e) => e.kind === "aili");
   const state = {
     request_id: o.request.request_id,
@@ -106,11 +108,13 @@ export function assembleProfessorPrompt(o: {
     posture: h.posture,
     learner_level: h.learner_level,
     active_scene: o.request.active_scene ?? null,
-    open_prompt: open ? { from_turn: open.turn } : null,
+    // The open question, with its text, kind and choices when known (so it can be kept and re-offered).
+    open_prompt: open ? { from_turn: open.turn, ...(lastPrompt && lastPrompt.turn === open.turn ? { kind: lastPrompt.kind, text: lastPrompt.text, choices: lastPrompt.chips } : {}) } : null,
     last_moves: ailiTurns.slice(-6).map((t) => ({ move: t.move, asked: t.asked, concepts: t.concepts, safety: t.safety })),
-    // Recorded from slice 5 (prediction → test → reveal, readings, waivers); empty until then.
-    predictions: [],
-    open_items: [],
+    // The real teaching state from the server (Lucky's decision 2026-10-12; was hard-coded empty).
+    predictions: (teaching?.predictions ?? []).filter((p) => p.status !== "revealed").map((p) => ({ id: p.id, concept: p.concept, question: p.question ?? null, choices: p.choices, status: p.status, guess: p.guess })),
+    open_items: (teaching?.open_items ?? []).map((o) => ({ kind: o.kind, ref: o.ref, opened_turn: o.opened_turn })),
+    waivers: (teaching?.waivers ?? []).map((w) => ({ concept: w.concept, reason: w.reason, safety_critical: w.safety_critical, acknowledged: w.acknowledged !== null })),
   };
   const learner = block("learner_input", o.request.learner_text);
   const stateBlock = block("session_state", JSON.stringify(state));

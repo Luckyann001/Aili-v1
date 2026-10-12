@@ -91,6 +91,8 @@ export const Prediction = z
     /** The Aili turn that asked it. */
     turn: z.number().int().positive(),
     choices: z.array(z.string().min(1)),
+    /** The question as asked, so a later turn can re-offer it (Lucky's decision 2026-10-12). */
+    question: z.string().min(1).optional(),
     guess: z.string().min(1).nullable(),
     status: z.enum(["open", "guessed", "revealed"]),
     outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]).optional(),
@@ -126,6 +128,12 @@ export const TeachingState = z
     evidence: z
       .array(z.object({ reading: z.string().min(1), turn: z.number().int().positive(), claims_covered: z.array(z.string()), misconceptions_seen: z.array(z.string()) }).strict())
       .default([]),
+    /** The last prompt Aili asked (its turn, text, kind, choices), shown to the director while it is open. */
+    last_prompt: z
+      .object({ turn: z.number().int().positive(), text: z.string().min(1), kind: z.enum(["question", "prediction", "acknowledgement"]), chips: z.array(z.string().min(1)) })
+      .strict()
+      .nullable()
+      .optional(),
     /** A debate in progress (spec A7): how many rounds so far. */
     debate: z.object({ active: z.boolean(), rounds: z.number().int().nonnegative() }).strict().default({ active: false, rounds: 0 }),
     /** Safety-critical items the learner was asked to acknowledge (a flagged reading, for example). */

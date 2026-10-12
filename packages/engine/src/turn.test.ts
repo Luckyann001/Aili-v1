@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { admit, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
+import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
 // runTurn pipeline with the scripted fake director (docs/m2-plan.md slice 5). No provider, no key,
 // no network. The registry is the dev-only test-fixture registry.
@@ -225,5 +226,28 @@ describe("interrupt mid-turn", () => {
     expect(director.calls).toBe(1);
     expect(events.map((e) => e.type)).toEqual(["turn.started"]);
     expect(s.state).toBe(before);
+  });
+});
+
+describe("the teaching state travels to the director (Lucky's decision 2026-10-12)", () => {
+  it("turn 2's request carries turn 1's open prediction, with its question and choices", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const prompt = { ...(VALID.prompt as object), kind: "prediction" };
+    const seen: DirectorRequest[] = [];
+    const director: Director = {
+      async respond(req) {
+        seen.push(req);
+        if (seen.length === 1) return { response: { ...VALID, prompt, prediction: { id: "weight-out", concept: "mech.torque.static" } } };
+        throw new Error("stop after capturing turn 2");
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "Why is it hard?" }, (e) => events.push(e));
+    expect(events.at(-1)!.type).toBe("turn.done");
+    await s.run({ text: "Not much. I built a Lego car once." }, () => {});
+    const t = seen[1]!.teaching!;
+    expect(t.predictions).toEqual([expect.objectContaining({ id: "weight-out", status: "open", question: (VALID.prompt as { text: string }).text, choices: (VALID.prompt as { chips: string[] }).chips })]);
+    expect(t.last_prompt).toEqual(expect.objectContaining({ turn: 1, kind: "prediction" }));
   });
 });
