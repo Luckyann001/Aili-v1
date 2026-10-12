@@ -4,7 +4,8 @@ import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
 import { validateDirectorResponse } from "./director";
 import { givesBack, validatePedagogy } from "./pedagogy";
-import { ReplyClassification, type AiConfig, type RuntimeModel } from "@aili/schemas";
+import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
+import { applyLearnerReply, applyResponse } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply } from "./router";
 import type { Attempt, ProviderErrorKind } from "./provider";
@@ -121,7 +122,11 @@ export const SOLVERS: Record<string, SolverFn> = {
 export interface SessionState {
   history: SessionHistory;
   activeScene?: string;
+  /** Predictions, open items, waivers and analogies used (slice 5a). Absent means all empty. */
+  teaching?: TeachingState;
 }
+
+const EMPTY_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [] };
 
 /** What the learner sent. How to read it (answered, pushback, evidence) is decided by the router. */
 export interface LearnerInput {
@@ -145,6 +150,8 @@ export interface TurnSessionOptions {
   startRev?: number;
   /** Classifies the learner's reply on the server. Defaults to the fake router (tests, demo). */
   router?: Router;
+  /** Today's date as YYYY-MM-DD (waiver acknowledgements); a clock for tests. */
+  today?: () => string;
   /**
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
    * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
@@ -225,7 +232,15 @@ export class TurnSession {
     let routed: RouterReply;
     try {
       routed = await withTimeout(
-        (this.opts.router ?? createFakeRouter()).classify({ text: input.text, history: before.history, open_prompt: openPrompt(before.history) !== null }, abort.signal),
+        (this.opts.router ?? createFakeRouter()).classify(
+          {
+            text: input.text,
+            history: before.history,
+            open_prompt: openPrompt(before.history) !== null,
+            prediction_choices: (before.teaching ?? EMPTY_TEACHING).predictions.find((p) => p.status === "open")?.choices,
+          },
+          abort.signal,
+        ),
         remaining(),
         abort.signal,
       );
@@ -237,7 +252,17 @@ export class TurnSession {
     if (rev !== this.rev) return;
     const classified = ReplyClassification.safeParse(routed.classification);
     if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
-    const history: SessionHistory = { ...before.history, entries: [...before.history.entries, { kind: "learner", ...classified.data }] };
+    const c = classified.data;
+    const history: SessionHistory = {
+      ...before.history,
+      entries: [
+        ...before.history.entries,
+        { kind: "learner", answered_prompt: c.answered_prompt, pushback: c.pushback, new_evidence: c.new_evidence, frustrated: c.frustrated, wants_another_example: c.wants_another_example, acknowledged: c.acknowledged },
+      ],
+    };
+    // What the reply changes (a prediction's guess, a waiver acknowledged): pending until the turn completes.
+    const today = (this.opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
+    const teaching = applyLearnerReply(before.teaching ?? EMPTY_TEACHING, c, today);
 
     // Director, then the checks; one repair attempt (with the errors fed back) if the checks fail.
     // Every attempt is metered, whether or not its answer passes.
@@ -248,19 +273,23 @@ export class TurnSession {
     };
     const callDirector = async (repair?: { errors: string[]; previous: unknown }): Promise<DirectorReply | TurnFailure | "stale"> => {
       if (remaining() <= 0) return "timeout";
+      let pending: Promise<DirectorReply> | undefined;
       try {
-        const reply = await withTimeout(
-          this.opts.director.respond(
-            { request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
-            abort.signal,
-          ),
-          remaining(),
+        pending = this.opts.director.respond(
+          { request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
           abort.signal,
         );
+        const reply = await withTimeout(pending, remaining(), abort.signal);
         meterReply(reply);
         return rev !== this.rev ? "stale" : reply;
       } catch (err) {
         if (err instanceof DirectorCallFailed) meterReply(err);
+        else if (pending) {
+          // The turn timed out or was interrupted first: stop the director's call and let it finish
+          // reporting its attempts (so a request that may be billed is metered) before going on.
+          abort.abort();
+          await Promise.race([pending.catch(() => undefined), new Promise((r) => setTimeout(r, 1000))]);
+        }
         if (rev !== this.rev) return "stale"; // interrupted: nothing more to say for this turn
         if (err instanceof TimeoutError) return "timeout";
         if (err instanceof DirectorCallFailed) return err.kind === "not_configured" || err.kind === "key_rejected" || err.kind === "timeout" ? err.kind : "director";
@@ -270,7 +299,7 @@ export class TurnSession {
     const check = (raw: unknown): { r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] } => {
       const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev } });
       if (!v.response) return { reason: "validation", errors: v.errors };
-      const p = validatePedagogy(v.response, history);
+      const p = validatePedagogy(v.response, history, teaching);
       return p.length ? { reason: "pedagogy", errors: p } : { r: v.response };
     };
 
@@ -336,9 +365,11 @@ export class TurnSession {
     // Commit the new state only now, then say the turn is done.
     let activeScene = before.activeScene;
     for (const a of r.actions) if (a.type === "select_scene") activeScene = a.scene;
+    const ailiTurnNumber = history.entries.filter((e) => e.kind === "aili").length + 1;
     const next: SessionState = {
       history: { ...history, entries: [...history.entries, { kind: "aili", move: r.move, asked: !!r.prompt, gave_back: givesBack(r), concepts: r.concepts, safety: r.safety }] },
       activeScene,
+      teaching: applyResponse(teaching, r, ailiTurnNumber, today),
     };
     if (rev !== this.rev) return;
     this.state = next;

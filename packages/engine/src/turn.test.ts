@@ -150,7 +150,7 @@ describe("the router classifies the reply on the server", () => {
     const s = new TurnSession({ registry, director: createFakeDirector("valid"), router, state: start(), concepts: ["mech.torque.static"], level: "L2" });
     await s.run({ text: "No, I measured it" }, () => {});
     expect(router.calls).toBe(1);
-    expect(s.state.history.entries[0]).toEqual({ kind: "learner", answered_prompt: true, pushback: true, new_evidence: true });
+    expect(s.state.history.entries[0]).toMatchObject({ kind: "learner", answered_prompt: true, pushback: true, new_evidence: true });
     // Pushback WITHOUT evidence makes the pedagogy validator demand "hold": the director's explain is rejected.
     const held = new TurnSession({ registry, director: createFakeDirector("valid"), router: createFakeRouter({ script: [{ pushback: true, new_evidence: false }] }), state: start(), concepts: ["mech.torque.static"], level: "L2" });
     const { events, emit } = collect();
@@ -162,8 +162,8 @@ describe("the router classifies the reply on the server", () => {
     const r = createFakeRouter();
     const h = { posture: "learning" as const, learner_level: "some_knowledge" as const, entries: [] };
     const c = async (text: string, open_prompt: boolean) => (await r.classify({ text, history: h, open_prompt }, new AbortController().signal)).classification;
-    expect(await c("Closer to my hand", true)).toEqual({ answered_prompt: true, pushback: false, new_evidence: false });
-    expect(await c("Closer to my hand", false)).toEqual({ answered_prompt: false, pushback: false, new_evidence: false });
+    expect(await c("Closer to my hand", true)).toMatchObject({ answered_prompt: true, pushback: false, new_evidence: false });
+    expect(await c("Closer to my hand", false)).toMatchObject({ answered_prompt: false, pushback: false, new_evidence: false });
     expect(await c("I disagree, it is the same", true)).toMatchObject({ pushback: true, new_evidence: false });
     expect(await c("No, I measured it with a scale", true)).toMatchObject({ pushback: true, new_evidence: true });
   });
@@ -185,7 +185,7 @@ describe("the router classifies the reply on the server", () => {
 });
 
 describe("session store (in memory)", () => {
-  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false })) } });
+  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false })) } });
 
   it("commits only a newer revision; an older turn finishing late cannot overwrite it", () => {
     const st = new InMemorySessionStore();

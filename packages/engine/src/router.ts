@@ -9,6 +9,8 @@ export interface RouterRequest {
   history: SessionHistory;
   /** Whether Aili's last question is still open. */
   open_prompt: boolean;
+  /** The choices of a prediction waiting for the learner's guess, if any. */
+  prediction_choices?: string[];
 }
 
 export interface RouterReply {
@@ -30,7 +32,11 @@ export const FAKE_ROUTER_USAGE: TokenUsage = { model: "router", input_tokens: 30
  * FAKE ROUTER, for tests and the demo only. Fixed rules, not language understanding:
  * - answered_prompt: a question is open and the reply is not empty;
  * - pushback: the reply starts with "no", "but", "I disagree" or "that's wrong";
- * - new_evidence: pushback that mentions a source, a datasheet, a measurement or a calculation.
+ * - new_evidence: pushback that mentions a source, a datasheet, a measurement or a calculation;
+ * - frustrated: starts with "I don't know", "idk", "no idea" or "just tell me";
+ * - wants_another_example: mentions "another example", "another analogy" or "different example";
+ * - acknowledged: starts with "I understand", "I acknowledge", "understood" or "I accept";
+ * - guess: for an open prediction, the choice whose text matches the reply exactly (any case).
  * `script` overrides the result for the n-th call, so tests can force any classification.
  */
 export function createFakeRouter(opts: { usage?: TokenUsage; script?: Array<Partial<ReplyClassification> | "fail"> } = {}): Router & { calls: number } {
@@ -46,6 +52,10 @@ export function createFakeRouter(opts: { usage?: TokenUsage; script?: Array<Part
         answered_prompt: req.open_prompt && text.length > 0,
         pushback,
         new_evidence: pushback && /\b(source|datasheet|measured|measurement|calculated|calculation)\b/i.test(text),
+        frustrated: /^(i don'?t know|idk|no idea|just tell me)/i.test(text),
+        wants_another_example: /\b(another (example|analogy)|different example)\b/i.test(text),
+        acknowledged: /^(i understand|i acknowledge|understood|i accept)/i.test(text),
+        guess: req.prediction_choices?.find((c) => c.toLowerCase() === text.toLowerCase()) ?? null,
       };
       return { classification: { ...base, ...scripted }, usage: opts.usage ?? FAKE_ROUTER_USAGE };
     },
