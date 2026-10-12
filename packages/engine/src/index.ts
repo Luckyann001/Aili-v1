@@ -15,3 +15,4 @@ export * from "./sessionStore";
 export * from "./provider";
 export * from "./recordedProvider";
 export * from "./providerDirector";
+export * from "./prompt";
