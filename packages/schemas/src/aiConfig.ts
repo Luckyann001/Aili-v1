@@ -55,6 +55,12 @@ export const AiConfig = z
     /** One budget for a whole live turn: router, director, retries and the repair share it. */
     turn_timeout_ms: z.number().int().positive().max(180_000),
     timeouts_status: z.string().min(1),
+    /**
+     * Estimated input tokens (characters ÷ 3.5) are multiplied by this before the pre-turn worst-case
+     * check, the per-attempt cap guard and conservative metering, until real counts recalibrate it.
+     */
+    input_estimate_factor: z.number().min(1).max(10),
+    input_estimate_factor_status: z.string().min(1),
     /** A hard cap on one whole bake-off run (all scenarios together), checked before every turn. */
     bakeoff_cap_micro_usd: MicroUsd.refine((n) => n > 0, "the bake-off cap must be above 0"),
     bakeoff_cap_status: z.string().min(1),

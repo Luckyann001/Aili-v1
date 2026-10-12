@@ -1,5 +1,5 @@
 import type { AiConfig, DirectorResponse, RuntimeModel } from "@aili/schemas";
-import type { Registry } from "../capabilities";
+import { shortlist, type Registry } from "../capabilities";
 import { InMemoryLedger, worstCaseTurnCost, type LedgerEntry } from "../metering";
 import { PROMPT_BUDGET_TOKENS } from "../prompt";
 import type { Router } from "../router";
@@ -123,10 +123,14 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
       const record: ScenarioRecord = { scenario, run, turns: [], cost_micro_usd: 0 };
       records.push(record);
       const turns = scenario.turns.slice(0, d.maxTurns ?? scenario.turns.length);
+      const sl = shortlist(d.registry, { concepts: scenario.concepts, level: scenario.level });
       for (const [index, turn] of turns.entries()) {
         // The run's hard cap: everything spent so far plus this turn's worst case must fit.
-        // The professor's prompt is budgeted to PROMPT_BUDGET_TOKENS (estimated), so that is its worst case.
-        const worst = worstCaseTurnCost(d.config, { professorInputTokens: PROMPT_BUDGET_TOKENS, routerInputTokens: router.estimateInputTokens?.(turn.text) ?? ROUTER_INPUT_ALLOWANCE_TOKENS });
+        // This turn's own prompt estimate (as the turn's session check uses); the prompt budget if the
+        // director gives none. worstCaseTurnCost pads both by input_estimate_factor.
+        const professorInputTokens =
+          director.estimateInputTokens?.({ request_id: `turn_${index + 1}`, state_rev: 0, shortlist: sl, history: s.state.history, active_scene: s.state.activeScene, learner_text: turn.text }) ?? PROMPT_BUDGET_TOKENS;
+        const worst = worstCaseTurnCost(d.config, { professorInputTokens, routerInputTokens: router.estimateInputTokens?.(turn.text) ?? ROUTER_INPUT_ALLOWANCE_TOKENS });
         if (spent() + worst > cap) {
           record.stopped = "bake-off cap";
           return { records, total_micro_usd: spent(), cap_micro_usd: cap, stopped: `bake-off cap: ${spent()} micro-USD spent + ${worst} worst case for the next turn would pass ${cap}` };

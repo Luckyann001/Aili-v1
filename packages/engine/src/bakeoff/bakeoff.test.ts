@@ -159,8 +159,8 @@ describe("per-attempt cap guard", () => {
     const c = config();
     const inner = new RecordedProvider({ source: "test", steps: [{ ok: { json: {}, input_tokens: 1, output_tokens: 1 } }] });
     const req = { system: "s".repeat(350), input: "i".repeat(350), outputSchema: {}, maxOutputTokens: 3000, signal: new AbortController().signal };
-    // worst case: 200 estimated input + 3,000 output tokens at professor prices
-    const worst = Math.ceil((200 * c.models.professor.price_micro_usd_per_million_tokens.input + 3000 * c.models.professor.price_micro_usd_per_million_tokens.output) / 1e6);
+    // worst case: 200 estimated input tokens × input_estimate_factor, + 3,000 output tokens, at professor prices
+    const worst = Math.ceil((Math.ceil(200 * c.input_estimate_factor) * c.models.professor.price_micro_usd_per_million_tokens.input + 3000 * c.models.professor.price_micro_usd_per_million_tokens.output) / 1e6);
     const blocked: string[] = [];
     const tight = new CapGuardProvider(inner, { config: c, model: "professor", spent: () => 70_001 - worst + 1, capMicroUsd: 70_001, onBlock: (m) => blocked.push(m) });
     await expect(tight.complete(req)).rejects.toMatchObject({ kind: "spend_limit" });

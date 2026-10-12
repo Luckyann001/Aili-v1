@@ -65,9 +65,12 @@ export type Refusal = "kill_switch" | "not_configured" | "limit_not_recorded" | 
  */
 export const WORST_CASE_ATTEMPTS = 2;
 
-/** The most a turn can cost in micro-USD: both models, each at its max output, times the attempts. */
+/** Estimated input tokens times config input_estimate_factor (rounded up): what the spend checks assume. */
+export const padEstimate = (config: AiConfig, tokens: number): number => Math.ceil(tokens * config.input_estimate_factor);
+
+/** The most a turn can cost in micro-USD: both models, each at its max output, times the attempts. Inputs are padded. */
 export function worstCaseTurnCost(config: AiConfig, est: { professorInputTokens: number; routerInputTokens: number }): number {
-  const one = (model: RuntimeModel, input: number) => costMicroUsd({ model, input_tokens: input, output_tokens: config.models[model].max_output_tokens }, config);
+  const one = (model: RuntimeModel, input: number) => costMicroUsd({ model, input_tokens: padEstimate(config, input), output_tokens: config.models[model].max_output_tokens }, config);
   return WORST_CASE_ATTEMPTS * (one("professor", est.professorInputTokens) + one("router", est.routerInputTokens));
 }
 

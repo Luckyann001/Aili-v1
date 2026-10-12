@@ -1,6 +1,7 @@
 import { ReplyClassification, type AiConfig } from "@aili/schemas";
 import { z } from "zod";
 import { completeWithPolicy, ProviderError, type ProfessorProvider } from "./provider";
+import { padEstimate } from "./metering";
 import { block, estimateTokens, systemPrompt } from "./prompt";
 import type { Router, RouterReply, RouterRequest } from "./router";
 
@@ -57,7 +58,7 @@ export class ProviderRouter implements Router {
         attemptTimeoutMs: this.o.config.attempt_timeout_ms,
         onAttempt: (a) => req.onAttempt?.(a),
         model: "router",
-        estimatedInputTokens: estimateTokens(system) + estimateTokens(input),
+        estimatedInputTokens: padEstimate(this.o.config, estimateTokens(system) + estimateTokens(input)),
         now: this.o.now,
         sleep: this.o.sleep,
         random: this.o.random,

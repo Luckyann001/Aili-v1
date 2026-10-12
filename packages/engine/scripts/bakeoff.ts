@@ -97,12 +97,20 @@ async function main() {
     const lowered = Math.min(config.bakeoff_cap_micro_usd, Math.round(usd * 1e6));
     config = AiConfig.parse({ ...config, bakeoff_cap_micro_usd: lowered });
   }
-  const diagnostic = (d: AnthropicDiagnostic) =>
+  // The last estimate per model (set by the cap guard just before each attempt), for real-vs-estimate.
+  const lastEstimate: Partial<Record<RuntimeModel, { raw: number; padded: number }>> = {};
+  const diagnostic = (d: AnthropicDiagnostic) => {
     console.error(
       d.type === "error"
         ? `  [provider ${d.model}] HTTP ${d.status} ${d.error_type}: ${d.message}`
         : `  [provider ${d.model}] HTTP ${d.status} stop_reason=${d.stop_reason} served_model=${d.served_model} input=${d.input_tokens} output=${d.output_tokens} thinking=${d.thinking_tokens ?? "not reported"} cache_read=${d.cache_read_input_tokens ?? 0} cache_write=${d.cache_creation_input_tokens ?? 0}`,
     );
+    const e = lastEstimate[d.model];
+    if (d.type === "response" && e && typeof d.input_tokens === "number") {
+      const real = d.input_tokens + (d.cache_read_input_tokens ?? 0) + (d.cache_creation_input_tokens ?? 0);
+      console.error(`  [estimate ${d.model}] real input ${real} vs estimate ${e.raw} = ${(real / e.raw).toFixed(2)}x (padded estimate ${e.padded} with factor ${config.input_estimate_factor}${real > e.padded ? "; REAL EXCEEDS THE PADDED ESTIMATE" : ""})`);
+    }
+  };
 
   const started = new Date().toISOString();
   const out = typeof a.out === "string" ? a.out : join(root, "bakeoff-runs", `${started.replace(/[:.]/g, "-")}-${mode}`);
@@ -127,7 +135,7 @@ async function main() {
           [professor, router] = [k.professor, k.router];
         }
         // Outermost: a blocked attempt is never sent (and never recorded).
-        const guard = (inner: ProfessorProvider, model: RuntimeModel) => new CapGuardProvider(inner, { config, model, spent, capMicroUsd: config.bakeoff_cap_micro_usd, onBlock: (m) => console.error(`  [cap] ${m}`) });
+        const guard = (inner: ProfessorProvider, model: RuntimeModel) => new CapGuardProvider(inner, { config, model, spent, capMicroUsd: config.bakeoff_cap_micro_usd, onBlock: (m) => console.error(`  [cap] ${m}`), onEstimate: (e) => (lastEstimate[e.model] = e) });
         [professor, router] = [guard(professor, "professor"), guard(router, "router")];
       } else {
         const r = recordings.get(s.id)!;

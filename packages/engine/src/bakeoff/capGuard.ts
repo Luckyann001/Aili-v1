@@ -1,5 +1,5 @@
 import type { AiConfig, RuntimeModel } from "@aili/schemas";
-import { costMicroUsd } from "../metering";
+import { costMicroUsd, padEstimate } from "../metering";
 import { estimateTokens } from "../prompt";
 import { ProviderError, type CompletionRequest, type CompletionResult, type ProfessorProvider } from "../provider";
 
@@ -11,11 +11,22 @@ import { ProviderError, type CompletionRequest, type CompletionResult, type Prof
 export class CapGuardProvider implements ProfessorProvider {
   constructor(
     private readonly inner: ProfessorProvider,
-    private readonly o: { config: AiConfig; model: RuntimeModel; spent: () => number; capMicroUsd: number; onBlock?: (detail: string) => void },
+    private readonly o: {
+      config: AiConfig;
+      model: RuntimeModel;
+      spent: () => number;
+      capMicroUsd: number;
+      onBlock?: (detail: string) => void;
+      /** Each attempt's estimate before it is sent (raw, and padded by input_estimate_factor), for real-vs-estimate reports. */
+      onEstimate?: (e: { model: RuntimeModel; raw: number; padded: number }) => void;
+    },
   ) {}
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
-    const worst = costMicroUsd({ model: this.o.model, input_tokens: estimateTokens(req.system) + estimateTokens(req.input), output_tokens: req.maxOutputTokens }, this.o.config);
+    const raw = estimateTokens(req.system) + estimateTokens(req.input);
+    const padded = padEstimate(this.o.config, raw);
+    this.o.onEstimate?.({ model: this.o.model, raw, padded });
+    const worst = costMicroUsd({ model: this.o.model, input_tokens: padded, output_tokens: req.maxOutputTokens }, this.o.config);
     const spent = this.o.spent();
     if (spent + worst > this.o.capMicroUsd) {
       this.o.onBlock?.(`${this.o.model} attempt not sent: ${spent} micro-USD spent + ${worst} worst case would pass the cap of ${this.o.capMicroUsd}`);

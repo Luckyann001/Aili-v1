@@ -32,6 +32,8 @@
   "attempt_timeout_ms": 30000,
   "turn_timeout_ms": 45000,
   "timeouts_status": "first-live-run values (Lucky, Oct 12 2026, slice 7a): 30 s per provider attempt, 45 s per turn; measured latency is reported in the 7b results",
+  "input_estimate_factor": 2.5,
+  "input_estimate_factor_status": "first-live-run value (Lucky, Oct 12 2026): the router's real input was 2.2x the estimate (1,198 vs 554); recalibrate from real counts",
   "bakeoff_cap_micro_usd": 3000000,
   "bakeoff_cap_status": "3 USD for one whole bake-off run, set by Lucky (Oct 12 2026, slice 7a); checked before every turn"
 }

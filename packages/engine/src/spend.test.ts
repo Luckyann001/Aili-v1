@@ -67,7 +67,8 @@ describe("worst-case check before each turn", () => {
   it("the worst case is both models at their max output, times the attempts, at config prices", () => {
     const c = live();
     const est = { professorInputTokens: 4000, routerInputTokens: 500 };
-    const one = (m: RuntimeModel, input: number) => costMicroUsd({ model: m, input_tokens: input, output_tokens: c.models[m].max_output_tokens }, c);
+    // Inputs are padded by config input_estimate_factor (2.5 for the first live run).
+    const one = (m: RuntimeModel, input: number) => costMicroUsd({ model: m, input_tokens: Math.ceil(input * c.input_estimate_factor), output_tokens: c.models[m].max_output_tokens }, c);
     expect(WORST_CASE_ATTEMPTS).toBe(2);
     expect(worstCaseTurnCost(c, est)).toBe(2 * (one("professor", 4000) + one("router", 500)));
   });

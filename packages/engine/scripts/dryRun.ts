@@ -1,4 +1,4 @@
-import { costMicroUsd, createProfessorProvider, directorResponseJsonSchema, estimateTokens, professorPrompt, assembleRouterPrompt, routerJsonSchema, shortlist, type ProfessorProvider } from "../src/index";
+import { costMicroUsd, padEstimate, createProfessorProvider, directorResponseJsonSchema, estimateTokens, professorPrompt, assembleRouterPrompt, routerJsonSchema, shortlist, type ProfessorProvider } from "../src/index";
 import type { AiConfig, RuntimeModel } from "@aili/schemas";
 import { args, loadConfig, loadFixtureRegistry, loadTemplates, repoRoot } from "./lib";
 
@@ -37,7 +37,7 @@ async function capture(config: AiConfig, model: RuntimeModel, system: string, in
   if (Object.entries(seen.headers).some(([k, v]) => k.toLowerCase() !== "x-api-key" && v.includes(PLACEHOLDER_KEY))) throw new Error("the key placeholder appeared outside x-api-key");
   if (JSON.stringify(seen.body).includes(PLACEHOLDER_KEY)) throw new Error("the key placeholder appeared in the request body");
   const estimatedInput = estimateTokens(system) + estimateTokens(input);
-  const worst = costMicroUsd({ model, input_tokens: estimatedInput, output_tokens: m.max_output_tokens }, config);
+  const worst = costMicroUsd({ model, input_tokens: padEstimate(config, estimatedInput), output_tokens: m.max_output_tokens }, config);
   return { url: seen.url, headers, body: seen.body, estimatedInput, worst };
 }
 
@@ -52,7 +52,7 @@ function show(title: string, config: AiConfig, model: RuntimeModel, r: Awaited<R
   console.log(`  max_tokens:        ${body.max_tokens}  (thinking + answer together)`);
   console.log(`  thinking:          ${body.thinking ? JSON.stringify(body.thinking) : "omitted → the model's default"}`);
   console.log(`  effort:            ${body.output_config.effort ?? "omitted → the model's default"}`);
-  console.log(`  est. input tokens: ${r.estimatedInput}  (characters ÷ 3.5; the provider's count may differ)`);
+  console.log(`  est. input tokens: ${r.estimatedInput}  (characters ÷ 3.5); padded ×${config.input_estimate_factor} = ${padEstimate(config, r.estimatedInput)} for the spend checks`);
   console.log(`  worst case/attempt: ${(r.worst / 1e6).toFixed(6)} USD at config prices (${m.pricing_status})`);
   console.log(`  headers:`);
   for (const [k, v] of Object.entries(r.headers)) console.log(`    ${k}: ${v}`);

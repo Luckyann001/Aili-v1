@@ -1,5 +1,6 @@
 import type { AiConfig } from "@aili/schemas";
 import { completeWithPolicy, ProviderError, type Attempt, type ProfessorProvider } from "./provider";
+import { padEstimate } from "./metering";
 import { estimateTokens } from "./prompt";
 import { DirectorCallFailed, type Director, type DirectorReply, type DirectorRequest } from "./turn";
 
@@ -33,7 +34,8 @@ export class ProviderDirector implements Director {
     const m = this.o.config.models.professor;
     if (!m.provider || !m.model || !this.o.hasKey()) throw new DirectorCallFailed("not_configured", []);
     const { system, input } = this.o.prompt(req);
-    const estimatedInputTokens = estimateTokens(system) + estimateTokens(input + "\n\n" + (req.repair?.errors.join("\n") ?? ""));
+    // Padded by config input_estimate_factor: the charge for an attempt that may be billed but reports nothing.
+    const estimatedInputTokens = padEstimate(this.o.config, estimateTokens(system) + estimateTokens(input + "\n\n" + (req.repair?.errors.join("\n") ?? "")));
     const repair = req.repair
       ? `\n\nYour previous answer failed these checks. Return a corrected answer that passes them:\n${req.repair.errors.map((e) => `- ${e}`).join("\n")}`
       : "";

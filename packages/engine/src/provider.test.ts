@@ -18,6 +18,7 @@ import {
   type TurnEvent,
 } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
+import { estimateTokens } from "./prompt";
 import valid from "./__recordings__/valid-explain.hand-written.json";
 
 // Provider interface, recorded adapter, retry/timeout/error mapping (docs/m3-plan.md slice 2).
@@ -263,6 +264,18 @@ describe("config: provider fields", () => {
     expect(t.ledger.entries("p").filter((e) => e.model === "professor")).toHaveLength(1);
     expect(Date.now() - started).toBeLessThan(1500);
     expect(AiConfig.parse(configJson()).attempt_timeout_ms).toBeLessThanOrEqual(AiConfig.parse(configJson()).turn_timeout_ms);
+  });
+
+  it("a timed-out attempt is charged the estimate padded by input_estimate_factor, plus max output", async () => {
+    const c = AiConfig.parse({ ...configJson(), models: CONFIGURED.models, attempt_timeout_ms: 150, turn_timeout_ms: 150 });
+    const t = turn(recorded({ hang: true }), { config: c });
+    await t.run();
+    // the helper's prompt: a fixed system line, and "turn_1: <learner text>" (+ the repair separator)
+    const raw = estimateTokens("slice 3 builds the real prompt") + estimateTokens("turn_1: Why is it hard to hold?" + "\n\n");
+    const [a] = t.ledger.entries("p").filter((e) => e.model === "professor");
+    expect(c.input_estimate_factor).toBeGreaterThan(1);
+    expect(a!.input_tokens).toBe(Math.ceil(raw * c.input_estimate_factor));
+    expect(a!.output_tokens).toBe(c.models.professor.max_output_tokens);
   });
 
   it("an attempt limit longer than the turn budget is rejected", () => {
