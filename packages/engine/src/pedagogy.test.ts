@@ -164,3 +164,11 @@ describe("no meta-talk (config/pedagogy-phrases.json meta_talk; Lucky's decision
     expect(said("Hold the ruler like hand tools are held.")).toEqual([]);
   });
 });
+
+describe("learner level unknown (Lucky's decision 2026-10-12, scenario s02)", () => {
+  it("is not treated as a true beginner: a first probe is allowed (one baseline question finds the level)", () => {
+    const probe = resp({ move: "probe", prompt: { text: "What have you built so far?", chips: [], kind: "question" } });
+    expect(validatePedagogy(probe, hist([], { learner_level: "unknown" })).join()).not.toMatch(/explain-first-for-beginners/);
+    expect(validatePedagogy(probe, hist([], { learner_level: "true_beginner" })).join()).toMatch(/explain-first-for-beginners/);
+  });
+});

@@ -11,8 +11,11 @@ import { Move } from "./beats";
 export const Posture = z.enum(["answer", "learning", "build"]);
 export type Posture = z.infer<typeof Posture>;
 
-/** "true_beginner": nothing to anchor on, so an explanation comes before any probe (spec A1a). */
-export const LearnerLevel = z.enum(["true_beginner", "some_knowledge"]);
+/**
+ * "true_beginner": nothing to anchor on, so an explanation comes before any probe (spec A1a).
+ * "unknown": not yet known (a goal statement, spec A14 test 2): one baseline question finds out.
+ */
+export const LearnerLevel = z.enum(["true_beginner", "some_knowledge", "unknown"]);
 
 export const AiliTurn = z
   .object({

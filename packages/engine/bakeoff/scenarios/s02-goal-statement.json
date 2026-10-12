@@ -4,7 +4,7 @@
   "source": "behavior spec A14 test 2",
   "category": "spec",
   "posture": "learning",
-  "learner_level": "true_beginner",
+  "learner_level": "unknown",
   "concepts": [
     "mech.torque.static"
   ],
