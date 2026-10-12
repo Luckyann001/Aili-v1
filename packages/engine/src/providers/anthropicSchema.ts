@@ -3,10 +3,13 @@
 // no minLength/maxLength, no minimum/maximum/multipleOf, minItems only 0 or 1, no other array
 // limits, and every object must have additionalProperties: false. Unsupported features return 400.
 // So the schema sent is a reduced copy; our own validators still enforce the full rules afterwards.
+// "pattern" (our ID formats) is dropped too: the professor schema with patterns was refused on the
+// first live call (2026-10-12, HTTP 400 "The compiled grammar is too large"); the structural
+// validator checks every ID on every answer, so the patterns are still enforced, just afterwards.
 // A map (an object whose keys are free, like calc_requests[].inputs) cannot be expressed with
 // additionalProperties: false, so it is sent as a list of { name, value } pairs and turned back.
 
-const DROP = new Set(["$schema", "minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "maxItems", "uniqueItems", "propertyNames", "minProperties", "maxProperties"]);
+const DROP = new Set(["$schema", "pattern", "minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "maxItems", "uniqueItems", "propertyNames", "minProperties", "maxProperties"]);
 
 export interface ReducedSchema {
   schema: object;

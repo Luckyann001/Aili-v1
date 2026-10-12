@@ -74,7 +74,7 @@ function simpleRequest(signal = new AbortController().signal) {
 }
 
 describe("structured-output schema for Anthropic", () => {
-  const DROPPED = ["$schema", "minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "maxItems", "uniqueItems", "propertyNames", "oneOf"];
+  const DROPPED = ["$schema", "pattern", "minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "maxItems", "uniqueItems", "propertyNames", "oneOf"];
   const { schema, mapPaths } = toAnthropicSchema(directorResponseJsonSchema());
 
   it("keeps none of the keywords the docs list as unsupported, and closes every object", () => {
@@ -189,6 +189,18 @@ describe("whole turns through the adapter", () => {
     await t.run();
     expect(errorOf(t.events).reason).toBe("validation");
     expect(t.srv.received).toHaveLength(2);
+  });
+
+  it("with no patterns in the schema sent, our validator still rejects a badly formed ID (after the one repair)", async () => {
+    const bad = message(JSON.stringify({ ...WIRE, concepts: ["Not A Concept ID"] }));
+    const t = await liveTurn([bad, bad]);
+    await t.run();
+    const sent = JSON.stringify(JSON.parse(t.srv.received[0]!.body).output_config.format.schema);
+    expect(sent).not.toContain('"pattern"');
+    const e = errorOf(t.events);
+    expect(e.reason).toBe("validation");
+    expect(e.details.join("\n")).toMatch(/concepts/);
+    expect(t.srv.received).toHaveLength(2); // the answer and its repair, both rejected
   });
 
   const rows: Array<[string, string, number, MockReply[]]> = [
