@@ -8,7 +8,7 @@ import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingSta
 import { applyLearnerReply, applyResponse } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply } from "./router";
-import type { Attempt, ProviderErrorKind } from "./provider";
+import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
 import { openPrompt } from "./pedagogy";
 import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
 
@@ -103,6 +103,8 @@ export interface Director {
 
 /** Assumed router input when the router gives no estimate (its prompt is small; slice 6 measures it). */
 export const ROUTER_INPUT_ALLOWANCE_TOKENS = 1000;
+/** Router failures shown to the learner under their own reason (others become "router"). */
+const ROUTER_KINDS: ReadonlySet<ProviderErrorKind> = new Set(["not_configured", "key_rejected", "spend_limit", "refused"]);
 
 /** A solver as the pipeline calls it: unit-named inputs in, unit-named numeric outputs out. */
 export type SolverFn = (inputs: Record<string, number>) => Record<string, number>;
@@ -235,27 +237,38 @@ export class TurnSession {
       if (refusal) return fail(refusal.reason, [refusal.detail]);
     }
 
+    // Every provider attempt is metered as it ends, whether or not its answer passes.
+    const meterUsage = (u: TokenUsage) => meter?.ledger.record(meter.sessionId, { ...u, turn_id, cost_micro_usd: costMicroUsd(u, meter.config) });
+
     // Router: how to read the learner's reply, decided here on the server, never by the client.
     let routed: RouterReply;
+    let routing: Promise<RouterReply> | undefined;
     try {
-      routed = await withTimeout(
-        (this.opts.router ?? createFakeRouter()).classify(
-          {
-            text: input.text,
-            history: before.history,
-            open_prompt: openPrompt(before.history) !== null,
-            prediction_choices: (before.teaching ?? EMPTY_TEACHING).predictions.find((p) => p.status === "open")?.choices,
-          },
-          abort.signal,
-        ),
-        remaining(),
+      routing = (this.opts.router ?? createFakeRouter()).classify(
+        {
+          text: input.text,
+          history: before.history,
+          open_prompt: openPrompt(before.history) !== null,
+          prediction_choices: (before.teaching ?? EMPTY_TEACHING).predictions.find((p) => p.status === "open")?.choices,
+          deadline_ms: deadline,
+          onAttempt: (a) => meterUsage(a.usage),
+        },
         abort.signal,
       );
+      routed = await withTimeout(routing, remaining(), abort.signal);
     } catch (err) {
+      if (err instanceof TimeoutError || rev !== this.rev) {
+        // Stop the router's call and let it report its attempts (a sent request may be billed).
+        abort.abort();
+        await Promise.race([routing?.catch(() => undefined), new Promise((r) => setTimeout(r, 1000))]);
+      }
       if (rev !== this.rev) return;
-      return fail(err instanceof TimeoutError ? "timeout" : "router", [errorText(err)]);
+      if (err instanceof TimeoutError) return fail("timeout", [errorText(err)]);
+      // A provider-backed router's failures keep their kind where the learner should know it.
+      if (err instanceof ProviderError && ROUTER_KINDS.has(err.kind)) return fail(err.kind as TurnFailure, [`router: ${err.kind}`]);
+      return fail("router", [err instanceof ProviderError ? `router: ${err.kind}` : errorText(err)]);
     }
-    if (meter && routed.usage) meter.ledger.record(meter.sessionId, { ...routed.usage, turn_id, cost_micro_usd: costMicroUsd(routed.usage, meter.config) });
+    if (meter && routed.usage) meterUsage(routed.usage);
     if (rev !== this.rev) return;
     const classified = ReplyClassification.safeParse(routed.classification);
     if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
@@ -286,8 +299,6 @@ export class TurnSession {
     const pedagogyContext = { unlistedSource: asked && !listed ? c.asks_for_source! : undefined, libraryAvailable: sl.readings.length > 0 };
 
     // Director, then the checks; one repair attempt (with the errors fed back) if the checks fail.
-    // Every attempt is metered, whether or not its answer passes.
-    const meterUsage = (u: TokenUsage) => meter?.ledger.record(meter.sessionId, { ...u, turn_id, cost_micro_usd: costMicroUsd(u, meter.config) });
     // Provider attempts are metered as they end (onAttempt); a director without them reports one usage.
     const meterReply = (reply: DirectorReply | DirectorCallFailed) => {
       if (!(reply instanceof DirectorCallFailed) && !reply.attempts && reply.usage) meterUsage(reply.usage);

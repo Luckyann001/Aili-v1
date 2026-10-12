@@ -1,5 +1,6 @@
 import type { ReplyClassification, SessionHistory } from "@aili/schemas";
 import type { TokenUsage } from "./metering";
+import type { Attempt } from "./provider";
 
 // The router (docs/m3-plan.md slice 1): classifies each learner reply on the SERVER, so the
 // pedagogy validator never reads labels a client sent. A cheap model in M3; a fake here.
@@ -11,11 +12,16 @@ export interface RouterRequest {
   open_prompt: boolean;
   /** The choices of a prediction waiting for the learner's guess, if any. */
   prediction_choices?: string[];
+  /** The turn's deadline (epoch ms), for a provider-backed router. */
+  deadline_ms?: number;
+  /** Called after every provider attempt (metering). A router that uses it returns no `usage`. */
+  onAttempt?: (a: Attempt) => void;
 }
 
 export interface RouterReply {
   /** Raw output: validated with ReplyClassification before use. */
   classification: unknown;
+  /** One usage for the whole call (the fake router). A provider-backed router reports attempts instead. */
   usage?: TokenUsage;
 }
 

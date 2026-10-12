@@ -1,6 +1,4 @@
 import { readFileSync } from "node:fs";
-import { createServer, type IncomingHttpHeaders } from "node:http";
-import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AiConfig, type RuntimeModel } from "@aili/schemas";
 import {
@@ -19,6 +17,7 @@ import { fixtureRegistry } from "../__fixtures__/registry";
 import valid from "../__recordings__/valid-explain.hand-written.json";
 import { ANTHROPIC_VERSION, AnthropicProvider, createProfessorProvider, fromAnthropicShape, toAnthropicSchema } from "./index";
 import { errors, message, refusal, SECRET_BODY_TEXT, type MockReply } from "./__fixtures__/anthropicResponses";
+import { mockServer } from "./__fixtures__/mockServer";
 
 // The Anthropic adapter against a LOCAL mock HTTP server on 127.0.0.1 (docs/m3-plan.md slice 6).
 // No real key, no external network. Responses are hand-written fixtures derived from the docs.
@@ -48,37 +47,7 @@ const WIRE = {
 };
 const ok = () => message(JSON.stringify(WIRE));
 
-interface Received {
-  headers: IncomingHttpHeaders;
-  body: string;
-}
-const servers: Array<() => Promise<void>> = [];
-afterEach(async () => {
-  vi.restoreAllMocks();
-  await Promise.all(servers.splice(0).map((close) => close()));
-});
-
-/** A local server answering each request with the next reply (the last one repeats). */
-async function mockServer(replies: MockReply[]) {
-  const received: Received[] = [];
-  let closedEarly = 0;
-  const server = createServer((req, res) => {
-    let body = "";
-    req.on("data", (c) => (body += c));
-    req.on("end", () => {
-      received.push({ headers: req.headers, body });
-      const r = replies[received.length - 1] ?? replies.at(-1)!;
-      if (r === "hang") return void res.on("close", () => closedEarly++);
-      if ("raw" in r) return void (res.writeHead(r.status, { "content-type": "application/json" }), res.end(r.raw));
-      res.writeHead(r.status, { "content-type": "application/json", ...r.headers });
-      res.end(JSON.stringify(r.body));
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const close = () => new Promise<void>((resolve) => (server.closeAllConnections(), server.close(() => resolve())));
-  servers.push(close);
-  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, received, closedEarly: () => closedEarly, close };
-}
+afterEach(() => vi.restoreAllMocks());
 
 const start = (): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" });
 

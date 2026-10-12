@@ -33,8 +33,8 @@ export function systemPrompt(template: string): string {
 }
 
 /** Escape < and > so DATA can never close or open a tagged block. */
-const escapeData = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const block = (tag: string, body: string) => `<${tag}>\n${escapeData(body)}\n</${tag}>`;
+export const escapeData = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+export const block = (tag: string, body: string) => `<${tag}>\n${escapeData(body)}\n</${tag}>`;
 
 type Item = { id: string; kind: string; rank: number; keep: boolean; data: unknown };
 
