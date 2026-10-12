@@ -1,5 +1,5 @@
 import { costMicroUsd, padEstimate, createProfessorProvider, directorResponseJsonSchema, estimateTokens, professorPrompt, assembleRouterPrompt, routerJsonSchema, shortlist, type ProfessorProvider } from "../src/index";
-import type { AiConfig, RuntimeModel } from "@aili/schemas";
+import type { AiConfig, RuntimeModel, SessionHistory, TeachingState } from "@aili/schemas";
 import { args, loadConfig, loadFixtureRegistry, loadTemplates, repoRoot } from "./lib";
 
 // DRY RUN (docs/m3-plan.md slice 7a): builds the full request for one live turn, the router's and
@@ -8,7 +8,9 @@ import { args, loadConfig, loadFixtureRegistry, loadTemplates, repoRoot } from "
 // adapter gets a placeholder, and the x-api-key header is masked in what is printed.
 //
 //   npm run dry-run -w @aili/engine -- [--text "learner message"] [--show-prompt]
-//     [--preview-provider NAME] [--professor-model ID] [--router-model ID]
+//     [--preview-provider NAME] [--professor-model ID] [--router-model ID] [--show-state] [--second-turn]
+// --show-state prints the professor's <session_state> block. --second-turn builds a SAMPLE second
+// turn (turn 1 asked a prediction the learner has not answered) so the state shows real values.
 // The --preview-* and --*-model flags show the request AS IF config held those values; config/ai.json
 // is not changed, and the summary says which values are previews.
 
@@ -78,7 +80,32 @@ async function main() {
   const templates = loadTemplates(root);
   const registry = loadFixtureRegistry(root);
   const text = typeof a.text === "string" ? a.text : "Why is it so hard to hold this arm out level?";
-  const history = { posture: "learning" as const, learner_level: "some_knowledge" as const, entries: [] };
+  const second = a["second-turn"] === true;
+  const history: SessionHistory = second
+    ? {
+        posture: "learning",
+        learner_level: "some_knowledge",
+        entries: [
+          { kind: "learner", answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null },
+          { kind: "aili", move: "explain", asked: true, gave_back: true, concepts: ["mech.torque.static"], safety: false },
+        ],
+      }
+    : { posture: "learning", learner_level: "some_knowledge", entries: [] };
+  const question = "If the weight slides farther from your hand, what happens to the twist your hand must resist?";
+  const chips = ["It grows", "No change", "It shrinks", "Not sure"];
+  const teaching: TeachingState | undefined = second
+    ? {
+        predictions: [{ id: "ruler-weight-distance", concept: "mech.moment-arm", turn: 1, choices: chips, question, guess: null, status: "open" }],
+        open_items: [{ kind: "prediction", ref: "ruler-weight-distance", opened_turn: 1 }],
+        waivers: [],
+        analogies_used: ["analogy.fx-long-wrench"],
+        safety_acks: [],
+        pending_teach_back: null,
+        evidence: [],
+        debate: { active: false, rounds: 0 },
+        last_prompt: { turn: 1, text: question, kind: "prediction", chips },
+      }
+    : undefined;
 
   console.log("AILI dry run: nothing is sent, no key is read. Registry: TEST FIXTURES (nothing published yet).");
   console.log(`Learner text: ${JSON.stringify(text)}`);
@@ -89,7 +116,12 @@ async function main() {
   show("Router request", config, "router", await capture(config, "router", rp.system, rp.input, routerJsonSchema()), { showPrompt: a["show-prompt"] === true, ...rp });
 
   const sl = shortlist(registry, { concepts: ["mech.torque.static"], level: "L2" });
-  const pp = professorPrompt(templates.professor)({ request_id: "turn_1", state_rev: 1, shortlist: sl, history, active_scene: "fx-lever", learner_text: text, deadline_ms: 0 });
+  const pp = professorPrompt(templates.professor)({ request_id: second ? "turn_2" : "turn_1", state_rev: second ? 2 : 1, shortlist: sl, history, teaching, active_scene: "fx-lever", learner_text: text, deadline_ms: 0 });
+  if (a["show-state"] === true) {
+    const state = /<session_state>\n([\s\S]*?)\n<\/session_state>/.exec(pp.input)?.[1] ?? "(none)";
+    console.log(`\n=== Professor <session_state>${second ? " (SAMPLE second turn: turn 1 asked a prediction, not yet answered)" : ""} ===`);
+    console.log(JSON.stringify(JSON.parse(state.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")), null, 2).replace(/^/gm, "  "));
+  }
   show("Professor request", config, "professor", await capture(config, "professor", pp.system, pp.input, directorResponseJsonSchema()), { showPrompt: a["show-prompt"] === true, ...pp });
   console.log("\nNothing was sent.");
 }
