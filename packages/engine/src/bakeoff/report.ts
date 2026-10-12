@@ -1,3 +1,4 @@
+import { PROMPT_REATTACHED } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
 // Bake-off report (docs/m3-plan.md slice 7a): numbers code can measure, and one transcript per
@@ -32,6 +33,8 @@ export interface Metrics {
   failures: Record<string, number>;
   /** Warnings on shown answers (semantic heuristics; for review, never a rejection). */
   warnings: number;
+  /** Turns whose prompt the engine re-attached from stored state (a re-offer without its prompt). */
+  reattached: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -69,6 +72,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     expectations: [exp.filter((e) => e.pass).length, exp.length],
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
+    reattached: turns.filter((t) => t.warnings.some((w) => w.startsWith(PROMPT_REATTACHED))).length,
   };
 }
 
@@ -105,6 +109,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Most questions in a row | ${m.max_consecutive_questions} |`,
     `| Failures | ${movesText(m.failures)} |`,
     `| Warnings (semantic, for review; never a rejection) | ${m.warnings} |`,
+    `| Prompts re-attached from stored state (engine fallback) | ${m.reattached} |`,
     "",
     "## Per scenario",
     "",

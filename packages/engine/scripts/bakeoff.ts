@@ -151,6 +151,7 @@ async function main() {
       const usage = t.usage.map((u) => `${u.model} ${u.input_tokens}/${u.output_tokens}`).join(", ");
       console.log(`  ${s.id} turn ${t.index}: ${t.outcome}${t.move ? ` (${t.move})` : ""} · ${t.latency_ms} ms · ${(t.cost_micro_usd / 1e6).toFixed(5)} USD · tokens in/out: ${usage || "none"} · checks ${t.checks.map((c) => `#${c.attempt} ${c.outcome}`).join(", ") || "none"}`);
       for (const e of t.events) if (e.type === "narration" || e.type === "prompt") console.log(`      ${e.type === "prompt" ? "asks" : "says"}: ${e.text}`);
+      for (const w of t.warnings) console.log(`  WARNING: ${w}`);
       if (t.unexpected) console.log(`  UNEXPECTED: ${t.outcome}`);
     },
   });

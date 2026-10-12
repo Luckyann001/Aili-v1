@@ -5,7 +5,7 @@ import { shortlist } from "./capabilities";
 import { validateDirectorResponse } from "./director";
 import { givesBack, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
-import { applyLearnerReply, applyResponse } from "./teaching";
+import { applyLearnerReply, applyResponse, reattachOpenPrompt } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
@@ -337,11 +337,14 @@ export class TurnSession {
         return "director";
       }
     };
-    const check = (raw: unknown): ({ r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] }) & { warnings: string[] } => {
-      const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
-      if (!v.response) return { reason: "validation", errors: v.errors, warnings: v.warnings };
+    const check = (answer: unknown): ({ r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] }) & { warnings: string[] } => {
+      // A re-offer of an open prediction that forgot its prompt gets the stored one back (a warning, never silent).
+      const fixed = reattachOpenPrompt(answer, teaching);
+      const v = validateDirectorResponse(fixed.raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
+      const warnings = [...(fixed.warning ? [fixed.warning] : []), ...v.warnings];
+      if (!v.response) return { reason: "validation", errors: v.errors, warnings };
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
-      return p.length ? { reason: "pedagogy", errors: p, warnings: v.warnings } : { r: v.response, warnings: v.warnings };
+      return p.length ? { reason: "pedagogy", errors: p, warnings } : { r: v.response, warnings };
     };
 
     let reply = await callDirector();

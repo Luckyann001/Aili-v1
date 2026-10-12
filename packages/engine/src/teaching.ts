@@ -65,3 +65,26 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
   const last_prompt = r.prompt ? { turn, text: r.prompt.text, kind: r.prompt.kind, chips: r.prompt.chips } : (t.last_prompt ?? null);
   return { predictions, open_items, waivers, analogies_used, safety_acks, pending_teach_back, evidence, debate, last_prompt };
 }
+
+/** The warning text when the engine re-attaches a stored prompt (Lucky's decision 2026-10-12). */
+export const PROMPT_REATTACHED = "prompt re-attached from stored state";
+
+/**
+ * Fallback for a re-offer that forgot its prompt: if the answer names an ALREADY-OPEN prediction id
+ * and has no prompt, attach that prediction's stored question and choices verbatim (kind "prediction")
+ * and say so in a warning. Never for a new prediction id, and never when no question was stored.
+ */
+export function reattachOpenPrompt(raw: unknown, t: TeachingState | undefined): { raw: unknown; warning: string | null } {
+  const none = { raw, warning: null };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return none;
+  const r = raw as Record<string, unknown>;
+  if (r.prompt !== undefined && r.prompt !== null) return none;
+  const id = (r.prediction as { id?: unknown } | undefined)?.id;
+  if (typeof id !== "string") return none;
+  const p = t?.predictions.find((x) => x.id === id && x.status === "open");
+  if (!p?.question) return none;
+  return {
+    raw: { ...r, prompt: { kind: "prediction", text: p.question, chips: [...p.choices] } },
+    warning: `${PROMPT_REATTACHED}: prediction "${id}" was re-offered without its prompt; its stored question and choices were attached verbatim`,
+  };
+}
