@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
 import { fixtureRegistry } from "../__fixtures__/registry";
 import { directorResponseJsonSchema, professorPrompt, shortlist, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
-import { liveRefusals, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
+import { CapGuardProvider, liveRefusals, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
 
 // The bake-off harness (docs/m3-plan.md slice 7a), in recorded mode only: no model, key or network.
 
@@ -151,5 +151,23 @@ describe("recording a live run for review", () => {
     await expect(p.complete(req)).rejects.toMatchObject({ kind: "server" });
     expect(p.steps).toEqual([{ ok: { json: { a: 1 }, input_tokens: 10, output_tokens: 2, latency_ms: 0 } }, { status: 500 }]);
     expect(JSON.stringify(p.steps)).not.toContain("SECRET");
+  });
+});
+
+describe("per-attempt cap guard", () => {
+  it("sends an attempt only if spent + its worst case fits the cap; a blocked attempt is never sent", async () => {
+    const c = config();
+    const inner = new RecordedProvider({ source: "test", steps: [{ ok: { json: {}, input_tokens: 1, output_tokens: 1 } }] });
+    const req = { system: "s".repeat(350), input: "i".repeat(350), outputSchema: {}, maxOutputTokens: 3000, signal: new AbortController().signal };
+    // worst case: 200 estimated input + 3,000 output tokens at professor prices
+    const worst = Math.ceil((200 * c.models.professor.price_micro_usd_per_million_tokens.input + 3000 * c.models.professor.price_micro_usd_per_million_tokens.output) / 1e6);
+    const blocked: string[] = [];
+    const tight = new CapGuardProvider(inner, { config: c, model: "professor", spent: () => 70_001 - worst + 1, capMicroUsd: 70_001, onBlock: (m) => blocked.push(m) });
+    await expect(tight.complete(req)).rejects.toMatchObject({ kind: "spend_limit" });
+    expect(inner.requests).toHaveLength(0);
+    expect(blocked[0]).toMatch(/attempt not sent/);
+    const fits = new CapGuardProvider(inner, { config: c, model: "professor", spent: () => 70_001 - worst, capMicroUsd: 70_001 });
+    await expect(fits.complete(req)).resolves.toBeDefined();
+    expect(inner.requests).toHaveLength(1);
   });
 });

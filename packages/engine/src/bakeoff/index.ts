@@ -3,3 +3,4 @@ export * from "./runner";
 export * from "./report";
 export * from "./live";
 export * from "./recorder";
+export * from "./capGuard";

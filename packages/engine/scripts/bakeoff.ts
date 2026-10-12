@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AiConfig, type RuntimeModel } from "@aili/schemas";
 import {
+  CapGuardProvider,
   createProfessorProvider,
   directorResponseJsonSchema,
   keyPresent,
@@ -15,6 +16,7 @@ import {
   Scenario,
   summaryMarkdown,
   transcriptMarkdown,
+  type AnthropicDiagnostic,
   type ProfessorProvider,
   type Recording,
   type TurnRecord,
@@ -32,7 +34,11 @@ import { args, loadConfig, loadFixtureRegistry, loadTemplates, readJson, repoRoo
 // to bakeoff-runs/<time>-<mode>/ (git-ignored; Lucky decides what to keep).
 //
 //   npm run bakeoff -w @aili/engine -- [--scenario id,id] [--category spec] [--runs 1] [--max-turns N] [--keep-going]
-//   npm run bakeoff:live -w @aili/engine -- --scenario s03-true-beginner --max-turns 1 [--record]
+//   npm run bakeoff:live -w @aili/engine -- --scenario s03-true-beginner --max-turns 1 [--record] [--cap-usd 0.10]
+// --cap-usd can only LOWER the config cap for this run. Live mode checks the cap before every
+// provider attempt too (CapGuardProvider). Live mode prints the provider's own error type and message
+// (scrubbed, 300 characters) and each response's stop reason and tokens to the TERMINAL (stderr) only;
+// they never go into events, the ledger, transcripts, results.json or any file.
 
 function fail(msg: string): never {
   console.error(msg);
@@ -85,6 +91,18 @@ async function main() {
     models = "recorded responses (see each recording's source)";
   }
   if (!scenarios.length) fail("no scenarios to run");
+  if (typeof a["cap-usd"] === "string") {
+    const usd = Number(a["cap-usd"]);
+    if (!(usd > 0)) fail("--cap-usd must be a positive number of USD");
+    const lowered = Math.min(config.bakeoff_cap_micro_usd, Math.round(usd * 1e6));
+    config = AiConfig.parse({ ...config, bakeoff_cap_micro_usd: lowered });
+  }
+  const diagnostic = (d: AnthropicDiagnostic) =>
+    console.error(
+      d.type === "error"
+        ? `  [provider ${d.model}] HTTP ${d.status} ${d.error_type}: ${d.message}`
+        : `  [provider ${d.model}] HTTP ${d.status} stop_reason=${d.stop_reason} served_model=${d.served_model} input=${d.input_tokens} output=${d.output_tokens} thinking=${d.thinking_tokens ?? "not reported"} cache_read=${d.cache_read_input_tokens ?? 0} cache_write=${d.cache_creation_input_tokens ?? 0}`,
+    );
 
   const started = new Date().toISOString();
   const out = typeof a.out === "string" ? a.out : join(root, "bakeoff-runs", `${started.replace(/[:.]/g, "-")}-${mode}`);
@@ -97,17 +115,20 @@ async function main() {
     stopOnUnexpected: a["keep-going"] !== true,
     live: mode === "live" ? { hasKey } : undefined,
     killSwitch: () => process.env.AILI_AI_KILL_SWITCH === "1",
-    make: (s, run) => {
+    make: (s, run, spent) => {
       let professor: ProfessorProvider;
       let router: ProfessorProvider;
       if (mode === "live") {
-        professor = createProfessorProvider(config, "professor", () => process.env);
-        router = createProfessorProvider(config, "router", () => process.env);
+        professor = createProfessorProvider(config, "professor", () => process.env, { onDiagnostic: diagnostic });
+        router = createProfessorProvider(config, "router", () => process.env, { onDiagnostic: diagnostic });
         if (a.record === true) {
           const k = { professor: new RecordingProvider(professor), router: new RecordingProvider(router) };
           kept.set(`${s.id}#${run}`, k);
           [professor, router] = [k.professor, k.router];
         }
+        // Outermost: a blocked attempt is never sent (and never recorded).
+        const guard = (inner: ProfessorProvider, model: RuntimeModel) => new CapGuardProvider(inner, { config, model, spent, capMicroUsd: config.bakeoff_cap_micro_usd, onBlock: (m) => console.error(`  [cap] ${m}`) });
+        [professor, router] = [guard(professor, "professor"), guard(router, "router")];
       } else {
         const r = recordings.get(s.id)!;
         professor = new RecordedProvider(r.professor, "professor");
@@ -136,6 +157,11 @@ async function main() {
       const source = `LIVE ${started}, ${models}. NOT reviewed: review before copying into bakeoff/recordings/.`;
       writeFileSync(join(out, "recordings-for-review", `${id.replace("#", "-run")}.json`), JSON.stringify({ source, scenario: id.split("#")[0], router: { source, steps: k.router!.steps }, professor: { source, steps: k.professor!.steps } }, null, 2));
     }
+  }
+  for (const [id, k] of kept) {
+    console.log(`\nRecorded for review (${id}):`);
+    for (const [model, steps] of [["router", k.router!.steps], ["professor", k.professor!.steps]] as const)
+      steps.forEach((st, i) => console.log(`  ${model} attempt ${i + 1}: ${"ok" in st ? `${st.ok.latency_ms} ms, answer:\n${JSON.stringify(st.ok.json, null, 2).replace(/^/gm, "    ")}` : JSON.stringify(st)}`));
   }
   console.log(`\nTotal ${(result.total_micro_usd / 1e6).toFixed(5)} USD (config prices). ${result.stopped ? `STOPPED: ${result.stopped}` : "Completed."}`);
   console.log(`Report: ${out}/summary.md`);

@@ -48,8 +48,11 @@ export interface ScenarioRecord {
 export interface RunDeps {
   registry: Registry;
   config: AiConfig;
-  /** A fresh director and router per scenario run (recorded providers replay per scenario). */
-  make: (scenario: Scenario, run: number) => { director: Director; router: Router };
+  /**
+   * A fresh director and router per scenario run (recorded providers replay per scenario). `spent`
+   * is everything the run has spent so far, for a per-attempt cap guard (CapGuardProvider).
+   */
+  make: (scenario: Scenario, run: number, spent: () => number) => { director: Director; router: Router };
   live?: { hasKey: (m: RuntimeModel) => boolean };
   killSwitch?: () => boolean;
   timeoutMs?: number;
@@ -102,7 +105,7 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
     for (const scenario of scenarios) {
       const sessionId = `${scenario.id}#${run}`;
       sessions.push(sessionId);
-      const { director, router } = d.make(scenario, run);
+      const { director, router } = d.make(scenario, run, spent);
       const checks: CheckRecord[] = [];
       const s = new TurnSession({
         registry: d.registry,
