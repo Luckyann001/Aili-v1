@@ -239,3 +239,23 @@ describe("concepts and evidence against this turn's shortlist; every error at on
     expect(e).toContain(`narration[0].text: ${LONG.length} characters, at most ${NARRATION_MAX_CHARS}`);
   });
 });
+
+describe("an analogy's mapping and breakdown go in the narration (Lucky's decision 2026-10-12)", () => {
+  // The shopping-bag fixture analogy, as both live answers of 2026-10-12 used it.
+  const bag = { analogy: "analogy.fx-shopping-bag", move: "explain" };
+  it("the first live answer (described the bag and where it breaks down) passes", () => {
+    const narration = [
+      { id: "n1", text: "Try the shopping bag: the bag is the load, your shoulder is the servo." },
+      { id: "n2", text: "The bag analogy breaks down: a shoulder tires, but a servo has a fixed rated torque." },
+    ];
+    expect(errs({ ...bag, narration })).toEqual([]);
+  });
+  it("the live repair (tag set, analogy never described) is rejected, with the mapping and breakdown to use", () => {
+    const narration = [{ id: "n1", text: "Try the stage: the ruler is the arm and your hand is the servo." }];
+    expect(errs({ ...bag, narration }).join("\n")).toMatch(/analogy: "analogy.fx-shopping-bag" is set, so the narration says what maps to what \(the bag → the payload; .*\) and where it breaks down \("A shoulder tires/);
+  });
+  it("a mapping without a breakdown, or a breakdown without the mapping, is rejected", () => {
+    expect(errs({ ...bag, narration: [{ id: "n1", text: "The bag is the load and your shoulder is the servo." }] })).not.toEqual([]);
+    expect(errs({ ...bag, narration: [{ id: "n1", text: "This picture breaks down for a real motor." }] })).not.toEqual([]);
+  });
+});

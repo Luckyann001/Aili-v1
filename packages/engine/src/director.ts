@@ -189,7 +189,14 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     }
     if (r.move !== "assign" && r.move !== "teach_back") errors.push(`reading: set only with move "assign" or "teach_back", not "${r.move}"`);
   }
-  if (r.analogy && !sl.analogies.some((a) => a.id === r.analogy)) notInShortlist("analogy", r.analogy);
+  if (r.analogy) {
+    const an = sl.analogies.find((a) => a.id === r.analogy);
+    if (!an) notInShortlist("analogy", r.analogy);
+    else if (!analogyExplained(r.narration.map((n) => n.text).join(" "), an.mapping))
+      errors.push(
+        `analogy: "${an.id}" is set, so the narration says what maps to what (${an.mapping.map((m) => `${m.source} → ${m.target}`).join("; ")}) and where it breaks down ("${an.breaks_down}")`,
+      );
+  }
 
   // A teach-back is graded ONLY against the reading's human-written guide (spec A8).
   if (r.teach_back_check) {
@@ -236,6 +243,22 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
   });
 
   return { response: errors.length ? null : r, errors };
+}
+
+// Words too common in this subject to show that an analogy was described.
+const COMMON = new Set(["the", "your", "how", "far", "from", "own", "you", "weight", "arm", "force", "torque", "load", "servo", "distance", "hard", "push", "twist", "its", "and", "with", "what", "where", "this", "that"]);
+/**
+ * Whether narration describes an analogy (Lucky's decision 2026-10-12): it names something from the
+ * mapping's source side (a distinctive word such as "bag" or "shoulder") AND says where it breaks
+ * down ("breaks down", "unlike", "differs", "doesn't hold", "not like"). A heuristic: it cannot judge
+ * whether the description is right, only that both parts are there.
+ */
+export function analogyExplained(narration: string, mapping: ReadonlyArray<{ source: string }>): boolean {
+  const said = narration.toLowerCase();
+  const words = mapping.flatMap((m) => m.source.toLowerCase().match(/[a-z]{3,}/g) ?? []).filter((w) => !COMMON.has(w));
+  const mapped = words.some((w) => new RegExp(`\\b${w}`).test(said));
+  const breaks = /\bbreaks? down\b|\bunlike\b|\bdiffers?\b|\bdoesn['’]t (hold|work|apply)\b|\bnot like\b/.test(said);
+  return mapped && breaks;
 }
 
 function fieldPath(path: readonly PropertyKey[]): string {

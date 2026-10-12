@@ -216,14 +216,14 @@ describe("A14 #16 return after reading: resumed, not piled on, no replay", () =>
 });
 
 describe("A14 #17 'another example': a different analogy, from the shortlist", () => {
-  const first: Answer = () => ({ move: "explain", analogy: "analogy.fx-door", narration: say("It is like a door turning on its hinges.") });
+  const first: Answer = () => ({ move: "explain", analogy: "analogy.fx-door", narration: say("Like a door on its hinges: the pivot is the servo joint. It breaks down: only turning carries over.") });
   it("the same analogy again, or none, is rejected; a different one passes", async () => {
-    for (const [answer, rule] of [[() => ({ move: "explain", analogy: "analogy.fx-door", narration: say("Again, the door.") }), "another-example"], [() => ({ move: "explain", narration: say("Think of it differently.") }), "another-example"]] as const) {
+    for (const [answer, rule] of [[() => ({ move: "explain", analogy: "analogy.fx-door", narration: say("Again, the door: the pivot is the servo joint. It breaks down: only turning carries over.") }), "another-example"], [() => ({ move: "explain", narration: say("Think of it differently.") }), "another-example"]] as const) {
       const t = session([first, answer as Answer]);
       await t.reply("Explain torque");
       rejectedBy(await t.reply("Use another example"), rule);
     }
-    const t = session([first, () => ({ move: "explain", analogy: "analogy.fx-wrench", narration: say("It is like a spanner on a nut.") })]);
+    const t = session([first, () => ({ move: "explain", analogy: "analogy.fx-wrench", narration: say("Like a spanner on a nut: the pivot is the servo joint. Unlike a servo, only turning carries over.") })]);
     await t.reply("Explain torque");
     done(await t.reply("Use another example"));
     expect(t.s.state.teaching!.analogies_used).toEqual(["analogy.fx-door", "analogy.fx-wrench"]);
