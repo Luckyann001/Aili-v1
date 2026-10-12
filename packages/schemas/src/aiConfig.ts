@@ -10,6 +10,10 @@ const ModelPricing = z
     /** Configuration, never hard-coded (CLAUDE.md). Null until a provider is chosen. */
     provider: z.string().min(1).nullable(),
     model: z.string().min(1).nullable(),
+    /** The NAME of a server-only environment variable holding the key; never a key value. */
+    api_key_env: z.string().regex(/^AILI_[A-Z0-9_]+_API_KEY$/, "api_key_env is a variable NAME like AILI_PROFESSOR_API_KEY, never a key"),
+    /** The most output tokens one call may produce (also used for the worst-case spend check). */
+    max_output_tokens: z.number().int().positive().max(16_000),
     price_micro_usd_per_million_tokens: z.object({ input: MicroUsd, output: MicroUsd }).strict(),
     pricing_status: z.string().min(1),
   })
