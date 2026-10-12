@@ -1,5 +1,6 @@
-import { createFakeDirector, encodeEvent, TurnSession, type TurnEvent } from "@aili/engine";
-import { InterruptRequest, TurnRequest } from "@aili/schemas";
+import { createFakeDirector, encodeEvent, InMemoryLedger, killSwitchFromEnv, TurnSession, type TurnEvent } from "@aili/engine";
+import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
+import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
 
 // Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Fake director only:
@@ -9,6 +10,15 @@ import { FAKE_DIRECTOR } from "./flags";
 // "aili-turn-fixtures" is a build-time alias (next.config.ts): the real fixture registry only when the
 // flag is set, otherwise a stub with no fixture data, so production builds never contain the files.
 const loadFixtureRegistry = FAKE_DIRECTOR ? () => import("aili-turn-fixtures") : null;
+
+// Prices and the session cap come only from config/ai.json, validated once at start-up.
+const aiConfig = AiConfig.safeParse(aiConfigJson);
+
+/**
+ * Cost per page session (slice 7). IN MEMORY ONLY: lost on restart and separate on each server
+ * instance. Per-user and global caps need the database (deferred stage).
+ */
+export const ledger = new InMemoryLedger();
 
 /** How long the "slow" case waits, so a person (or a test) can interrupt it. */
 export const SLOW_MS = 3000;
@@ -35,6 +45,7 @@ export async function handleTurn(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest(parsed.error.issues.map((i) => `${i.path.join(".") || "(body)"}: ${i.message}`));
   const req = parsed.data;
 
+  if (!aiConfig.success) return Response.json({ error: "config/ai.json is invalid", issues: aiConfig.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) }, { status: 500 });
   const { registry, errors } = (await loadFixtureRegistry()).fixtureTurnRegistry();
   if (errors.length) return Response.json({ error: "the test-fixture registry did not load", issues: errors }, { status: 500 });
 
@@ -47,6 +58,8 @@ export async function handleTurn(request: Request): Promise<Response> {
     startRev: req.state_rev - 1,
     timeoutMs: TIMEOUT_MS,
     includeStateInDone: true,
+    // The kill switch is read on every request (server-only env, so it can be flipped without a rebuild).
+    meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env) },
   });
   const key = `${req.session_id}/turn_${req.state_rev}`;
   const enc = new TextEncoder();

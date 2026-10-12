@@ -113,6 +113,34 @@ describe("flag on: interrupt", () => {
   });
 });
 
+describe("metering in the route (slice 7)", () => {
+  it("AILI_AI_KILL_SWITCH=1 refuses the turn before it starts, in plain words", async () => {
+    const { handleTurn } = await load("1");
+    vi.stubEnv("AILI_AI_KILL_SWITCH", "1");
+    const events = await readAll(await handleTurn(post(turnBody({ session_id: "kill-switch-0001" }))));
+    expect(events.map((e) => e.type)).toEqual(["turn.started", "turn.error"]);
+    const err = events[1] as Extract<TurnEvent, { type: "turn.error" }>;
+    expect(err.reason).toBe("kill_switch");
+    expect(err.message).toMatch(/^Aili's live answers are switched off right now\. Prepared lessons still work\./);
+  });
+
+  it("a page session is refused once it reaches the cap in config/ai.json; other sessions are not", async () => {
+    const { handleTurn, ledger } = await load("1");
+    const turn = async (session_id: string, state_rev: number) => (await readAll(await handleTurn(post(turnBody({ session_id, state_rev }))))).at(-1) as TurnEvent;
+    const config = JSON.parse(readFileSync(new URL("../../../../config/ai.json", import.meta.url), "utf8"));
+    let rev = 1;
+    let last = await turn("capped-0001", rev);
+    while (last.type === "turn.done" && rev < 1000) last = await turn("capped-0001", ++rev);
+    expect(last.type).toBe("turn.error");
+    expect((last as Extract<TurnEvent, { type: "turn.error" }>).reason).toBe("session_cap");
+    expect(ledger.spent("capped-0001")).toBeGreaterThanOrEqual(config.session_cap_micro_usd);
+    // The turn before the refusal was still under the cap when it started.
+    const entries = ledger.entries("capped-0001");
+    expect(ledger.spent("capped-0001") - entries.at(-1)!.cost_micro_usd).toBeLessThan(config.session_cap_micro_usd);
+    expect((await turn("fresh-0002", 1)).type).toBe("turn.done");
+  });
+});
+
 describe("no provider, no key, no network on this path", () => {
   const files = ["./server.ts", "./flags.ts", "./fixtureRegistry.ts", "./noFixtureRegistry.ts", "../app/api/turn/route.ts", "../app/api/turn/interrupt/route.ts"];
   it("imports only the engine, the schemas, local modules and content JSON; reads only the two testing flags", () => {
@@ -121,6 +149,9 @@ describe("no provider, no key, no network on this path", () => {
       for (const [, spec] of src.matchAll(/from\s+"([^"]+)"/g)) expect(spec, `${f} imports ${spec}`).toMatch(/^(@aili\/(engine|schemas)|aili-turn-fixtures|\.\.?\/.*)$/);
       expect(src, f).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/);
       for (const [, name] of src.matchAll(/process\.env\.([A-Z0-9_]+)/g)) expect(["NEXT_PUBLIC_AILI_FAKE_DIRECTOR", "NEXT_PUBLIC_AILI_DEMO_TOOLS"], f).toContain(name);
+      // The only other environment read is the server-only kill switch, through the engine's helper.
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""); // comments removed
+      expect(code.replace(/killSwitchFromEnv\(process\.env\)/g, ""), f).not.toMatch(/process\.env(?!\.[A-Z])/);
     }
   });
 });
