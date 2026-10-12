@@ -9,7 +9,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run --passWithNoTests",
-    "dry-run": "rolldown scripts/dryRun.ts --platform node --format esm --file .script-build/dryRun.mjs --log-level warn && node .script-build/dryRun.mjs"
+    "dry-run": "rolldown scripts/dryRun.ts --platform node --format esm --file .script-build/dryRun.mjs --log-level warn && node .script-build/dryRun.mjs",
+    "bakeoff": "rolldown scripts/bakeoff.ts --platform node --format esm --file .script-build/bakeoff.mjs --log-level warn && node .script-build/bakeoff.mjs --mode recorded",
+    "bakeoff:live": "rolldown scripts/bakeoff.ts --platform node --format esm --file .script-build/bakeoff.mjs --log-level warn && node --env-file-if-exists=../../apps/web/.env.local .script-build/bakeoff.mjs --mode live"
   },
   "dependencies": {
     "@aili/schemas": "^0.0.0",

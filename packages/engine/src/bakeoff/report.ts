@@ -1,0 +1,154 @@
+import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
+
+// Bake-off report (docs/m3-plan.md slice 7a): numbers code can measure, and one transcript per
+// scenario run for a human to read. Code does not judge tone, physics or teaching quality.
+
+const usd = (micro: number) => `${(micro / 1e6).toFixed(4)} USD`;
+const pct = (n: number, d: number) => (d === 0 ? "n/a" : `${Math.round((100 * n) / d)}% (${n}/${d})`);
+const quantile = (xs: number[], q: number) => {
+  if (!xs.length) return NaN;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.ceil(q * s.length) - 1)]!;
+};
+
+export interface Metrics {
+  turns: number;
+  completed: number;
+  /** Turns whose first answer passed the structural validator / both validators. */
+  first_try_structural: [number, number];
+  first_try_both: [number, number];
+  /** Turns that needed a repair, and how many of those passed after it. */
+  repaired: [number, number];
+  /** Turns with an answer that passed (first try or after repair), over turns with any answer. */
+  after_repair: [number, number];
+  latency_median_ms: number;
+  latency_p95_ms: number;
+  cost_micro_usd: number;
+  moves: Record<string, number>;
+  /** Explain moves per question asked. */
+  explain_per_question: number;
+  max_consecutive_questions: number;
+  expectations: [number, number];
+  failures: Record<string, number>;
+}
+
+export function metrics(turns: TurnRecord[]): Metrics {
+  const withAnswer = turns.filter((t) => t.checks.length > 0);
+  const first = withAnswer.map((t) => t.checks.find((c) => c.attempt === 1)!);
+  const repairedTurns = withAnswer.filter((t) => t.checks.some((c) => c.attempt === 2));
+  const moves: Record<string, number> = {};
+  const failures: Record<string, number> = {};
+  let asked = 0;
+  let run = 0;
+  let maxRun = 0;
+  for (const t of turns) {
+    if (t.move) moves[t.move] = (moves[t.move] ?? 0) + 1;
+    if (t.outcome !== "done") failures[t.outcome] = (failures[t.outcome] ?? 0) + 1;
+    const q = !!t.response?.prompt;
+    if (q) asked++;
+    run = q ? run + 1 : 0;
+    maxRun = Math.max(maxRun, run);
+  }
+  const latencies = turns.map((t) => t.latency_ms);
+  const exp = turns.flatMap((t) => t.expectations);
+  return {
+    turns: turns.length,
+    completed: turns.filter((t) => t.outcome === "done").length,
+    first_try_structural: [first.filter((c) => c.outcome !== "validation").length, first.length],
+    first_try_both: [first.filter((c) => c.outcome === "pass").length, first.length],
+    repaired: [repairedTurns.filter((t) => t.checks.some((c) => c.attempt === 2 && c.outcome === "pass")).length, repairedTurns.length],
+    after_repair: [withAnswer.filter((t) => t.checks.some((c) => c.outcome === "pass")).length, withAnswer.length],
+    latency_median_ms: quantile(latencies, 0.5),
+    latency_p95_ms: quantile(latencies, 0.95),
+    cost_micro_usd: turns.reduce((s, t) => s + t.cost_micro_usd, 0),
+    moves,
+    explain_per_question: asked ? (moves.explain ?? 0) / asked : NaN,
+    max_consecutive_questions: maxRun,
+    expectations: [exp.filter((e) => e.pass).length, exp.length],
+    failures,
+  };
+}
+
+const movesText = (m: Record<string, number>) => Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
+
+export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "live"; started: string; models: string; note?: string }): string {
+  const all = result.records.flatMap((r) => r.turns);
+  const m = metrics(all);
+  const lines = [
+    `# Bake-off run: ${meta.mode.toUpperCase()}`,
+    "",
+    `- Started: ${meta.started}`,
+    `- Mode: **${meta.mode}**${meta.mode === "recorded" ? " (replayed recordings; no model was called)" : " (real model calls)"}`,
+    `- Models: ${meta.models}`,
+    `- Registry: **test fixtures** (nothing is published yet); scenarios outside them test the "not supported yet" path.`,
+    ...(meta.note ? [`- Note: ${meta.note}`] : []),
+    `- Total cost: ${usd(result.total_micro_usd)} of the ${usd(result.cap_micro_usd)} bake-off cap (at config prices, from the ledger)`,
+    `- Stopped early: ${result.stopped ?? "no"}`,
+    "",
+    "## Overall",
+    "",
+    `| Measure | Value |`,
+    `|---|---|`,
+    `| Turns run / completed | ${m.turns} / ${m.completed} |`,
+    `| Structural validator, first try | ${pct(...m.first_try_structural)} |`,
+    `| Both validators (structural + pedagogy), first try | ${pct(...m.first_try_both)} |`,
+    `| Repairs that passed | ${pct(...m.repaired)} |`,
+    `| Passed after repair (of turns with an answer) | ${pct(...m.after_repair)} |`,
+    `| Automatic expectations met | ${pct(...m.expectations)} |`,
+    `| Latency median / slowest 5% | ${m.latency_median_ms} ms / ${m.latency_p95_ms} ms |`,
+    `| Moves | ${movesText(m.moves)} |`,
+    `| Explain moves per question asked | ${Number.isNaN(m.explain_per_question) ? "n/a" : m.explain_per_question.toFixed(2)} |`,
+    `| Most questions in a row | ${m.max_consecutive_questions} |`,
+    `| Failures | ${movesText(m.failures)} |`,
+    "",
+    "## Per scenario",
+    "",
+    "| Scenario | Run | Category | Turns | Cost | Moves | 1st try (both) | After repair | Expectations | Median latency | Stopped |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
+    ...result.records.map((r) => {
+      const s = metrics(r.turns);
+      return `| ${r.scenario.id} | ${r.run} | ${r.scenario.category} | ${s.turns}/${r.scenario.turns.length} | ${usd(r.cost_micro_usd)} | ${movesText(s.moves)} | ${pct(...s.first_try_both)} | ${pct(...s.after_repair)} | ${pct(...s.expectations)} | ${s.latency_median_ms} ms | ${r.stopped ?? ""} |`;
+    }),
+    "",
+    "Code checks only what it can see (moves, questions, coverage, safety flag, validators, cost, time). Tone, physics and teaching quality are for the reviewer: read the transcripts.",
+  ];
+  return lines.join("\n") + "\n";
+}
+
+/** One scenario run as a readable transcript. */
+export function transcriptMarkdown(r: ScenarioRecord, mode: "recorded" | "live"): string {
+  const s = r.scenario;
+  const out = [
+    `# ${s.id}: ${s.title} (run ${r.run})`,
+    "",
+    `- Mode: **${mode}**${mode === "recorded" ? " (replayed, not a live model)" : ""} · Registry: test fixtures`,
+    `- Source: ${s.source} · Category: ${s.category} · Posture: ${s.posture} · Level: ${s.learner_level}`,
+    `- Concepts: ${s.concepts.join(", ")} · Cost: ${usd(r.cost_micro_usd)}${r.stopped ? ` · **Stopped: ${r.stopped}**` : ""}`,
+    "",
+    `**Reviewer checks:** ${s.reviewer_notes}`,
+    "",
+  ];
+  for (const t of r.turns) {
+    out.push(`## Turn ${t.index}`, "", `**Learner:** ${t.learner}`, "");
+    for (const e of t.events) {
+      if (e.type === "narration") out.push(`**Aili:** ${e.text}`, "");
+      else if (e.type === "prompt") out.push(`**Aili asks:** ${e.text}${e.chips.length ? `  \nChoices: ${e.chips.map((c) => `[${c}]`).join(" ")}` : ""}`, "");
+      else if (e.type === "action") out.push(`*Stage:* \`${JSON.stringify(e.action)}\``, "");
+      else if (e.type === "calc.result") out.push(`*Calculated (${e.calc_id}):* \`${JSON.stringify(e.outputs)}\``, "");
+      else if (e.type === "turn.error") out.push(`**Turn failed: ${e.reason}.** ${e.message}`, "", ...e.details.map((d) => `- ${d}`), "");
+    }
+    const r = t.response;
+    out.push(
+      `<details><summary>Move ${t.move ?? "-"} · ${t.latency_ms} ms · ${usd(t.cost_micro_usd)} · checks: ${t.checks.map((c) => `#${c.attempt} ${c.outcome}`).join(", ") || "none"}</summary>`,
+      "",
+      ...(r ? [`- assumptions: ${JSON.stringify(r.assumptions)}`, `- limitations: ${JSON.stringify(r.limitations)}`, `- safety: ${r.safety} · coverage: ${r.coverage ?? "(unset)"} · reading: ${JSON.stringify(r.reading ?? null)}`] : []),
+      ...t.checks.flatMap((c) => c.errors.map((e) => `- check #${c.attempt} (${c.outcome}): ${e}`)),
+      ...t.usage.map((u) => `- usage: ${u.model} in ${u.input_tokens} / out ${u.output_tokens} → ${usd(u.cost_micro_usd)}`),
+      ...t.expectations.map((e) => `- expectation ${e.name}: ${e.pass ? "PASS" : "FAIL"} (${e.detail})`),
+      "",
+      "</details>",
+      "",
+    );
+  }
+  return out.join("\n");
+}

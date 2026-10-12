@@ -19,3 +19,4 @@ export * from "./providerRouter";
 export * from "./prompt";
 export * from "./teaching";
 export * from "./providers";
+export * from "./bakeoff";

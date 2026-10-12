@@ -1,0 +1,61 @@
+{
+  "source": "HAND-WRITTEN for slice 7a (not from a real model): an out-of-coverage answer.",
+  "scenario": "o1-inverse-kinematics",
+  "router": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null
+          },
+          "input_tokens": 530,
+          "output_tokens": 44
+        }
+      }
+    ]
+  },
+  "professor": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_1",
+            "state_rev": 1,
+            "move": "answer",
+            "concepts": [
+              "mech.torque.static"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Inverse kinematics isn't supported here yet."
+              },
+              {
+                "id": "n2",
+                "text": "The nearest supported topic is how much torque a joint needs to hold an arm still."
+              }
+            ],
+            "actions": [],
+            "calc_requests": [],
+            "evidence": [],
+            "assumptions": [],
+            "limitations": [],
+            "coverage": "unsupported"
+          },
+          "input_tokens": 1900,
+          "output_tokens": 210
+        }
+      }
+    ]
+  }
+}

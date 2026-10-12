@@ -1,0 +1,31 @@
+{
+  "id": "s06-frustration",
+  "title": "Repeated 'I don't know'",
+  "source": "behavior spec A14 test 6",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Why is it harder to hold the weight further out?"
+    },
+    {
+      "text": "I don't know."
+    },
+    {
+      "text": "I don't know.",
+      "expect": {
+        "moves": [
+          "explain",
+          "answer"
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": "After repeated 'I don't know', Aili explains or moves up the help ladder instead of asking again."
+}

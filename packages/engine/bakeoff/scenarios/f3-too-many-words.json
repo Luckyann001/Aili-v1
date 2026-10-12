@@ -1,0 +1,22 @@
+{
+  "id": "f3-too-many-words",
+  "title": "Frustration: 'too many words'",
+  "source": "approved bake-off list: frustration",
+  "category": "frustration",
+  "posture": "learning",
+  "learner_level": "true_beginner",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Explain why holding the weight further out is harder."
+    },
+    {
+      "text": "I'm confused, that was too many words."
+    }
+  ],
+  "reviewer_notes": "A shorter, simpler explanation, possibly using the stage; no lecture."
+}

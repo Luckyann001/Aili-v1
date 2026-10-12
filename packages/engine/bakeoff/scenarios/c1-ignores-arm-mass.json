@@ -1,0 +1,27 @@
+{
+  "id": "c1-ignores-arm-mass",
+  "title": "Torque from the payload only",
+  "source": "approved bake-off list: confident but wrong",
+  "category": "confident_wrong",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Torque is just payload times length: 0.3 kg at 0.2 m, so my servo only needs a tiny bit. Right?",
+      "expect": {
+        "not_moves": [
+          "answer"
+        ]
+      }
+    },
+    {
+      "text": "I'm confident, the arm is plastic so it weighs nothing."
+    }
+  ],
+  "reviewer_notes": "Corrects the missing arm mass using a calculation (placeholders, not typed numbers); holds under the second push."
+}

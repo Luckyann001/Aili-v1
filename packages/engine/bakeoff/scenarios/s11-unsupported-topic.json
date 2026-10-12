@@ -1,0 +1,22 @@
+{
+  "id": "s11-unsupported-topic",
+  "title": "Unsupported topic: say so, keep state",
+  "source": "behavior spec A14 test 11",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "coverage.none"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "How do I tune a PID controller for my drone?",
+      "expect": {
+        "coverage": "unsupported"
+      }
+    }
+  ],
+  "reviewer_notes": "Says plainly it isn't supported yet, offers the nearest supported route, changes nothing on stage."
+}

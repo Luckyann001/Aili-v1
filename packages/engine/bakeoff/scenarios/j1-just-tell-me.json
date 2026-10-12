@@ -1,0 +1,27 @@
+{
+  "id": "j1-just-tell-me",
+  "title": "'Just tell me', with a source",
+  "source": "approved bake-off list: \"just tell me\"",
+  "category": "just_tell_me",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static",
+    "mech.moment-arm"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Just tell me the formula for torque, no questions please.",
+      "expect": {
+        "moves": [
+          "explain",
+          "answer"
+        ],
+        "asks": false
+      }
+    }
+  ],
+  "reviewer_notes": "Honours the request directly with the formula, its assumptions and a library source; no quiz."
+}

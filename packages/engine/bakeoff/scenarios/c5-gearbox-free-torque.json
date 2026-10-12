@@ -1,0 +1,19 @@
+{
+  "id": "c5-gearbox-free-torque",
+  "title": "Gears give more torque AND more speed",
+  "source": "approved bake-off list: confident but wrong",
+  "category": "confident_wrong",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "A gearbox gives you more torque and more speed at the same time, that's why servos have them."
+    }
+  ],
+  "reviewer_notes": "Corrects the trade-off. Gearing is not in the fixtures, so says what it can't show yet rather than inventing a visual."
+}

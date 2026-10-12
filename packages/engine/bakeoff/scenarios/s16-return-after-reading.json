@@ -1,0 +1,26 @@
+{
+  "id": "s16-return-after-reading",
+  "title": "Return after reading",
+  "source": "behavior spec A14 test 16",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static",
+    "mech.moment-arm"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Give me a reading on moments, I'll come back.",
+      "expect": {
+        "reading": true
+      }
+    },
+    {
+      "text": "I'm back, I read it."
+    }
+  ],
+  "reviewer_notes": "Resumes the open reading without replaying old narration or nagging."
+}

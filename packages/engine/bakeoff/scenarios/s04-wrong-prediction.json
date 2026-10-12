@@ -1,0 +1,30 @@
+{
+  "id": "s04-wrong-prediction",
+  "title": "Wrong prediction: explain the mechanism",
+  "source": "behavior spec A14 test 4",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Does it matter how far out the weight sits?"
+    },
+    {
+      "text": "I think it makes no difference where the weight is."
+    },
+    {
+      "text": "Why was I wrong?",
+      "expect": {
+        "moves": [
+          "explain"
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": "If Aili asks for a prediction, the wrong guess gets a reveal and an explanation of WHY (the moment arm), not 'try again'. The learner's guess may not match a choice exactly; note how the router read it."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "s15-skip-theory",
+  "title": "Build intent, skip theory",
+  "source": "behavior spec A14 test 15",
+  "category": "spec",
+  "posture": "build",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Skip the theory, I just need to pick a servo for my arm."
+    },
+    {
+      "text": "I understand, let's go."
+    }
+  ],
+  "reviewer_notes": "Need-to-know minimum; a waiver is offered and recorded; safety-critical items still need an explicit acknowledgement."
+}
