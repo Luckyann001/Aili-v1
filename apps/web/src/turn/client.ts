@@ -39,12 +39,12 @@ export function initialTurnClient<S>(committed: SessionState): TurnClientState<S
   return { gate: { rev: 0, lastSeq: -1 }, status: "idle", turnId: null, snapshot: null, restoreTo: null, committed, narration: [], actions: [], calcs: [], prompt: null, message: null };
 }
 
-const cleared = { narration: [], actions: [], calcs: [], prompt: null } as const;
+const cleared = (): Pick<TurnClientState<unknown>, "narration" | "actions" | "calcs" | "prompt"> => ({ narration: [], actions: [], calcs: [], prompt: null });
 
 export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<S>): TurnClientState<S> {
   switch (a.type) {
     case "begin":
-      return { ...s, ...cleared, gate: { rev: a.rev, lastSeq: -1 }, status: "streaming", turnId: `turn_${a.rev}`, snapshot: a.snapshot, restoreTo: null, message: null };
+      return { ...s, ...cleared(), gate: { rev: a.rev, lastSeq: -1 }, status: "streaming", turnId: `turn_${a.rev}`, snapshot: a.snapshot, restoreTo: null, message: null };
 
     case "event": {
       const e = a.event;
@@ -66,17 +66,17 @@ export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<
         case "turn.done":
           return { ...t, status: "done", snapshot: null, committed: e.state ?? t.committed };
         case "turn.error":
-          return { ...t, ...cleared, status: "error", restoreTo: t.snapshot, snapshot: null, message: e.message };
+          return { ...t, ...cleared(), status: "error", restoreTo: t.snapshot, snapshot: null, message: e.message };
       }
       return s;
     }
 
     case "interrupt":
       if (s.status !== "streaming") return s;
-      return { ...s, ...cleared, gate: nextRevision(s.gate), status: "stopped", restoreTo: s.snapshot, snapshot: null, message: STOPPED_MESSAGE };
+      return { ...s, ...cleared(), gate: nextRevision(s.gate), status: "stopped", restoreTo: s.snapshot, snapshot: null, message: STOPPED_MESSAGE };
 
     case "streamEnded":
       if (s.status !== "streaming") return s; // ended after done, error or stop: nothing to do
-      return { ...s, ...cleared, gate: nextRevision(s.gate), status: "dropped", restoreTo: s.snapshot, snapshot: null, message: DROPPED_MESSAGE };
+      return { ...s, ...cleared(), gate: nextRevision(s.gate), status: "dropped", restoreTo: s.snapshot, snapshot: null, message: DROPPED_MESSAGE };
   }
 }
