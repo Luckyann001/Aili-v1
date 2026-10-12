@@ -122,8 +122,7 @@ describe("order of the checks for live turns: kill switch, configuration and key
     expect([t.router.calls, t.provider.requests.length]).toEqual([0, 0]);
   });
 
-  it("the committed config/ai.json has no limit record, so live turns are refused as it stands", () => {
-    expect(AiConfig.parse(configJson()).provider_monthly_limit_set).toBeNull();
+  it("a limit record needs a real date and a positive amount (Lucky recorded one on 2026-10-12)", () => {
     expect(AiConfig.safeParse({ ...configJson(), provider_monthly_limit_set: { by: "Lucky", on: "12 Oct", usd: 30 } }).success).toBe(false);
     expect(AiConfig.safeParse({ ...configJson(), provider_monthly_limit_set: { by: "Lucky", on: "2026-10-12", usd: 0 } }).success).toBe(false);
   });

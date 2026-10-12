@@ -127,10 +127,9 @@ describe("live mode readiness (no call is made here)", () => {
     c.provider_monthly_limit_set = { by: "test", on: "2026-10-12", usd: 5 };
     return AiConfig.parse(c);
   };
-  it("the committed config is refused, with every gap named", () => {
+  it("the committed config (limit recorded by Lucky, models set) is refused here only for the missing keys", () => {
     const r = liveRefusals(AiConfig.parse(JSON.parse(read("config/ai.json"))), {});
-    expect(r.join("\n")).toMatch(/provider_monthly_limit_set is not recorded/);
-    expect(r.join("\n")).toMatch(/no key in AILI_ROUTER_API_KEY/);
+    expect(r).toEqual([expect.stringMatching(/no key in AILI_PROFESSOR_API_KEY/), expect.stringMatching(/no key in AILI_ROUTER_API_KEY/)]);
   });
   it("without the limit record it refuses even with models and keys", () => {
     const c = { ...filled(), provider_monthly_limit_set: null };
