@@ -7,6 +7,7 @@ import { useConsent } from "@/voice/consent";
 import { DEMO_TOOLS } from "@/turn/flags";
 import { useVoice } from "@/voice/store";
 import type { VoiceStatus } from "@/voice/machine";
+import { FAKE_CASES, type FakeCase } from "@aili/schemas";
 import styles from "./learn.module.css";
 
 const STATES: VoiceStatus[] = ["idle", "listening", "thinking", "speaking", "error"];
@@ -24,7 +25,7 @@ export function useDemoMode(): boolean {
   return DEMO_TOOLS && asked;
 }
 
-export function DemoControls({ onPlay }: { onPlay: () => void }) {
+export function DemoControls({ onPlay, onFakeTurn }: { onPlay: () => void; onFakeTurn?: (c: FakeCase) => void }) {
   const dispatch = useVoice((s) => s.dispatch);
   const mode = useVoice((s) => s.mode);
   const consent = useConsent();
@@ -44,6 +45,15 @@ export function DemoControls({ onPlay }: { onPlay: () => void }) {
           Play prepared reply
         </button>
       </div>
+      {onFakeTurn && (
+        <div className={styles.demoButtons} role="group" aria-label="Fake director turns (testing only)">
+          {FAKE_CASES.map((c) => (
+            <button key={c} type="button" className={styles.demoButton} onClick={() => onFakeTurn(c)}>
+              Fake turn: {c}
+            </button>
+          ))}
+        </div>
+      )}
       <PerfReadoutPanel />
       <dl className={styles.demoFacts}>
         <dt>Speech recognition in this browser</dt>

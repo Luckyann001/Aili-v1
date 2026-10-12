@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { consentCovers, getConsent, getMuted } from "./consent";
-import { isBusy } from "./machine";
+import { isBusy, type Caption, type CaptionPart } from "./machine";
 import {
   detectRecognitionMode,
   isRecognitionSupported,
@@ -60,7 +60,8 @@ export function useVoiceController(opts: {
   }, [stopEverything]);
 
   /** Speaks lines as caption segments under revision `rev`; stops scheduling once `rev` is stale. */
-  const playLines = useCallback((rev: number, lines: readonly string[], chips: string[] | undefined, onDone?: () => void) => {
+  const playLines = useCallback(
+    (rev: number, lines: readonly string[], chips: string[] | undefined, onDone?: () => void, meta?: { source: Caption["source"]; parts?: Array<CaptionPart[] | undefined> }) => {
     const lang = recognitionLang();
     const step = (seq: number) => {
       const s = useVoice.getState();
@@ -70,11 +71,13 @@ export function useVoiceController(opts: {
         onDone?.();
         return;
       }
-      s.dispatch({ type: "speak", rev, seq, text: lines[seq]! });
+      s.dispatch({ type: "speak", rev, seq, text: lines[seq]!, source: meta?.source, parts: meta?.parts?.[seq] });
       cancelSegment.current = speakSegment(lines[seq]!, { muted: getMuted(), lang, onDone: () => step(seq + 1) });
     };
     step(0);
-  }, []);
+    },
+    [],
+  );
 
   // The prepared reply ends with a question, so it offers quick replies.
   const playReply = useCallback((rev: number) => playLines(rev, PREPARED_REPLY, PREPARED_CHIPS), [playLines]);
@@ -95,6 +98,27 @@ export function useVoiceController(opts: {
     },
     [playLines, stopEverything],
   );
+
+  /** A fake-director turn starts: Aili is "thinking" under a new revision, which is returned. */
+  const beginTurn = useCallback(() => {
+    const s = useVoice.getState();
+    s.setHint(null);
+    s.dispatch({ type: "submit" });
+    stopEverything();
+    return useVoice.getState().rev;
+  }, [stopEverything]);
+
+  /** Speaks a completed fake-director turn under `rev` (badged "Test fixture"), then offers its chips. */
+  const playTurn = useCallback(
+    (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[]) =>
+      playLines(rev, lines.map((l) => l.text), chips, undefined, { source: "fixture", parts: lines.map((l) => l.parts) }),
+    [playLines],
+  );
+
+  /** A turn ended without anything to say (an error or a dropped connection): back to idle, no note. */
+  const settle = useCallback((rev: number) => {
+    if (useVoice.getState().rev === rev) useVoice.getState().dispatch({ type: "reset" });
+  }, []);
 
   const submit = useCallback(
     (text: string) => {
@@ -160,5 +184,5 @@ export function useVoiceController(opts: {
   // Leaving the page (or Next hiding the route) stops speech and drops anything queued.
   useEffect(() => () => interrupt(), [interrupt]);
 
-  return { press, interrupt, submit, startListening, say };
+  return { press, interrupt, submit, startListening, say, beginTurn, playTurn, settle };
 }

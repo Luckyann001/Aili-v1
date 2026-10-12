@@ -25,6 +25,7 @@ export function CommandBar({
   onVoice,
   inputRef,
   offer,
+  note,
 }: {
   text: string;
   onText: (text: string) => void;
@@ -32,8 +33,11 @@ export function CommandBar({
   onVoice: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
   offer?: ChipOffer | null;
+  /** A line about what the text box does, shown above it and read with it (e.g. the scripted demo). */
+  note?: string;
 }) {
   const inputId = useId();
+  const noteId = useId();
   const replies = useVoice((s) => s.prompt?.chips ?? null);
   const chips: ChipOffer | null =
     offer ?? (replies ? { group: "Suggested replies", items: replies.map((r) => ({ id: r, label: r })), onPick: (id) => onText(id) } : null);
@@ -48,6 +52,16 @@ export function CommandBar({
             </button>
           ))}
         </div>
+      )}
+
+      {note && (
+        <p id={noteId} className={styles.scriptedNote}>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="7" cy="7" r="5.5" />
+            <path d="M7 6.2v3.6M7 4.3v.1" strokeLinecap="round" />
+          </svg>
+          {note}
+        </p>
       )}
 
       <form
@@ -71,6 +85,7 @@ export function CommandBar({
           value={text}
           onChange={(e) => onText(e.target.value)}
           placeholder="Ask Aili or answer…"
+          aria-describedby={note ? noteId : undefined}
           autoComplete="off"
         />
         <Button type="submit" variant="primary">

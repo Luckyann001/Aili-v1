@@ -16,6 +16,10 @@ import { useVoiceController } from "@/voice/useVoiceController";
 import { useLesson } from "@/lesson/store";
 import { useLessonPlayer } from "@/lesson/useLessonPlayer";
 import { markLearnVisited } from "@/learn/visited";
+import { FAKE_DIRECTOR } from "@/turn/flags";
+import { useStageContent } from "@/turn/stageContent";
+import { useDemoTurn } from "@/turn/useDemoTurn";
+import type { CaptionPart } from "@/voice/machine";
 import { CommandBar, type ChipOffer } from "./CommandBar";
 import { EffortGauge } from "./scene/EffortGauge";
 import { ConsentDialog } from "./ConsentDialog";
@@ -85,6 +89,9 @@ export function LearnStage() {
   }, []);
   const voice = useVoiceController({ onTranscript, onUnsupported: focusInput, askConsent });
   useLessonPlayer(voice);
+  // Fake-director demo (testing only): ?demo=1 in a build with both testing flags.
+  const fakeDemo = demo && FAKE_DIRECTOR;
+  const demoTurn = useDemoTurn(voice);
   const lessonStatus = useLesson((s) => s.status);
   const lessonChoices = useLesson((s) => s.choices);
   const lessonRev = useLesson((s) => s.rev);
@@ -108,6 +115,7 @@ export function LearnStage() {
       }
       useLesson.getState().setScript(loaded.beats, loaded.title);
     }
+    if (how === "start") useStageContent.getState().setFixture(false); // the lesson takes the stage
     useLesson.getState().dispatch({ type: how });
   }, []);
 
@@ -179,7 +187,7 @@ export function LearnStage() {
           </div>
         </div>
 
-        {demo && <DemoControls onPlay={() => voice.submit("demo")} />}
+        {demo && <DemoControls onPlay={() => voice.submit("demo")} onFakeTurn={fakeDemo ? (c) => void demoTurn.start(c, "") : undefined} />}
 
         {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
         <div ref={safeArea} className={styles.scene} data-safe-area="">
@@ -200,14 +208,14 @@ export function LearnStage() {
 
         <div className={styles.overlay}>
           {(hint || error) && (
-            <p className={styles.voiceMessage} data-kind={error ? "error" : hint!.kind} role={error ? "alert" : undefined}>
+            <p className={styles.voiceMessage} data-kind={error ? "error" : hint!.kind} role={error || hint?.kind === "error" ? "alert" : undefined}>
               {error ?? hint!.text}
             </p>
           )}
           {captionsOn && caption && (
             <div className={styles.caption}>
-              <ContentBadge kind="prepared" />
-              <p aria-live={captionLive}>{caption.text}</p>
+              <ContentBadge kind={caption.source === "fixture" ? "fixture" : "prepared"} />
+              <p aria-live={captionLive}>{caption.parts ? <CaptionText parts={caption.parts} /> : caption.text}</p>
             </div>
           )}
         </div>
@@ -249,7 +257,8 @@ export function LearnStage() {
       <CommandBar
         text={text}
         onText={setText}
-        onSubmit={voice.submit}
+        onSubmit={fakeDemo ? (t) => void demoTurn.start("valid", t) : voice.submit}
+        note={fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
         onVoice={() => void voice.press()}
         inputRef={inputRef}
         offer={offer}
@@ -276,6 +285,34 @@ export function LearnStage() {
         />
       )}
     </div>
+  );
+}
+
+/** A caption line with solver-calculated values marked: calculator icon, dotted underline, ", calculated". */
+function CaptionText({ parts }: { parts: CaptionPart[] }) {
+  return (
+    <>
+      {parts.map((p, i) =>
+        "value" in p ? (
+          <span key={i} className={styles.calc} data-calculated="">
+            <CalcIcon />
+            {p.value}
+            <span className={styles.srOnly}>, calculated</span>
+          </span>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function CalcIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+      <rect x="2.5" y="1.5" width="9" height="11" rx="1.5" />
+      <path d="M4.5 4h5M4.75 7h.5M7 7h.5M9.25 7h.5M4.75 9.5h.5M7 9.5h.5M9.25 9.5h.5" />
+    </svg>
   );
 }
 

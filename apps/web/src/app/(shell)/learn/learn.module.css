@@ -1036,3 +1036,32 @@
     justify-content: space-between;
   }
 }
+
+/* Second stage badge: fake-director (test fixture) content is on stage. Flask icon + words. */
+.badgeFixture {
+  font: 500 0.8rem var(--aili-font-ui);
+  color: var(--aili-text);
+}
+
+/* A value a solver calculated: calculator icon + dotted underline (behavior spec A10). */
+.calc {
+  white-space: nowrap;
+  font-weight: 600;
+  text-decoration: underline dotted 1.5px;
+  text-underline-offset: 3px;
+}
+
+.calc > svg {
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+
+/* Near the input under ?demo=1: the fake director ignores what was typed. Always shown there. */
+.scriptedNote {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin: 0 0 var(--aili-space-2);
+  color: var(--aili-text);
+  font: 500 0.875rem var(--aili-font-ui);
+}
