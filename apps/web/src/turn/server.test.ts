@@ -147,7 +147,7 @@ describe("metering in the route (slice 7)", () => {
     expect(err.message).toMatch(/^Aili's live answers are switched off right now\. Prepared lessons still work\./);
   });
 
-  it("a page session is refused once it reaches the cap in config/ai.json; other sessions are not", async () => {
+  it("a page session is refused once one more worst-case turn would pass the cap in config/ai.json; other sessions are not", async () => {
     const { handleTurn, ledger } = await load("1");
     const turn = async (session_id: string, state_rev: number) => (await readAll(await handleTurn(post(turnBody({ session_id, state_rev }))))).at(-1) as TurnEvent;
     const config = JSON.parse(readFileSync(new URL("../../../../config/ai.json", import.meta.url), "utf8"));
@@ -156,10 +156,13 @@ describe("metering in the route (slice 7)", () => {
     while (last.type === "turn.done" && rev < 1000) last = await turn("capped-0001", ++rev);
     expect(last.type).toBe("turn.error");
     expect((last as Extract<TurnEvent, { type: "turn.error" }>).reason).toBe("session_cap");
-    expect(ledger.spent("capped-0001")).toBeGreaterThanOrEqual(config.session_cap_micro_usd);
-    // The turn before the refusal was still under the cap when it started.
-    const entries = ledger.entries("capped-0001");
-    expect(ledger.spent("capped-0001") - entries.at(-1)!.cost_micro_usd).toBeLessThan(config.session_cap_micro_usd);
+    // Worst case (slice 4): the fake director and router give no estimate, so the full allowances are used.
+    const { worstCaseTurnCost, PROMPT_BUDGET_TOKENS, ROUTER_INPUT_ALLOWANCE_TOKENS } = await import("@aili/engine");
+    const { AiConfig } = await import("@aili/schemas");
+    const worst = worstCaseTurnCost(AiConfig.parse(config), { professorInputTokens: PROMPT_BUDGET_TOKENS, routerInputTokens: ROUTER_INPUT_ALLOWANCE_TOKENS });
+    const spent = ledger.spent("capped-0001");
+    expect(spent).toBeLessThan(config.session_cap_micro_usd); // refused BEFORE the cap is reached…
+    expect(spent + worst).toBeGreaterThan(config.session_cap_micro_usd); // …because one more worst-case turn would pass it
     expect((await turn("fresh-0002", 1)).type).toBe("turn.done");
   });
 });
