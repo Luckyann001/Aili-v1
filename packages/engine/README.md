@@ -35,6 +35,23 @@ solvers → compile (placeholders filled, three significant figures) → events.
   evidence); its output is validated and metered at router prices. M3 slice 1 has only the fake
   router, with fixed rules; the real one is a cheap model.
 
+## Provider adapter (`src/provider.ts`, `src/providerDirector.ts`, `src/recordedProvider.ts`)
+- `ProfessorProvider.complete({ system, input, outputSchema, maxOutputTokens, signal })` →
+  `{ json, usage, latencyMs }`. Provider, model, the key's variable NAME (`api_key_env`) and
+  `max_output_tokens` live only in `config/ai.json`; a test greps the code for provider and model names.
+- **One 20 s budget per turn** (router, director, retries and the repair share it). Network error,
+  attempt timeout, 429 and 5xx get ONE jittered retry (250–750 ms) if at least 2 s remain; 401/403
+  is `key_rejected` and other 4xx fail at once; an interrupt aborts the request at once.
+- **One repair attempt**: an answer that fails the structural or pedagogy checks is sent back with
+  the errors, once. Every attempt (retries and the repair included) is metered.
+- **Errors** become `turn.error` reasons (`not_configured`, `key_rejected`, `timeout`, `director`,
+  `validation`, `pedagogy`); `details` carry a kind only, never a key or a provider's response body.
+- **`not_configured`** when the config has no provider or model, or no key is set (only its presence
+  is checked; the value never enters the engine).
+- **`RecordedProvider`** replays stored steps (`src/__recordings__/`), so CI needs no key or network.
+  The current recording is hand-written; real recordings come in slice 7, reviewed before they are kept.
+  The real HTTP adapters are slice 6.
+
 ## Metering, cap and kill switch (`src/metering.ts`)
 - **Prices only from `config/ai.json`** (validated by `AiConfig`): integer micro-USD per million
   tokens for the professor and the router. The current prices are **test values, not real pricing**.
