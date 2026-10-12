@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
 import { fixtureRegistry } from "../__fixtures__/registry";
-import { directorResponseJsonSchema, professorPrompt, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
+import { directorResponseJsonSchema, professorPrompt, shortlist, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
 import { liveRefusals, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
 
 // The bake-off harness (docs/m3-plan.md slice 7a), in recorded mode only: no model, key or network.
@@ -56,6 +56,16 @@ describe("scenario files", () => {
       if (s.active_scene) expect(reg.scenes.some((x) => x.id === s.active_scene), `${s.id}: scene ${s.active_scene}`).toBe(true);
       for (const c of s.concepts) if (c !== "coverage.none") expect(reg.concepts.some((x) => x.id === c), `${s.id}: concept ${c}`).toBe(true);
     }
+  });
+
+  it("scenario 17 can run: its shortlist holds two analogies, each with its own mapping and breakdown (test fixtures)", () => {
+    const s = byId("s17-another-example");
+    const sl = shortlist(fixtureRegistry().registry, { concepts: s.concepts, level: s.level });
+    expect(sl.analogies.length).toBeGreaterThanOrEqual(2);
+    const [a, b] = sl.analogies;
+    expect(a!.mapping).not.toEqual(b!.mapping);
+    expect(a!.breaks_down).not.toBe(b!.breaks_down);
+    expect(sl.analogies.every((x) => x.test_fixture === true && x.review === undefined)).toBe(true);
   });
 
   it("every recording names an existing scenario and says where it came from", () => {

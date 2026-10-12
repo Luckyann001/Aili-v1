@@ -1,0 +1,28 @@
+{
+  "id": "read.fx-lever-basics",
+  "type": "reading",
+  "version": "0.1.0",
+  "teaches": [
+    "mech.moment-arm"
+  ],
+  "source": "src.fx-book",
+  "location": "Fixture section on levers",
+  "level": "L1",
+  "purpose": "intro",
+  "est_minutes": 10,
+  "guide": {
+    "key_claims": [
+      "The moment arm is the perpendicular distance from the pivot to the line of the force",
+      "The same force further from the pivot gives a bigger turning effect"
+    ],
+    "misconceptions": [
+      "Only the size of the force matters, not where it acts"
+    ],
+    "teach_back_prompts": [
+      "Explain why a door handle is far from the hinges"
+    ],
+    "application_question": "Where would you hold a heavy tool to make it easiest to keep level"
+  },
+  "review_status": "published",
+  "test_fixture": true
+}

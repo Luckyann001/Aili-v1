@@ -94,7 +94,7 @@ request as if config held those values; config is not changed.
   are fully checked by code and need no model), 5 confident-but-wrong, 3 frustration, 2 out of
   coverage, 2 safety, 1 "just tell me". Each has the few expectations code can check (move,
   question, coverage, safety flag, reading) and `reviewer_notes` for the rest. They run against
-  the **test-fixture registry** (two concepts, one reading, no analogies), so many exercise the
+  the **test-fixture registry** (two concepts, two readings, two analogies), so many exercise the
   "not supported yet" path.
 - **Recorded mode** (`npm run bakeoff -w @aili/engine`): replays `bakeoff/recordings/<id>.json`;
   no model, key or network. Only two hand-written recordings exist; other scenarios are skipped.

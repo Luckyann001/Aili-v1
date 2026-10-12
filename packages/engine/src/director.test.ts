@@ -34,7 +34,7 @@ const errs = (o: object, ctx = CTX) => run(o, ctx).errors;
 describe("director response: setup", () => {
   it("the fixture registry loads, and its shortlist holds the fixtures only (real content is draft)", () => {
     expect(loaded.errors).toEqual([]);
-    expect([...SL.ids].sort()).toEqual(["fx-lever", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
+    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-shopping-bag", "fx-lever", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
   });
 
   it("a valid response passes", () => {

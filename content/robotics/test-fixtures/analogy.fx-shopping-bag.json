@@ -1,0 +1,37 @@
+{
+  "id": "analogy.fx-shopping-bag",
+  "type": "analogy",
+  "title": "Holding a shopping bag at arm's length (test fixture)",
+  "version": "0.1.0",
+  "teaches": [
+    "mech.torque.static",
+    "mech.moment-arm"
+  ],
+  "levels": [
+    "L1",
+    "L2"
+  ],
+  "fidelity": "illustrative",
+  "provenance": "authored",
+  "mapping": [
+    {
+      "source": "the bag",
+      "target": "the payload"
+    },
+    {
+      "source": "how far your hand is from your shoulder",
+      "target": "the moment arm"
+    },
+    {
+      "source": "your shoulder",
+      "target": "the servo"
+    },
+    {
+      "source": "the weight of your own arm",
+      "target": "the arm's own mass"
+    }
+  ],
+  "breaks_down": "A shoulder tires gradually and can shift its grip; a servo has a fixed rated torque, cannot change posture, and heats up while it holds.",
+  "review_status": "published",
+  "test_fixture": true
+}
