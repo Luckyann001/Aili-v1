@@ -282,12 +282,14 @@ describe("an analogy's mapping and breakdown in the narration: a WARNING, never 
 describe("the prediction example in professor.v1.md (Lucky's decision 2026-10-12)", () => {
   it("is valid: kind prediction, the prediction object, a Not sure chip, and it passes the validator", () => {
     const template = readFileSync(new URL("../../../content/prompts/professor.v1.md", import.meta.url), "utf8");
-    const line = template.split("\n").find((l) => l.startsWith("Example, an outcome question with choices, so a prediction:"))!;
+    const line = template.split("\n").find((l) => l.startsWith("Example (format only; write your own question, ids and wording):"))!;
     const example = JSON.parse(`{${line.slice(line.indexOf('"prompt"'), line.indexOf("<!--")).trim()}}`);
     expect(example.prompt.kind).toBe("prediction");
     expect(example.prompt.chips).toContain("Not sure");
-    expect(example.prediction).toEqual({ id: "weight-twice-as-far", concept: "mech.torque.static" });
+    expect(example.prediction).toEqual({ id: "wrench-grip-distance", concept: "mech.moment-arm" });
     expect(errs(example)).toEqual([]);
+    // a different topic from the lessons, so it is not copied into one (Lucky's decision 2026-10-12)
+    expect(line).not.toMatch(/servo|weight-twice-as-far|slides twice as far/i);
   });
 });
 
