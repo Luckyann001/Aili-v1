@@ -350,3 +350,15 @@ describe("the re-offer example in professor.v1.md (Lucky's decision 2026-10-12)"
     expect(errs(example)).toEqual([]);
   });
 });
+
+describe("mild praise: a good/fine/great/nice start (Lucky's decision 2026-10-12), warning only", () => {
+  it.each(["good", "fine", "great", "nice"])("\"a %s start\" warns and is still accepted", (w) => {
+    const r = run({ narration: [{ id: "n1", text: `A Lego car is a ${w} start: wheels turn because a motor twists an axle.` }] });
+    expect(r.errors).toEqual([]);
+    expect(r.response).not.toBeNull();
+    expect(r.warnings).toEqual([`narration[0].text says "a ${w} start" (mild praise; for review, not a rejection)`]);
+  });
+  it("other starts do not warn", () => {
+    expect(run({ narration: [{ id: "n1", text: "Let's start with one idea." }] }).warnings).toEqual([]);
+  });
+});
