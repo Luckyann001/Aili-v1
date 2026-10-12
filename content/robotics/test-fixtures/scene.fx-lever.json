@@ -1,0 +1,53 @@
+{
+  "id": "fx-lever",
+  "title": "Holding a ruler out: a weight near or far",
+  "teaches": [
+    "mech.moment-arm",
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "fidelity": "illustrative",
+  "version": "0.1.0",
+  "review_status": "published",
+  "provenance": "authored",
+  "parts": [
+    {
+      "id": "hand",
+      "name": "Hand (grip)"
+    },
+    {
+      "id": "ruler",
+      "name": "Ruler"
+    },
+    {
+      "id": "weight",
+      "name": "Weight"
+    }
+  ],
+  "params": [
+    {
+      "id": "weight_distance_m",
+      "label": "Weight distance from the hand",
+      "unit": "m",
+      "min": 0.03,
+      "max": 0.3,
+      "step": 0.01,
+      "default": 0.05
+    }
+  ],
+  "animations": [
+    {
+      "id": "slide-weight-out",
+      "description": "The weight slides from near the hand to the far end."
+    }
+  ],
+  "solver": {
+    "id": "solver.lever-relative-effort",
+    "constants": {
+      "lever_length_m": 0.3,
+      "lever_mass_kg": 0.05,
+      "weight_mass_kg": 0.2
+    }
+  },
+  "test_fixture": true
+}

@@ -1,0 +1,15 @@
+{
+  "id": "src.fx-book",
+  "type": "source",
+  "kind": "book",
+  "title": "Fixture book",
+  "authors": [
+    "Fixture"
+  ],
+  "edition": null,
+  "url": null,
+  "access": "free",
+  "rights": "Test fixture: not a real source.",
+  "verified": null,
+  "test_fixture": true
+}

@@ -246,3 +246,40 @@ describe("shortlist: published items only, by concept and level", () => {
     expect(s.ids.has("sim.fx-load")).toBe(false);
   });
 });
+
+describe("content/robotics/test-fixtures", () => {
+  // Imported here rather than at the top so the earlier tests stay independent of the folder.
+  const load = async () => import("./__fixtures__/registry");
+
+  it("the production loader refuses every file in the folder", async () => {
+    const { fixtureFiles, fixtureRegistry } = await load();
+    const files = fixtureFiles();
+    const r = fixtureRegistry({ allowTestFixtures: false });
+    const all = [...files.scenes, ...files.capabilities];
+    expect(all.length).toBeGreaterThan(0);
+    for (const { data } of all) expect(r.errors.join("\n"), data.id).toContain(`"${data.id}" is a test fixture and is refused outside development`);
+    expect(r.registry.scenes).toEqual([]);
+  });
+
+  it("every fixture is marked test_fixture and carries no review or verification record", async () => {
+    const { fixtureFiles } = await load();
+    const files = fixtureFiles();
+    for (const { file, data } of [...files.scenes, ...files.capabilities]) {
+      expect(data.test_fixture, file).toBe(true);
+      expect(data.review, file).toBeUndefined();
+      if (data.type === "source") expect(data.verified, file).toBeNull();
+    }
+  });
+
+  it("the fixture copies match the real scene, solver and simulation apart from the fixture fields", async () => {
+    const { readJson } = await load();
+    const strip = (o: Record<string, unknown>, extra: string[] = []) => {
+      const c = { ...o };
+      for (const k of ["id", "review_status", "test_fixture", ...extra]) delete c[k];
+      return c;
+    };
+    expect(strip(readJson("test-fixtures/scene.fx-lever.json"), ["level"])).toEqual(strip(readJson("scenes/lever-analogy.json"), ["level"]));
+    expect(strip(readJson("test-fixtures/solver.fx-torque.json"))).toEqual(strip(readJson("capabilities/solver.static-torque-single-link.json")));
+    expect(strip(readJson("test-fixtures/sim.fx-servo-load.json"), ["solver"])).toEqual(strip(readJson("capabilities/sim.servo-static-load.json"), ["solver"]));
+  });
+});
