@@ -53,6 +53,13 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - The cost: a wrongly shaped action is no longer impossible to write, only rejected afterwards, so it can cost a repair attempt.
 20. **Input estimate factor:** estimated input tokens are multiplied by `input_estimate_factor` (2.5 in config, first-live-run value) in the pre-turn worst case, the per-attempt cap guard and conservative metering. The router's real input was 2.14× the estimate; the schema alone adds roughly 2,000 input tokens to every professor call. Recalibrate from real counts.
 
+### Update (Oct 12 2026, after the first answered live turn)
+
+21. **The first professor answers failed our structural validator** (both the answer and its repair): concept tags as plain words or invented IDs, an analogy cited as evidence, narration segments of 223 and 303 characters (limit 160). The content itself was sound. Fixes, decided by Lucky:
+    - **Validator:** every ID in `concepts` must be one of this turn's shortlist concepts (the requested concepts in the registry plus what the shortlisted items teach; none when the shortlist is empty), and every `evidence` ID a shortlist reading. Each error lists the valid IDs, so one repair can fix it.
+    - **Repair feedback:** when the format check fails, narration length, concepts and evidence are still checked, so the repair hears every error at once (each reported once).
+    - **Prompt (`professor.v1.md`):** states the 160-character limit per narration segment, that `concepts` are exact concept IDs from the shortlist's `concept_ids`, and that `evidence` holds reading IDs only. The shortlist block now lists `concept_ids` first and never drops them. The prompt is about 3,111 estimated tokens (was 2,987).
+
 ## Design summary
 
 - **Provider adapter:**
