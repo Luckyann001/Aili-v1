@@ -114,6 +114,10 @@ export const TeachingState = z
     open_items: z.array(OpenItem).default([]),
     waivers: z.array(Waiver).default([]),
     analogies_used: z.array(z.string().min(1)).default([]),
+    /** Safety-critical items the learner was asked to acknowledge (a flagged reading, for example). */
+    safety_acks: z
+      .array(z.object({ ref: z.string().min(1), turn: z.number().int().positive(), acknowledged: z.object({ by: z.literal("learner"), on: z.string() }).strict().nullable() }).strict())
+      .default([]),
   })
   .strict();
 export type TeachingState = z.infer<typeof TeachingState>;

@@ -45,6 +45,8 @@ export const SceneManifest = z
     review_status: ReviewStatus,
     provenance: Provenance,
     review: Review.optional(),
+    /** Touching this scene needs the learner's explicit acknowledgement (see ConceptSeed.safety_critical). */
+    safety_critical: z.boolean().default(false),
     /** Test-fixture scene: loaded only with the dev flag, refused in production (m2-plan decision 5). */
     test_fixture: z.literal(true).optional(),
     parts: z.array(ScenePart).min(1),
@@ -68,7 +70,15 @@ export const SceneManifest = z
 export type SceneManifest = z.infer<typeof SceneManifest>;
 
 /** Minimal concept node for now (the full concept graph is M4). */
-export const ConceptSeed = z.object({ id: ConceptId, title: z.string().min(1), review_status: ReviewStatus }).strict();
+export const ConceptSeed = z
+  .object({
+    id: ConceptId,
+    title: z.string().min(1),
+    review_status: ReviewStatus,
+    /** Skipping or assigning work on this concept needs the learner's explicit acknowledgement. M4 decides which concepts get it. */
+    safety_critical: z.boolean().default(false),
+  })
+  .strict();
 export type ConceptSeed = z.infer<typeof ConceptSeed>;
 
 export { REVIEW_LABEL } from "./labels";

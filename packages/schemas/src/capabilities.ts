@@ -62,6 +62,8 @@ const common = {
   review_status: ReviewStatus,
   review: Review.optional(),
   test_fixture: z.literal(true).optional(),
+  /** Touching this item needs the learner's explicit acknowledgement, whatever the director declares. */
+  safety_critical: z.boolean().default(false),
 };
 
 function unitRules(id: string, fields: Array<[string, Unit]>, ctx: z.RefinementCtx) {

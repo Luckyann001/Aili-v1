@@ -29,6 +29,8 @@ export interface TurnContext {
   activeScene?: string;
   /** When given, the response must answer this request at this state revision. */
   expected?: { request_id: string; state_rev: number };
+  /** IDs of safety-critical concepts and items (from the registry), whatever the director declares. */
+  safetyCritical?: ReadonlySet<string>;
 }
 
 export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[] } {
@@ -145,6 +147,19 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     if (r.move !== "assign" && r.move !== "teach_back") errors.push(`reading: set only with move "assign" or "teach_back", not "${r.move}"`);
   }
   if (r.analogy && !sl.analogies.some((a) => a.id === r.analogy)) notInShortlist("analogy", r.analogy);
+
+  // Safety-critical concepts and items need explicit acknowledgement, whatever the director declares.
+  const critical = ctx.safetyCritical ?? new Set<string>();
+  const touches: string[] = [];
+  if (r.waiver && critical.has(r.waiver.concept)) touches.push(`waiver.concept "${r.waiver.concept}"`);
+  if (r.reading) {
+    const rd = sl.readings.find((x) => x.id === r.reading);
+    if (critical.has(r.reading) || rd?.teaches.some((c) => critical.has(c))) touches.push(`reading "${r.reading}"`);
+  }
+  for (const t of touches) {
+    if (r.prompt?.kind !== "acknowledgement") errors.push(`${t} is safety-critical: ask for explicit acknowledgement (prompt kind "acknowledgement")`);
+    if (!r.safety) errors.push(`${t} is safety-critical: set "safety": true`);
+  }
 
   // Evidence: verified library items in this turn's shortlist only.
   r.evidence.forEach((id, i) => {

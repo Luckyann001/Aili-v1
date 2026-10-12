@@ -10,13 +10,18 @@ export function applyLearnerReply(t: TeachingState, c: ReplyClassification, toda
   const open = predictions.find((p) => p.status === "open");
   if (open && c.guess !== null) predictions = predictions.map((p) => (p === open ? { ...p, guess: c.guess, status: "guessed" as const } : p));
   let waivers = t.waivers;
-  if (c.acknowledged) waivers = waivers.map((w) => (w.acknowledged === null ? { ...w, acknowledged: { by: "learner" as const, on: today } } : w));
-  return { ...t, predictions, waivers };
+  let safety_acks = t.safety_acks ?? [];
+  if (c.acknowledged) {
+    waivers = waivers.map((w) => (w.acknowledged === null ? { ...w, acknowledged: { by: "learner" as const, on: today } } : w));
+    safety_acks = safety_acks.map((a) => (a.acknowledged === null ? { ...a, acknowledged: { by: "learner" as const, on: today } } : a));
+  }
+  return { ...t, predictions, waivers, safety_acks };
 }
 
 /** What a validated director answer changes, as the Aili turn numbered `turn`. */
-export function applyResponse(t: TeachingState, r: DirectorResponse, turn: number, today: string): TeachingState {
+export function applyResponse(t: TeachingState, r: DirectorResponse, turn: number, today: string, safetyCritical: ReadonlySet<string> = new Set(), readingTeaches: readonly string[] = []): TeachingState {
   let { predictions, open_items, waivers, analogies_used } = t;
+  let safety_acks = t.safety_acks ?? [];
   if (r.reveal) {
     const id = r.reveal.prediction;
     predictions = predictions.map((p) => (p.id === id ? { ...p, status: "revealed" as const, outcome: r.reveal!.outcome } : p));
@@ -32,8 +37,11 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
     waivers = [
       ...waivers.filter((w) => w.concept !== r.waiver!.concept),
       // A safety-critical waiver waits for the learner's explicit acknowledgement; others are recorded as asked.
-      { ...r.waiver, turn, acknowledged: r.waiver.safety_critical ? null : { by: "learner" as const, on: today } },
+      // Safety-critical if the director says so OR the concept is flagged in the registry.
+      ...[{ ...r.waiver, safety_critical: r.waiver.safety_critical || safetyCritical.has(r.waiver.concept) }].map((w) => ({ ...w, turn, acknowledged: w.safety_critical ? null : { by: "learner" as const, on: today } })),
     ];
+  if (r.reading && (safetyCritical.has(r.reading) || readingTeaches.some((c) => safetyCritical.has(c))) && !safety_acks.some((a) => a.ref === r.reading && a.acknowledged))
+    safety_acks = [...safety_acks.filter((a) => a.ref !== r.reading), { ref: r.reading, turn, acknowledged: null }];
   if (r.analogy) analogies_used = [...analogies_used, r.analogy];
-  return { predictions, open_items, waivers, analogies_used };
+  return { predictions, open_items, waivers, analogies_used, safety_acks };
 }

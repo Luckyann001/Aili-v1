@@ -126,7 +126,7 @@ export interface SessionState {
   teaching?: TeachingState;
 }
 
-const EMPTY_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [] };
+const EMPTY_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [] };
 
 /** What the learner sent. How to read it (answered, pushback, evidence) is decided by the router. */
 export interface LearnerInput {
@@ -213,6 +213,11 @@ export class TurnSession {
     const deadline = Date.now() + (this.opts.timeoutMs ?? 20_000);
     const remaining = () => Math.max(0, deadline - Date.now());
     const sl = shortlist(this.opts.registry, { concepts: this.opts.concepts, level: this.opts.level });
+    // Safety-critical concepts and items, from the registry (never from the director).
+    const reg = this.opts.registry;
+    const safetyCritical = new Set<string>(
+      [...reg.concepts, ...reg.scenes, ...reg.solvers, ...reg.simulations, ...reg.analogies, ...reg.readings].filter((x) => (x as { safety_critical?: boolean }).safety_critical).map((x) => x.id),
+    );
 
     // Refused before anything is called: kill switch, (live) configuration and key, (live) the
     // provider-limit record, then the worst case against this session's cap.
@@ -297,7 +302,7 @@ export class TurnSession {
       }
     };
     const check = (raw: unknown): { r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] } => {
-      const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev } });
+      const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
       if (!v.response) return { reason: "validation", errors: v.errors };
       const p = validatePedagogy(v.response, history, teaching);
       return p.length ? { reason: "pedagogy", errors: p } : { r: v.response };
@@ -369,7 +374,7 @@ export class TurnSession {
     const next: SessionState = {
       history: { ...history, entries: [...history.entries, { kind: "aili", move: r.move, asked: !!r.prompt, gave_back: givesBack(r), concepts: r.concepts, safety: r.safety }] },
       activeScene,
-      teaching: applyResponse(teaching, r, ailiTurnNumber, today),
+      teaching: applyResponse(teaching, r, ailiTurnNumber, today, safetyCritical, sl.readings.find((x) => x.id === r.reading)?.teaches ?? []),
     };
     if (rev !== this.rev) return;
     this.state = next;

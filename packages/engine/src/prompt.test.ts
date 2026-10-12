@@ -67,7 +67,7 @@ describe("assembly", () => {
     const sl = fixtureShortlist();
     const withAnalogy: Shortlist = {
       ...sl,
-      analogies: [{ id: "analogy.fx-door", type: "analogy", title: "Door on hinges", version: "0.1.0", teaches: ["mech.torque.static"], levels: ["L2"], fidelity: "illustrative", provenance: "authored", review_status: "published", test_fixture: true, mapping: [{ source: "hinge", target: "joint" }], breaks_down: "A door has no motor." }],
+      analogies: [{ id: "analogy.fx-door", type: "analogy", title: "Door on hinges", version: "0.1.0", teaches: ["mech.torque.static"], levels: ["L2"], fidelity: "illustrative", provenance: "authored", review_status: "published", test_fixture: true, safety_critical: false, mapping: [{ source: "hinge", target: "joint" }], breaks_down: "A door has no motor." }],
     };
     const analogy = JSON.parse(unescape(blockOf(assemble({ shortlist: withAnalogy }).input, "shortlist"))).analogys[0];
     expect(analogy).toMatchObject({ mapping: [{ source: "hinge", target: "joint" }], breaks_down: "A door has no motor." });
@@ -112,7 +112,7 @@ describe("token budget (estimated: characters ÷ 3.5; no provider tokenizer offl
       ...sl,
       scenes: [...sl.scenes, ...n(10).map((i) => ({ ...sl.scenes[0]!, id: `fx-extra-${i}` }))],
       simulations: [...sl.simulations, ...n(6).map((i) => ({ ...sl.simulations[0]!, id: `sim.fx-extra-${i}` }))],
-      analogies: n(20).map((i) => ({ id: `analogy.fx-${i}`, type: "analogy" as const, title: `Analogy ${i}`, version: "0.1.0", teaches: ["mech.torque.static"], levels: ["L2" as const], fidelity: "illustrative" as const, provenance: "authored" as const, review_status: "published" as const, test_fixture: true as const, mapping: [{ source: "a long source description for this analogy", target: "a long target description" }], breaks_down: "Where this analogy stops working, explained in a full sentence or two for the learner." })),
+      analogies: n(20).map((i) => ({ id: `analogy.fx-${i}`, type: "analogy" as const, title: `Analogy ${i}`, version: "0.1.0", teaches: ["mech.torque.static"], levels: ["L2" as const], fidelity: "illustrative" as const, provenance: "authored" as const, review_status: "published" as const, test_fixture: true as const, safety_critical: false, mapping: [{ source: "a long source description for this analogy", target: "a long target description" }], breaks_down: "Where this analogy stops working, explained in a full sentence or two for the learner." })),
       readings: n(40).map((i) => ({ ...sl.readings[0]!, id: `read.fx-${i}` })),
     };
   };

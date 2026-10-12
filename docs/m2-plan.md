@@ -161,6 +161,7 @@ Every slice ends with lint, typecheck, unit tests and the e2e run, followed by s
 
 - **Digit rule false positives** (a numbered step, a year). The allow-list grows only by review.
 - **No `?` in narration** also blocks rhetorical questions. The M3 prompt must say so.
+- **`safety_critical` flag** (added Oct 12 2026, M3 slice 5b): concepts, scenes and capabilities carry it (default false). The validator requires explicit acknowledgement whenever a waiver or a reading touches a flagged item, whatever the director declares; build steps join the rule in M5. **M4 decides which concepts get the flag.**
 - **An interrupt across server instances needs shared state**, which waits for the database (deferred stage).
 - **Sequencing question to raise:** the milestones list says an LLM key is needed by M3, but the deferred stage (which includes sign-in) comes "before any real AI key", after M6. M3 with a real provider would therefore come after the deferred stage, or M3 runs with the fake director only. To be decided by Lucky before M3.
 

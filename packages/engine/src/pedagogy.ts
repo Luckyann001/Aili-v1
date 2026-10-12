@@ -35,7 +35,7 @@ export function openPrompt(h: SessionHistory): { turn: number } | null {
   return open === null ? null : { turn: open };
 }
 
-const NO_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [] };
+const NO_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [] };
 
 /** Open items allowed at once before new ones must wait (spec A5: "do not pile on new ones"). */
 export const MAX_OPEN_ITEMS = 3;
@@ -149,6 +149,9 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   const pending = teaching.waivers.find((w) => w.acknowledged === null);
   if (pending && !r.waiver && r.prompt?.kind !== "acknowledgement")
     fail("waiver-acknowledgement", `skipping "${pending.concept}" still awaits the learner's explicit acknowledgement; ask for it before going on`);
+  const pendingAck = (teaching.safety_acks ?? []).find((a) => a.acknowledged === null);
+  if (pendingAck && !pending && r.prompt?.kind !== "acknowledgement")
+    fail("waiver-acknowledgement", `"${pendingAck.ref}" is safety-critical and still awaits the learner's explicit acknowledgement; ask for it before going on`);
 
   return errors;
 }
