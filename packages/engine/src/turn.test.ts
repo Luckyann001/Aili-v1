@@ -66,12 +66,20 @@ describe("failure keeps the last valid state and emits no partial actions", () =
     });
 
   it("after a failure, the next valid turn works from the same state", async () => {
-    const { s } = session(["hard-coded-number", "valid"]);
+    const { s } = session(["hard-coded-number", "hard-coded-number", "valid"]); // the first turn fails even after its repair attempt
     await s.run(input, () => {});
     const { events, emit } = collect();
     await s.run(input, emit);
     expect(events.at(-1)!.type).toBe("turn.done");
     expect(s.state.history.entries.map((e) => e.kind)).toEqual(["learner", "aili"]); // the failed turn left nothing
+  });
+
+  it("one repair attempt: a failing answer is sent back with its errors, and a corrected one is shown", async () => {
+    const { s, director } = session(["hard-coded-number", "valid"]);
+    const { events, emit } = collect();
+    await s.run(input, emit);
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(director.calls).toBe(2);
   });
 
   it("a director that takes too long gets a timeout error", async () => {

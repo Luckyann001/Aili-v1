@@ -6,6 +6,7 @@ import { validateDirectorResponse } from "./director";
 import { givesBack, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig } from "@aili/schemas";
 import { createFakeRouter, type Router, type RouterReply } from "./router";
+import type { Attempt, ProviderErrorKind } from "./provider";
 import { openPrompt } from "./pedagogy";
 import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
 
@@ -34,10 +35,12 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
  */
 export type TextPart = { text: string } | { value: string; calc_id: string; output: string };
 
-export type TurnFailure = "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
+export type TurnFailure = "not_configured" | "key_rejected" | "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
 
 /** Plain words for the learner. Details go to the event's `details` for developers and logs. */
 export const FAILURE_MESSAGES: Record<TurnFailure, string> = {
+  not_configured: "Live answers aren't set up on this computer. Prepared lessons still work. Nothing on the stage changed.",
+  key_rejected: "The AI provider didn't accept the key set up on this computer. Prepared lessons still work. Nothing on the stage changed.",
   router: "Aili couldn't make sense of that reply this time. Nothing on the stage changed.",
   director: "Aili couldn't prepare an answer this time. Nothing on the stage changed.",
   timeout: "Aili took too long to answer, so the turn was stopped. Nothing on the stage changed.",
@@ -55,12 +58,30 @@ export interface DirectorRequest {
   history: SessionHistory;
   active_scene?: string;
   learner_text: string;
+  /** The turn's deadline (epoch ms); a provider-backed director retries only within it. */
+  deadline_ms: number;
+  /** Set on the one repair attempt: the previous answer and why it failed the checks. */
+  repair?: { errors: string[]; previous: unknown };
 }
 
 /** What a director call returns: the raw response (validated here) and the tokens it used. */
 export interface DirectorReply {
   response: unknown;
+  /** Tokens for a single call (the fake director). */
   usage?: TokenUsage;
+  /** Every provider attempt, retries included, for metering (a provider-backed director). */
+  attempts?: Attempt[];
+}
+
+/** A director call that failed, with the attempts it made (they are metered too). */
+export class DirectorCallFailed extends Error {
+  constructor(
+    readonly kind: ProviderErrorKind,
+    readonly attempts: Attempt[],
+  ) {
+    super(`director: ${kind}`);
+    this.name = "DirectorCallFailed";
+  }
 }
 
 /** The professor model in M3; a scripted fake in M2. */
@@ -162,6 +183,9 @@ export class TurnSession {
 
     send({ type: "turn.started" });
     const before = this.state;
+    // One time budget for the whole turn: router, director, retries and the repair share it.
+    const deadline = Date.now() + (this.opts.timeoutMs ?? 20_000);
+    const remaining = () => Math.max(0, deadline - Date.now());
     const sl = shortlist(this.opts.registry, { concepts: this.opts.concepts, level: this.opts.level });
 
     // Refused before it starts: the kill switch, or this session's cap already reached.
@@ -176,7 +200,7 @@ export class TurnSession {
     try {
       routed = await withTimeout(
         (this.opts.router ?? createFakeRouter()).classify({ text: input.text, history: before.history, open_prompt: openPrompt(before.history) !== null }, abort.signal),
-        this.opts.timeoutMs ?? 20_000,
+        remaining(),
         abort.signal,
       );
     } catch (err) {
@@ -189,29 +213,54 @@ export class TurnSession {
     if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
     const history: SessionHistory = { ...before.history, entries: [...before.history.entries, { kind: "learner", ...classified.data }] };
 
-    // Director (with a timeout and the interrupt signal).
-    let reply: DirectorReply;
-    try {
-      reply = await withTimeout(
-        this.opts.director.respond({ request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text }, abort.signal),
-        this.opts.timeoutMs ?? 20_000,
-        abort.signal,
-      );
-    } catch (err) {
-      if (rev !== this.rev) return; // interrupted: nothing more to say for this turn
-      return fail(err instanceof TimeoutError ? "timeout" : "director", [errorText(err)]);
-    }
-    // Tokens were spent whether or not the response passes the checks: record them first.
-    if (meter && reply.usage) meter.ledger.record(meter.sessionId, { ...reply.usage, turn_id, cost_micro_usd: costMicroUsd(reply.usage, meter.config) });
-    if (rev !== this.rev) return;
-    const raw = reply.response;
+    // Director, then the checks; one repair attempt (with the errors fed back) if the checks fail.
+    // Every attempt is metered, whether or not its answer passes.
+    const meterReply = (reply: DirectorReply | DirectorCallFailed) => {
+      if (!meter) return;
+      const usages = reply.attempts ? reply.attempts.map((a) => a.usage) : "usage" in reply && reply.usage ? [reply.usage] : [];
+      for (const u of usages) meter.ledger.record(meter.sessionId, { ...u, turn_id, cost_micro_usd: costMicroUsd(u, meter.config) });
+    };
+    const callDirector = async (repair?: { errors: string[]; previous: unknown }): Promise<DirectorReply | TurnFailure | "stale"> => {
+      if (remaining() <= 0) return "timeout";
+      try {
+        const reply = await withTimeout(
+          this.opts.director.respond(
+            { request_id: turn_id, state_rev: rev, shortlist: sl, history, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, ...(repair ? { repair } : {}) },
+            abort.signal,
+          ),
+          remaining(),
+          abort.signal,
+        );
+        meterReply(reply);
+        return rev !== this.rev ? "stale" : reply;
+      } catch (err) {
+        if (err instanceof DirectorCallFailed) meterReply(err);
+        if (rev !== this.rev) return "stale"; // interrupted: nothing more to say for this turn
+        if (err instanceof TimeoutError) return "timeout";
+        if (err instanceof DirectorCallFailed) return err.kind === "not_configured" || err.kind === "key_rejected" || err.kind === "timeout" ? err.kind : "director";
+        return "director";
+      }
+    };
+    const check = (raw: unknown): { r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] } => {
+      const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev } });
+      if (!v.response) return { reason: "validation", errors: v.errors };
+      const p = validatePedagogy(v.response, history);
+      return p.length ? { reason: "pedagogy", errors: p } : { r: v.response };
+    };
 
-    // Validate: structure, then pedagogy.
-    const v = validateDirectorResponse(raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev } });
-    if (!v.response) return fail("validation", v.errors);
-    const r = v.response;
-    const p = validatePedagogy(r, history);
-    if (p.length) return fail("pedagogy", p);
+    let reply = await callDirector();
+    if (reply === "stale") return;
+    if (typeof reply === "string") return fail(reply, [`director: ${reply}`]);
+    let checked = check(reply.response);
+    if ("errors" in checked) {
+      const first = checked;
+      reply = await callDirector({ errors: first.errors, previous: reply.response });
+      if (reply === "stale") return;
+      if (typeof reply === "string") return fail(reply, [`director: ${reply}`, ...first.errors]);
+      checked = check(reply.response);
+      if ("errors" in checked) return fail(checked.reason, [...checked.errors, "(after one repair attempt)"]);
+    }
+    const r = checked.r;
 
     // Solve every calculation before showing anything.
     const values: Record<string, string> = {};

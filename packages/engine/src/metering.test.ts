@@ -117,7 +117,7 @@ describe("turns: metered, capped, switchable", () => {
   it("tokens spent on a response that fails its checks are still recorded", async () => {
     const { s, ledger } = session("hard-coded-number");
     expect((await run(s)).at(-1)!.type).toBe("turn.error");
-    expect(ledger.spent("page-1")).toBe(12); // router 2 + director 10, though the response failed
+    expect(ledger.spent("page-1")).toBe(22); // router 2 + director 10 + the repair attempt 10, though both answers failed
   });
 
   it("the kill switch stops the router too", async () => {
