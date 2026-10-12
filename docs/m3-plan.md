@@ -76,6 +76,13 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - The repair message now says that anything added must fit within the four segments.
     - **Predictions:** no code check (a "Not sure" chip does not mean an outcome question). Instead the prompt carries one worked example of a prediction prompt (about 3,457 estimated tokens in total).
 
+24. **After the first 5-turn check stopped (Oct 12 2026), decided by Lucky:**
+    - **The professor now sees the real teaching state:** open predictions (id, question, choices), open items, waivers, and the open prompt's text, kind and choices. They had been sent as fixed empty lists since slice 3, so the model could not know a prediction was still waiting. A test fails if they are hard-coded again.
+    - **An open prediction the learner has not answered** is kept open: Aili answers what they said in one sentence and re-offers the same question more simply (same prediction id). The one-open-question rule allows exactly this re-offer; any new question is still rejected.
+    - **Learner level "unknown"** (a goal statement): one baseline question finds the level. Scenario s02 uses it.
+    - **Scripted scenario replies** may say what Aili's previous answer must be (`after`). If it no longer fits, the bake-off reports "script diverged" and skips the rest of that scenario; this is not a professor failure.
+    - **Mild praise** ("that's a fine start") is a warning only (`flattery_warn`), never a rejection.
+
 ## Design summary
 
 - **Provider adapter:**
