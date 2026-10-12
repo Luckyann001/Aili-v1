@@ -20,7 +20,7 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
   | { type: "action"; action: DirectorResponse["actions"][number] }
   | { type: "calc.result"; calc_id: string; outputs: Record<string, number> }
   | { type: "prompt"; text: string; parts: TextPart[]; chips: string[] }
-  | { type: "turn.done"; move: DirectorResponse["move"] }
+  | { type: "turn.done"; move: DirectorResponse["move"]; state?: SessionState }
   | { type: "turn.error"; reason: TurnFailure; message: string; details: string[] }
 );
 
@@ -97,6 +97,11 @@ export interface TurnSessionOptions {
    * minus one, so the turn's events carry the revision the client's gate expects.
    */
   startRev?: number;
+  /**
+   * FAKE-DIRECTOR ROUND TRIP ONLY: put the committed session state in turn.done, so a stateless
+   * server can hand it back to the client for the next turn. M3 keeps state on the server instead.
+   */
+  includeStateInDone?: boolean;
 }
 
 /** Numbers shown to learners: three significant figures, no exponent for ordinary values. */
@@ -223,7 +228,7 @@ export class TurnSession {
     };
     if (rev !== this.rev) return;
     this.state = next;
-    send({ type: "turn.done", move: r.move });
+    send({ type: "turn.done", move: r.move, ...(this.opts.includeStateInDone ? { state: next } : {}) });
   }
 }
 

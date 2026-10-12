@@ -1,3 +1,4 @@
+import type { FakeCase } from "@aili/schemas";
 import type { Director, DirectorRequest } from "./turn";
 
 // A scripted stand-in for the professor model (docs/m2-plan.md slice 5). No provider, no key, no
@@ -5,14 +6,11 @@ import type { Director, DirectorRequest } from "./turn";
 // "sim.fx-servo-load", solver "solver.fx-torque", reading "read.fx-moments"), so it only works
 // with the dev-only fixture registry. Every case is labelled for what it is meant to trigger.
 
-export type FakeCase =
-  | "valid" // passes every check
-  | "invalid-id" // a part that is not in the scene → validation failure
-  | "out-of-bounds" // a setting outside its bounds → validation failure
-  | "hard-coded-number" // a number in narration → validation failure (spec test 14)
-  | "pedagogy-violation" // flattery → pedagogy failure
-  | "solver-failure" // passes the validators, but the solver refuses the input
-  | "slow"; // valid, but only after `slowMs` (for interrupt tests)
+// Cases (FAKE_CASES in @aili/schemas): valid (passes every check); invalid-id (a part not in the
+// scene); out-of-bounds (a setting outside its bounds); hard-coded-number (spec test 14);
+// pedagogy-violation (flattery); solver-failure (passes the validators, the solver refuses the
+// input); slow (valid, after `slowMs`, for interrupt tests).
+export type { FakeCase };
 
 const CALC = { id: "c1", solver: "solver.fx-torque", simulation: "sim.fx-servo-load", inputs: { arm_length_m: 0.2, payload_kg: 0.3, arm_kg_per_m: 0.25, angle_deg: 0 } };
 

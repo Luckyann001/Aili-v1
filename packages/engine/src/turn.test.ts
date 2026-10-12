@@ -136,6 +136,19 @@ describe("revision from the client", () => {
   });
 });
 
+describe("state in turn.done (fake-director round trip only)", () => {
+  it("is absent by default and present when asked for", async () => {
+    const plain = collect();
+    await session("valid").s.run(input, plain.emit);
+    expect((plain.events.at(-1) as Extract<TurnEvent, { type: "turn.done" }>).state).toBeUndefined();
+    const director = createFakeDirector("valid");
+    const s = new TurnSession({ registry, director, state: start(), concepts: ["mech.torque.static"], level: "L2", includeStateInDone: true });
+    const withState = collect();
+    await s.run(input, withState.emit);
+    expect((withState.events.at(-1) as Extract<TurnEvent, { type: "turn.done" }>).state).toEqual(s.state);
+  });
+});
+
 describe("interrupt mid-turn", () => {
   it("stops a slow turn at once: the director is aborted, nothing after turn.started, state unchanged", async () => {
     const { s, director } = session("slow", { slowMs: 2000 });
