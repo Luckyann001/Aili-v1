@@ -4,7 +4,9 @@ import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
 import { validateDirectorResponse } from "./director";
 import { givesBack, validatePedagogy } from "./pedagogy";
-import type { AiConfig } from "@aili/schemas";
+import { ReplyClassification, type AiConfig } from "@aili/schemas";
+import { createFakeRouter, type Router, type RouterReply } from "./router";
+import { openPrompt } from "./pedagogy";
 import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
 
 // One turn, end to end (docs/m2-plan.md slice 5):
@@ -22,7 +24,7 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
   | { type: "action"; action: DirectorResponse["actions"][number] }
   | { type: "calc.result"; calc_id: string; outputs: Record<string, number> }
   | { type: "prompt"; text: string; parts: TextPart[]; chips: string[] }
-  | { type: "turn.done"; move: DirectorResponse["move"]; state?: SessionState }
+  | { type: "turn.done"; move: DirectorResponse["move"] }
   | { type: "turn.error"; reason: TurnFailure; message: string; details: string[] }
 );
 
@@ -32,10 +34,11 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
  */
 export type TextPart = { text: string } | { value: string; calc_id: string; output: string };
 
-export type TurnFailure = "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
+export type TurnFailure = "router" | "director" | "timeout" | "validation" | "pedagogy" | "solver" | "kill_switch" | "session_cap";
 
 /** Plain words for the learner. Details go to the event's `details` for developers and logs. */
 export const FAILURE_MESSAGES: Record<TurnFailure, string> = {
+  router: "Aili couldn't make sense of that reply this time. Nothing on the stage changed.",
   director: "Aili couldn't prepare an answer this time. Nothing on the stage changed.",
   timeout: "Aili took too long to answer, so the turn was stopped. Nothing on the stage changed.",
   validation: "Aili's answer didn't pass its checks, so it wasn't shown. Nothing on the stage changed.",
@@ -87,11 +90,11 @@ export interface SessionState {
   activeScene?: string;
 }
 
+/** What the learner sent. How to read it (answered, pushback, evidence) is decided by the router. */
 export interface LearnerInput {
   text: string;
-  /** Classification of the reply (a router in M3; given directly in M2). */
-  reply: { answered_prompt: boolean; pushback?: boolean; new_evidence?: boolean };
 }
+
 
 export interface TurnSessionOptions {
   registry: Registry;
@@ -107,11 +110,8 @@ export interface TurnSessionOptions {
    * minus one, so the turn's events carry the revision the client's gate expects.
    */
   startRev?: number;
-  /**
-   * FAKE-DIRECTOR ROUND TRIP ONLY: put the committed session state in turn.done, so a stateless
-   * server can hand it back to the client for the next turn. M3 keeps state on the server instead.
-   */
-  includeStateInDone?: boolean;
+  /** Classifies the learner's reply on the server. Defaults to the fake router (tests, demo). */
+  router?: Router;
   /**
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
    * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
@@ -162,10 +162,6 @@ export class TurnSession {
 
     send({ type: "turn.started" });
     const before = this.state;
-    const history: SessionHistory = {
-      ...before.history,
-      entries: [...before.history.entries, { kind: "learner", answered_prompt: input.reply.answered_prompt, pushback: input.reply.pushback ?? false, new_evidence: input.reply.new_evidence ?? false }],
-    };
     const sl = shortlist(this.opts.registry, { concepts: this.opts.concepts, level: this.opts.level });
 
     // Refused before it starts: the kill switch, or this session's cap already reached.
@@ -174,6 +170,24 @@ export class TurnSession {
       const refusal = refuseTurn({ killSwitch: meter.killSwitch, ledger: meter.ledger, sessionId: meter.sessionId, config: meter.config });
       if (refusal) return fail(refusal, [refusal === "kill_switch" ? "AILI_AI_KILL_SWITCH=1" : `spent ${meter.ledger.spent(meter.sessionId)} of ${meter.config.session_cap_micro_usd} micro-USD`]);
     }
+
+    // Router: how to read the learner's reply, decided here on the server, never by the client.
+    let routed: RouterReply;
+    try {
+      routed = await withTimeout(
+        (this.opts.router ?? createFakeRouter()).classify({ text: input.text, history: before.history, open_prompt: openPrompt(before.history) !== null }, abort.signal),
+        this.opts.timeoutMs ?? 20_000,
+        abort.signal,
+      );
+    } catch (err) {
+      if (rev !== this.rev) return;
+      return fail(err instanceof TimeoutError ? "timeout" : "router", [errorText(err)]);
+    }
+    if (meter && routed.usage) meter.ledger.record(meter.sessionId, { ...routed.usage, turn_id, cost_micro_usd: costMicroUsd(routed.usage, meter.config) });
+    if (rev !== this.rev) return;
+    const classified = ReplyClassification.safeParse(routed.classification);
+    if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
+    const history: SessionHistory = { ...before.history, entries: [...before.history.entries, { kind: "learner", ...classified.data }] };
 
     // Director (with a timeout and the interrupt signal).
     let reply: DirectorReply;
@@ -253,7 +267,7 @@ export class TurnSession {
     };
     if (rev !== this.rev) return;
     this.state = next;
-    send({ type: "turn.done", move: r.move, ...(this.opts.includeStateInDone ? { state: next } : {}) });
+    send({ type: "turn.done", move: r.move });
   }
 }
 

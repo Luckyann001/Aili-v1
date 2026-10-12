@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, createFakeDirector, initialGate, TurnSession, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 
 // runTurn pipeline with the scripted fake director (docs/m2-plan.md slice 5). No provider, no key,
@@ -11,7 +11,7 @@ const session = (cases: FakeCase | FakeCase[], o: { slowMs?: number; timeoutMs?:
   const director = createFakeDirector(cases, { slowMs: o.slowMs });
   return { director, s: new TurnSession({ registry, director, state: start(), concepts: ["mech.torque.static"], level: "L2", timeoutMs: o.timeoutMs }) };
 };
-const input = { text: "Why is it hard to hold?", reply: { answered_prompt: false } };
+const input = { text: "Why is it hard to hold?" };
 const collect = () => {
   const events: TurnEvent[] = [];
   return { events, emit: (e: TurnEvent) => events.push(e) };
@@ -136,16 +136,70 @@ describe("revision from the client", () => {
   });
 });
 
-describe("state in turn.done (fake-director round trip only)", () => {
-  it("is absent by default and present when asked for", async () => {
-    const plain = collect();
-    await session("valid").s.run(input, plain.emit);
-    expect((plain.events.at(-1) as Extract<TurnEvent, { type: "turn.done" }>).state).toBeUndefined();
-    const director = createFakeDirector("valid");
-    const s = new TurnSession({ registry, director, state: start(), concepts: ["mech.torque.static"], level: "L2", includeStateInDone: true });
-    const withState = collect();
-    await s.run(input, withState.emit);
-    expect((withState.events.at(-1) as Extract<TurnEvent, { type: "turn.done" }>).state).toEqual(s.state);
+describe("the router classifies the reply on the server", () => {
+  it("its classification, not anything the client sent, becomes the learner's history entry", async () => {
+    const router = createFakeRouter({ script: [{ answered_prompt: true, pushback: true, new_evidence: true }] });
+    const s = new TurnSession({ registry, director: createFakeDirector("valid"), router, state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "No, I measured it" }, () => {});
+    expect(router.calls).toBe(1);
+    expect(s.state.history.entries[0]).toEqual({ kind: "learner", answered_prompt: true, pushback: true, new_evidence: true });
+    // Pushback WITHOUT evidence makes the pedagogy validator demand "hold": the director's explain is rejected.
+    const held = new TurnSession({ registry, director: createFakeDirector("valid"), router: createFakeRouter({ script: [{ pushback: true, new_evidence: false }] }), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    const { events, emit } = collect();
+    await held.run({ text: "No, that's wrong" }, emit);
+    expect((events.at(-1) as Extract<TurnEvent, { type: "turn.error" }>).details.join()).toMatch(/hold-under-pushback/);
+  });
+
+  it("the fake router's fixed rules: answered only when a question is open; pushback; evidence", async () => {
+    const r = createFakeRouter();
+    const h = { posture: "learning" as const, learner_level: "some_knowledge" as const, entries: [] };
+    const c = async (text: string, open_prompt: boolean) => (await r.classify({ text, history: h, open_prompt }, new AbortController().signal)).classification;
+    expect(await c("Closer to my hand", true)).toEqual({ answered_prompt: true, pushback: false, new_evidence: false });
+    expect(await c("Closer to my hand", false)).toEqual({ answered_prompt: false, pushback: false, new_evidence: false });
+    expect(await c("I disagree, it is the same", true)).toMatchObject({ pushback: true, new_evidence: false });
+    expect(await c("No, I measured it with a scale", true)).toMatchObject({ pushback: true, new_evidence: true });
+  });
+
+  it("a router failure or an invalid classification is a plain turn.error, and the director is not called", async () => {
+    for (const script of [["fail" as const], [{ answered_prompt: "yes" as unknown as boolean }]]) {
+      const director = createFakeDirector("valid");
+      const s = new TurnSession({ registry, director, router: createFakeRouter({ script }), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+      const before = s.state;
+      const { events, emit } = collect();
+      await s.run(input, emit);
+      expect(events.map((e) => e.type)).toEqual(["turn.started", "turn.error"]);
+      expect((events[1] as Extract<TurnEvent, { type: "turn.error" }>).reason).toBe("router");
+      expect((events[1] as Extract<TurnEvent, { type: "turn.error" }>).message).toBe("Aili couldn't make sense of that reply this time. Nothing on the stage changed.");
+      expect(director.calls).toBe(0);
+      expect(s.state).toBe(before);
+    }
+  });
+});
+
+describe("session store (in memory)", () => {
+  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false })) } });
+
+  it("commits only a newer revision; an older turn finishing late cannot overwrite it", () => {
+    const st = new InMemorySessionStore();
+    expect(st.get("a")).toBeUndefined();
+    expect(st.commit("a", 5, state(2))).toBe(true);
+    expect(st.commit("a", 4, state(9))).toBe(false);
+    expect(st.commit("a", 5, state(9))).toBe(false);
+    expect(st.get("a")!.history.entries).toHaveLength(2);
+    expect(st.commit("a", 6, state(4))).toBe(true);
+    expect(st.get("a")!.history.entries).toHaveLength(4);
+  });
+
+  it("is bounded (least recently used dropped first) and forgets idle sessions", () => {
+    let t = 0;
+    const st = new InMemorySessionStore({ maxSessions: 2, idleMs: 100, now: () => t });
+    st.commit("a", 1, state(1));
+    st.commit("b", 1, state(1));
+    st.get("a"); // a is now the most recently used
+    st.commit("c", 1, state(1));
+    expect([st.get("a") !== undefined, st.get("b") !== undefined, st.get("c") !== undefined]).toEqual([true, false, true]);
+    t = 1000;
+    expect(st.get("a")).toBeUndefined();
   });
 });
 

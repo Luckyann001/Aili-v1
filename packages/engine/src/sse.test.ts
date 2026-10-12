@@ -11,7 +11,7 @@ const events = async () => {
     concepts: ["mech.torque.static"],
     level: "L2",
   });
-  await s.run({ text: "hi", reply: { answered_prompt: false } }, (e) => out.push(e));
+  await s.run({ text: "hi" }, (e) => out.push(e));
   return out;
 };
 const parse = (chunks: string[]) => {

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
-import { costMicroUsd, createFakeDirector, FAKE_USAGE, InMemoryLedger, refuseTurn, TurnSession, type SessionState, type TurnEvent } from "./index";
+import { costMicroUsd, createFakeDirector, createFakeRouter, FAKE_USAGE, InMemoryLedger, refuseTurn, TurnSession, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 
 // Metering, cap and kill switch (M2 slice 7). Real prices are read from config/ai.json, never
@@ -74,7 +74,7 @@ describe("ledger (in memory) and refusals", () => {
 
 describe("turns: metered, capped, switchable", () => {
   const start = (): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" });
-  const input = { text: "hi", reply: { answered_prompt: true } };
+  const input = { text: "hi" };
   const usage = { model: "professor" as const, input_tokens: 1_000_000, output_tokens: 1_000_000 }; // costs 3 + 7 = 10 in MADE_UP
   const session = (cases: Parameters<typeof createFakeDirector>[0], killSwitch = false, ledger = new InMemoryLedger()) => {
     const director = createFakeDirector(cases, { usage });
@@ -88,11 +88,12 @@ describe("turns: metered, capped, switchable", () => {
   };
 
   it("records each turn's tokens and cost, and refuses the turn after the cap is reached, keeping the state", async () => {
-    const { s, director, ledger } = session("valid"); // 10 per turn, cap 20
-    expect((await run(s)).at(-1)!.type).toBe("turn.done");
-    expect((await run(s)).at(-1)!.type).toBe("turn.done");
-    expect(ledger.spent("page-1")).toBe(20);
-    expect(ledger.entries("page-1").map((e) => e.cost_micro_usd)).toEqual([10, 10]);
+    // Per turn: the router (fake usage at made-up router prices: 1 + 1 = 2) and the director (10). Cap 20.
+    const { s, director, ledger } = session("valid");
+    expect((await run(s)).at(-1)!.type).toBe("turn.done"); // 12 spent: under the cap
+    expect((await run(s)).at(-1)!.type).toBe("turn.done"); // started at 12 (< 20): allowed; 24 spent
+    expect(ledger.spent("page-1")).toBe(24);
+    expect(ledger.entries("page-1").map((e) => `${e.model}:${e.cost_micro_usd}`)).toEqual(["router:2", "professor:10", "router:2", "professor:10"]);
     const before = s.state;
     const refused = await run(s);
     expect(refused.map((e) => e.type)).toEqual(["turn.started", "turn.error"]);
@@ -101,7 +102,7 @@ describe("turns: metered, capped, switchable", () => {
     expect(err.message).toBe("This session has reached its limit for live answers. Prepared lessons still work. Nothing on the stage changed.");
     expect(director.calls).toBe(2); // the director was never asked
     expect(s.state).toBe(before);
-    expect(ledger.spent("page-1")).toBe(20);
+    expect(ledger.spent("page-1")).toBe(24);
   });
 
   it("the kill switch refuses before the director is called", async () => {
@@ -116,7 +117,15 @@ describe("turns: metered, capped, switchable", () => {
   it("tokens spent on a response that fails its checks are still recorded", async () => {
     const { s, ledger } = session("hard-coded-number");
     expect((await run(s)).at(-1)!.type).toBe("turn.error");
-    expect(ledger.spent("page-1")).toBe(10);
+    expect(ledger.spent("page-1")).toBe(12); // router 2 + director 10, though the response failed
+  });
+
+  it("the kill switch stops the router too", async () => {
+    const director = createFakeDirector("valid", { usage });
+    const router = createFakeRouter();
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router, state: start(), concepts: ["mech.torque.static"], level: "L2", meter: { ledger: new InMemoryLedger(), sessionId: "p", config: MADE_UP, killSwitch: true } });
+    await run(s);
+    expect([router.calls, director.calls]).toEqual([0, 0]);
   });
 });
 
