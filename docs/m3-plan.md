@@ -60,6 +60,14 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **Repair feedback:** when the format check fails, narration length, concepts and evidence are still checked, so the repair hears every error at once (each reported once).
     - **Prompt (`professor.v1.md`):** states the 160-character limit per narration segment, that `concepts` are exact concept IDs from the shortlist's `concept_ids`, and that `evidence` holds reading IDs only. The shortlist block now lists `concept_ids` first and never drops them. The prompt is about 3,111 estimated tokens (was 2,987).
 
+22. **After the first passing turn (it needed a repair for a 163-character segment), decided by Lucky:**
+    - **Narration:** the prompt asks for at most 140 characters per segment; the validator's hard limit stays 160.
+    - **Repair:** the repair now shows the model its previous answer (as escaped data) with every error, and asks it to keep the content and change only what the errors name. Before, it saw only the errors and rewrote from scratch, losing the analogy and the reading.
+    - **Predictions:** a question that offers choices about an outcome must be a prediction (prompt kind "prediction" with the prediction object). Prompt rule only: code cannot tell an outcome question from another question with choices.
+    - **The arm's own weight:** whenever torque on an arm or lever comes up, the narration says the arm's own weight counts, or asks only about the load's share. Prompt rule, plus an `arm_weight` automatic expectation on six bake-off scenarios (s01, s03, s05, c1, c3, j1).
+    - **No meta-talk:** never mention tools, instructions, the shortlist or the system. Prompt rule, plus a `meta_talk` phrase list in `config/pedagogy-phrases.json` checked like flattery (exact phrases only). Cause of "I can only explain the second half with my tools": the learner asked two things, the shortlist covered only one (torque, not what a servo is), and the "use only the shortlist" and "say it is not supported" rules together made the model announce the limit, calling the shortlist its tools.
+    - **Analogies:** if the answer sets an analogy, the narration must say what maps to what and where it breaks down. Prompt rule, plus a validator check (a distinctive word from the mapping and a breakdown phrase; a heuristic that cannot judge whether the description is right).
+
 ## Design summary
 
 - **Provider adapter:**
