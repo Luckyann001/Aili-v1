@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Action } from "@aili/schemas";
 import { NARRATION_MAX_CHARS, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
@@ -158,5 +159,50 @@ describe("rule: at most four narration segments, each within the length cap", ()
 
   it("segment IDs are unique", () => {
     expect(errs({ narration: [{ id: "n1", text: "One." }, { id: "n1", text: "Two." }] })).toContain(`narration[1].id: duplicate "n1"`);
+  });
+});
+
+describe("actions: the provider schema is flattened (any field on any action), our validator is not", () => {
+  // The schema sent to the provider makes every action field optional (schema probe, 2026-10-12), so
+  // these checks are what keeps each action's shape: required fields, field types, no foreign fields.
+  const VALID: Record<string, object> = {
+    select_scene: { type: "select_scene", scene: "fx-lever" },
+    highlight_part: { type: "highlight_part", part: "weight" },
+    set_parameter: { type: "set_parameter", param: "weight_distance_m", value: 0.2 },
+    play_animation: { type: "play_animation", animation: "slide-weight-out" },
+    show_choices: { type: "show_choices", choices: [{ id: "closer", label: "Closer" }, { id: "further", label: "Further" }] },
+  };
+  const REQUIRED: Record<string, string[]> = { select_scene: ["scene"], highlight_part: ["part"], set_parameter: ["param", "value"], play_animation: ["animation"], show_choices: ["choices"] };
+  const WRONG_TYPE: Record<string, object> = { select_scene: { scene: 5 }, highlight_part: { part: ["weight"] }, set_parameter: { value: "0.2" }, play_animation: { animation: true }, show_choices: { choices: "closer, further" } };
+  const FOREIGN: Record<string, object> = { select_scene: { part: "weight" }, highlight_part: { scene: "fx-lever" }, set_parameter: { animation: "slide-weight-out" }, play_animation: { choices: [] }, show_choices: { value: 1 } };
+  const DIRECTOR = ["select_scene", "highlight_part", "set_parameter", "play_animation"];
+  const broken = (t: string) => {
+    const out: Array<[string, object]> = [];
+    for (const f of REQUIRED[t]!) {
+      const a: Record<string, unknown> = { ...VALID[t] };
+      delete a[f];
+      out.push([`without ${f}`, a]);
+    }
+    out.push(["a field of the wrong type", { ...VALID[t], ...WRONG_TYPE[t] }]);
+    out.push(["a field of another action type (wrong combination)", { ...VALID[t], ...FOREIGN[t] }]);
+    return out;
+  };
+
+  it.each(DIRECTOR)("a well-formed %s passes", (t) => {
+    expect(errs({ actions: [VALID[t]] })).toEqual([]);
+  });
+  it.each(DIRECTOR)("%s: a missing required field, a wrong type and a foreign field are each rejected", (t) => {
+    for (const [what, a] of broken(t)) expect(errs({ actions: [a] }), `${t}: ${what}`).not.toEqual([]);
+  });
+  it("show_choices is for prepared lessons: refused from the director even when well formed", () => {
+    expect(errs({ actions: [VALID.show_choices] }).join("\n")).toMatch(/prepared lessons/);
+  });
+  it("show_choices' own shape (prepared lessons) is still checked by the shared Action schema", () => {
+    expect(Action.safeParse(VALID.show_choices).success).toBe(true);
+    for (const [what, a] of broken("show_choices")) expect(Action.safeParse(a).success, `show_choices: ${what}`).toBe(false);
+  });
+  it("an unknown action type, or none, is rejected", () => {
+    expect(errs({ actions: [{ type: "teleport", scene: "fx-lever" }] })).not.toEqual([]);
+    expect(errs({ actions: [{ scene: "fx-lever" }] })).not.toEqual([]);
   });
 });

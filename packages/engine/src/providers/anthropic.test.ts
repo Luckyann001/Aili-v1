@@ -89,7 +89,14 @@ describe("structured-output schema for Anthropic", () => {
       if (o.properties) for (const [k, v] of Object.entries(o.properties as object)) walk(v, `${where}.properties.${k}`);
     };
     walk(schema, "$");
-    expect(JSON.stringify(schema)).toContain('"anyOf"'); // the actions union, as anyOf
+  });
+
+  it("flattens the actions union into one shape: type from the list, every other field optional (accepted by the provider, 2026-10-12)", () => {
+    const items = (schema as { properties: { actions: { items: { anyOf?: unknown; properties: Record<string, { enum?: string[] }>; required: string[] } } } }).properties.actions.items;
+    expect(items.anyOf).toBeUndefined();
+    expect(items.properties.type!.enum).toEqual(["select_scene", "highlight_part", "set_parameter", "play_animation", "show_choices"]);
+    expect(items.required).toEqual(["type"]);
+    expect(Object.keys(items.properties).sort()).toEqual(["animation", "choices", "param", "part", "scene", "type", "value"]);
   });
 
   it("sends calc inputs as { name, value } pairs and turns them back into the map", () => {

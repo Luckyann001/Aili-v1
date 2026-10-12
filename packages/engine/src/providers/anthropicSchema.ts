@@ -6,6 +6,10 @@
 // "pattern" (our ID formats) is dropped too: the professor schema with patterns was refused on the
 // first live call (2026-10-12, HTTP 400 "The compiled grammar is too large"); the structural
 // validator checks every ID on every answer, so the patterns are still enforced, just afterwards.
+// A union of object shapes told apart by a constant "type" (the director's actions) is FLATTENED
+// into one object: "type" from the list of variants, every other field optional. Patterns removed,
+// the schema was still refused; flattening the actions was the change the provider accepted (schema
+// probe, 2026-10-12). The strict Zod union still rejects a missing, wrong or foreign field afterwards.
 // A map (an object whose keys are free, like calc_requests[].inputs) cannot be expressed with
 // additionalProperties: false, so it is sent as a list of { name, value } pairs and turned back.
 
@@ -50,9 +54,29 @@ export function toAnthropicSchema(input: object): ReducedSchema {
       out[k] = walk(v, path);
     }
     if (out.type === "object") out.additionalProperties = false;
+    const flat = flattenTagged(out.anyOf);
+    if (flat) {
+      delete out.anyOf;
+      return { ...out, ...flat };
+    }
     return out;
   };
   return { schema: walk(input, []) as object, mapPaths };
+}
+
+/** A union of closed object shapes, each with a constant "type", as one object; else null. */
+function flattenTagged(anyOf: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(anyOf) || anyOf.length < 2) return null;
+  const variants = anyOf as Array<{ type?: unknown; properties?: Record<string, { const?: unknown }> }>;
+  if (!variants.every((v) => v.type === "object" && typeof v.properties?.type?.const === "string")) return null;
+  const properties: Record<string, unknown> = { type: { type: "string", enum: variants.map((v) => v.properties!.type!.const) } };
+  for (const v of variants)
+    for (const [k, sub] of Object.entries(v.properties!)) {
+      if (k === "type") continue;
+      if (k in properties && JSON.stringify(properties[k]) !== JSON.stringify(sub)) return null; // a clash: leave the union as it is
+      properties[k] = sub;
+    }
+  return { type: "object", properties, required: ["type"], additionalProperties: false };
 }
 
 /** Turn the pairs back into maps, so the answer has the shape our validators expect. */
