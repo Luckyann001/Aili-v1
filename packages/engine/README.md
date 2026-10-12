@@ -52,6 +52,20 @@ solvers → compile (placeholders filled, three significant figures) → events.
   The current recording is hand-written; real recordings come in slice 7, reviewed before they are kept.
   The real HTTP adapters are slice 6.
 
+## Prompt (`src/prompt.ts`, `content/prompts/professor.v1.md`)
+- **System prompt**: the versioned template with its review comments (one per rule, naming the spec
+  section) removed. The template is a draft for Lucky's review.
+- **Input**: three tagged DATA blocks, `<shortlist>` (compact: IDs, settings with bounds, solver
+  inputs/outputs, analogy mappings and where they break down, reading guides), `<session_state>`
+  (posture, level, open prompt, last moves; predictions and open items from slice 5) and
+  `<learner_input>`. `<` and `>` are escaped inside them, so no text can close or open a block.
+- **Budget**: about 6,000 tokens, ESTIMATED as characters ÷ 3.5 (no provider tokenizer offline).
+  Over budget, whole items are dropped lowest rank first: readings, analogies, scenes not on stage,
+  unused solvers, simulations. Never dropped: the scene on stage and any item with safety notes;
+  kept items keep their bounds. The model is told what was left out. `overBudget` is reported if
+  even that is not enough.
+- **Output schema**: generated from the Zod director-response schema (`z.toJSONSchema`).
+
 ## Metering, cap and kill switch (`src/metering.ts`)
 - **Prices only from `config/ai.json`** (validated by `AiConfig`): integer micro-USD per million
   tokens for the professor and the router. The current prices are **test values, not real pricing**.
