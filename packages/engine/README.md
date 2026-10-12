@@ -123,6 +123,12 @@ solvers → compile (placeholders filled, three significant figures) → events.
 | another-example | after "another example": an `analogy` from the shortlist not used before |
 | open-items | at most 3 open items; no new reading while one is open |
 | waiver-acknowledgement | a safety-critical waiver asks for explicit acknowledgement (and sets `safety`); nothing goes on until the learner gives it |
+| (5b) teach-back-graded | a teach-back answer is graded in `teach_back_check`, only with the guide's exact key claims and misconceptions; a vague answer gets a follow-up question, a good one the guide's application question; no verdict, score or mastery field exists |
+| (5b) unverified-source | a source the learner names that is not in the library: "I can't verify that", plus the nearest library item |
+| (5b) debate-announce / -rounds / -stop / -concede | announced "on purpose", at most 3 rounds, stops on request, concedes on evidence |
+| (5b) coverage | an empty shortlist needs `coverage: "unsupported"`; an unsupported topic changes nothing on stage |
+| (5b) answer-posture | also: no prediction quiz; a calculated answer states assumptions and cites a source |
+| safety_critical | a waiver or reading touching a flagged concept or item needs explicit acknowledgement, whatever the director declares (build steps from M5; M4 flags the concepts) |
 
 Predictions (guess, result), open items, waivers (who acknowledged, and the date) and the analogies
 used live in `SessionState.teaching` on the server, change only when a turn completes, and are lost
