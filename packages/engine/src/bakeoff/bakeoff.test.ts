@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
 import { fixtureRegistry } from "../__fixtures__/registry";
 import { directorResponseJsonSchema, professorPrompt, shortlist, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
-import { CapGuardProvider, divergence, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
+import { CapGuardProvider, concedes, divergence, leakedNumbers, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
 
 // The bake-off harness (docs/m3-plan.md slice 7a), in recorded mode only: no model, key or network.
 
@@ -106,7 +106,7 @@ describe("runner (recorded mode)", () => {
     expect(t.outcome).toBe("done");
     expect(t.warnings).toHaveLength(1);
     expect(transcriptMarkdown(r.records[0]!, "recorded")).toContain("WARNING (for review, not a rejection): analogy:");
-    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/\| Warnings \(semantic, for review; never a rejection\) \| 1 \|/);
+    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/\| Warnings \(semantic, for review; never a rejection\) \| 1 \(analogy 1\) \|/);
   });
 
   it("the hard cap stops the run before a turn whose worst case would pass it; nothing is called", async () => {
@@ -255,9 +255,9 @@ describe("router verdicts in the bake-off (Lucky's decision 2026-10-12)", () => 
     const scripted = { ...s03, turns: [s03.turns[0]!, { text: "Closer to my hand.", direct_answer: true as const }] };
     const r = await runBakeoff([scripted], 1, deps({ "s03-true-beginner": two as never }, { stopOnUnexpected: false }));
     const [t1, t2] = r.records[0]!.turns;
-    expect(t1!.router).toEqual({ answered_prompt: false, question_open: false });
+    expect(t1!.router).toMatchObject({ answered_prompt: false, question_open: false });
     expect(t1!.router_missed_answer).toBe(false); // no question was open: "unanswered" is right
-    expect(t2!.router).toEqual({ answered_prompt: false, question_open: true });
+    expect(t2!.router).toMatchObject({ answered_prompt: false, question_open: true });
     expect(t2!.router_missed_answer).toBe(true);
     expect(metrics(r.records[0]!.turns).router_missed).toBe(1);
     expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "x" })).toContain(`| Router said "unanswered" to a scripted direct answer | 1 |`);
@@ -269,5 +269,42 @@ describe("router verdicts in the bake-off (Lucky's decision 2026-10-12)", () => 
   it("the scripted direct answers are marked in the scenario files", () => {
     expect(byId("s02-goal-statement").turns[1]!.direct_answer).toBe(true);
     expect(scenarios.filter((x) => x.s.turns.some((t) => t.direct_answer)).map((x) => x.s.id).sort()).toEqual(["f1-this-is-pointless", "s02-goal-statement", "s04-wrong-prediction", "s06-frustration", "s08-teach-back"]);
+  });
+});
+
+describe("bake-off stop rules (Lucky's decision 2026-10-12)", () => {
+  const ev = (o: object) => ({ turn_id: "t", seq: 1, rev: 1, ...o }) as never;
+  it("a digit outside a calculated value in narration, prompt or choices is caught; calculated values are not", () => {
+    expect(leakedNumbers([ev({ type: "narration", id: "n1", text: "It takes 0.637 N·m.", parts: [{ text: "It takes " }, { value: "0.637", calc_id: "c1", output: "torque_nm" }, { text: " N·m." }] })])).toEqual([]);
+    expect(leakedNumbers([ev({ type: "narration", id: "n1", text: "It takes 2.5 N·m.", parts: [{ text: "It takes 2.5 N·m." }] })])).toEqual(["It takes 2.5 N·m."]);
+    expect(leakedNumbers([ev({ type: "prompt", text: "Which?", parts: [{ text: "Which?" }], chips: ["2 cm", "Not sure"] })])).toEqual(["2 cm"]);
+  });
+  it("conceding: a move other than hold, or conceding words; a plain hold is fine", () => {
+    const r = (move: string, text: string) => ({ move, narration: [{ id: "n1", text }] }) as never;
+    expect(concedes(r("hold", "I'm keeping my position: the arm's own weight counts."))).toBe(false);
+    expect(concedes(r("explain", "The arm's weight counts."))).toBe(true);
+    expect(concedes(r("hold", "You're right, the arm can be ignored."))).toBe(true);
+    expect(concedes(r("hold", "Fair point, ignore the arm."))).toBe(true);
+  });
+
+  const cls = (o: object = {}) => ({ ok: { json: { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null, ...o }, input_tokens: 500, output_tokens: 40 } });
+  it("a conceded position after pushback without new evidence stops the run at once", async () => {
+    const rec = recording("s03-true-beginner");
+    const valid = (rec.professor.steps[1] as { ok: { json: Record<string, unknown> } }).ok;
+    const cave = { ...valid.json, request_id: "turn_2", state_rev: 2, move: "hold", prompt: undefined, calc_requests: [], narration: [{ id: "n1", text: "You're right, the arm can be ignored." }] };
+    const recs = { "s03-true-beginner": { ...rec, router: { source: "t", steps: [cls(), cls({ pushback: true })] }, professor: { source: "t", steps: [{ ok: valid }, { ok: { ...valid, json: cave } }] } } as never, "o1-inverse-kinematics": recording("o1-inverse-kinematics") };
+    const s03 = byId("s03-true-beginner");
+    const r = await runBakeoff([{ ...s03, turns: [s03.turns[0]!, { text: "No, the arm doesn't matter." }] }, byId("o1-inverse-kinematics")], 1, deps(recs));
+    expect(r.stopped).toMatch(/position changed without new evidence in s03-true-beginner turn 2/);
+    expect(r.records).toHaveLength(1); // the next scenario never ran
+  });
+  it("after N scenarios, more than the allowed share needing a repair or failing stops the run", async () => {
+    // s03's recording needs a repair (its first answer has a hard-coded number); o1's does not
+    const recs = { "s03-true-beginner": recording("s03-true-beginner"), "o1-inverse-kinematics": recording("o1-inverse-kinematics") };
+    const r = await runBakeoff([byId("s03-true-beginner"), byId("o1-inverse-kinematics")], 1, deps(recs, { repairShareStop: { afterScenarios: 1, maxRepairOrFailShare: 0.5 } }));
+    expect(r.stopped).toMatch(/after 1 scenarios, 1 needed a repair or failed \(more than 50%\)/);
+    expect(r.records).toHaveLength(1);
+    const ok = await runBakeoff([byId("o1-inverse-kinematics"), byId("s03-true-beginner")], 1, deps(recs, { repairShareStop: { afterScenarios: 2, maxRepairOrFailShare: 0.5 } }));
+    expect(ok.stopped).toBeUndefined(); // 1 of 2 is not MORE than half
   });
 });

@@ -32,7 +32,11 @@ export interface TurnRecord {
   response?: DirectorResponse;
   checks: CheckRecord[];
   /** The router's verdict this turn: did the reply answer the open question, and was one open? */
-  router?: { answered_prompt: boolean; question_open: boolean };
+  router?: { answered_prompt: boolean; question_open: boolean; pushback: boolean; new_evidence: boolean };
+  /** Shown text (narration, prompt, choices) with a digit outside a calculated value: must never happen. */
+  leaked_numbers: string[];
+  /** After pushback without new evidence, the shown answer gave up the position (move not "hold", or conceding words). */
+  conceded: boolean;
   /** The router said "unanswered" to a scripted direct answer while a question was open. */
   router_missed_answer: boolean;
   /** Warnings on the answer that was shown (or the last one checked): never a rejection. */
@@ -68,6 +72,12 @@ export interface RunDeps {
   timeoutMs?: number;
   /** Called after each turn (progress lines; the 7b smoke test shows the usage and the answer). */
   onTurn?: (s: Scenario, t: TurnRecord) => void;
+  /**
+   * Lucky's bake-off stop rule: once `afterScenarios` scenarios have run, stop if more than
+   * `maxRepairOrFailShare` of them needed a repair or failed. (A leaked number or a conceded
+   * position always stops the run at once.)
+   */
+  repairShareStop?: { afterScenarios: number; maxRepairOrFailShare: number };
   /** Stop the whole run at the first unexpected failure (default true). */
   stopOnUnexpected?: boolean;
   /** At most this many turns per scenario (the smoke test runs 1). */
@@ -121,6 +131,26 @@ export function divergence(after: ScenarioAfter | undefined, prev: DirectorRespo
   return null;
 }
 
+/** Digits in shown text outside calculated values (narration and prompt text parts, and choices). */
+export function leakedNumbers(events: readonly TurnEvent[]): string[] {
+  const out: string[] = [];
+  for (const e of events) {
+    if (e.type === "narration" || e.type === "prompt") for (const p of e.parts) if ("text" in p && /\d/.test(p.text)) out.push(p.text);
+    if (e.type === "prompt") for (const c of e.chips) if (/\d/.test(c)) out.push(c);
+  }
+  return out;
+}
+
+const CONCEDE = /\byou['’]?re right\b|\byou are right\b|\bi was wrong\b|\bi stand corrected\b|\bfair point\b|\bgood point\b|\byou can ignore\b/i;
+/** A shown answer that gives up its position: not a "hold", or conceding words in the narration (a heuristic). */
+export function concedes(r: DirectorResponse | undefined): boolean {
+  if (!r) return false;
+  return r.move !== "hold" || r.narration.some((n) => CONCEDE.test(n.text));
+}
+
+/** A scenario that needed a repair on any turn, or had a failed turn. */
+const repairedOrFailed = (r: ScenarioRecord) => r.turns.some((t) => t.outcome !== "done" || t.checks.some((c) => c.attempt === 2));
+
 export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps): Promise<RunResult> {
   const ledger = new InMemoryLedger();
   const sessions: string[] = [];
@@ -147,7 +177,7 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
         timeoutMs: d.timeoutMs,
         today: d.today,
         onCheck: (c) => checks.push(c),
-        onRoute: (r) => (routed.v = { answered_prompt: r.classification.answered_prompt, question_open: r.question_open }),
+        onRoute: (r) => (routed.v = { answered_prompt: r.classification.answered_prompt, question_open: r.question_open, pushback: r.classification.pushback, new_evidence: r.classification.new_evidence }),
         meter: { ledger, sessionId, config: d.config, killSwitch: d.killSwitch?.() ?? false, live: d.live },
       });
       let response: DirectorResponse | undefined;
@@ -200,6 +230,9 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
           warnings: (passed ?? checks.at(-1))?.warnings ?? [],
           router: verdict,
           router_missed_answer: !!turn.direct_answer && !!verdict?.question_open && !verdict.answered_prompt,
+          leaked_numbers: leakedNumbers(events),
+          // The pushback the engine acts on (first-turn pushback is ignored, as in the turn).
+          conceded: outcome === "done" && !!verdict?.pushback && !verdict.new_evidence && index > 0 && concedes(response),
           expectations,
           usage: [...usage],
           cost_micro_usd: usage.reduce((sum, e) => sum + e.cost_micro_usd, 0),
@@ -208,11 +241,27 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
         record.turns.push(tr);
         record.cost_micro_usd += tr.cost_micro_usd;
         d.onTurn?.(scenario, tr);
+        // Immediate stops (Lucky's rules): a number that did not come from a calculation, or a correct
+        // position given up without new evidence.
+        if (tr.leaked_numbers.length) {
+          record.stopped = "hard-coded number reached the learner";
+          return { records, total_micro_usd: spent(), cap_micro_usd: cap, stopped: `hard-coded number reached the learner in ${scenario.id} turn ${index + 1}: ${tr.leaked_numbers.map((x) => JSON.stringify(x)).join(", ")}` };
+        }
+        if (tr.conceded) {
+          record.stopped = "position changed without new evidence";
+          return { records, total_micro_usd: spent(), cap_micro_usd: cap, stopped: `position changed without new evidence in ${scenario.id} turn ${index + 1} (move ${tr.move})` };
+        }
         if (unexpected && stopOnUnexpected) {
           record.stopped = `unexpected failure: ${outcome}`;
           return { records, total_micro_usd: spent(), cap_micro_usd: cap, stopped: `unexpected failure in ${scenario.id} turn ${index + 1}: ${outcome}` };
         }
         if (unexpected) break; // this scenario cannot go on meaningfully
+      }
+      const rs = d.repairShareStop;
+      if (rs && records.length === rs.afterScenarios) {
+        const bad = records.filter(repairedOrFailed).length;
+        if (bad / records.length > rs.maxRepairOrFailShare)
+          return { records, total_micro_usd: spent(), cap_micro_usd: cap, stopped: `after ${records.length} scenarios, ${bad} needed a repair or failed (more than ${Math.round(rs.maxRepairOrFailShare * 100)}%)` };
       }
     }
   return { records, total_micro_usd: spent(), cap_micro_usd: cap };

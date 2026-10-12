@@ -24,6 +24,9 @@ export interface Metrics {
   after_repair: [number, number];
   latency_median_ms: number;
   latency_p95_ms: number;
+  latency_max_ms: number;
+  /** Warnings counted by kind: analogy, mild praise, prompt re-attached, other. */
+  warnings_by_type: Record<string, number>;
   cost_micro_usd: number;
   moves: Record<string, number>;
   /** Explain moves per question asked. */
@@ -67,6 +70,14 @@ export function metrics(turns: TurnRecord[]): Metrics {
     after_repair: [withAnswer.filter((t) => t.checks.some((c) => c.outcome === "pass")).length, withAnswer.length],
     latency_median_ms: quantile(latencies, 0.5),
     latency_p95_ms: quantile(latencies, 0.95),
+    latency_max_ms: latencies.length ? Math.max(...latencies) : NaN,
+    warnings_by_type: turns
+      .flatMap((t) => t.warnings)
+      .reduce<Record<string, number>>((acc, w) => {
+        const k = w.startsWith(PROMPT_REATTACHED) ? "prompt re-attached" : w.startsWith("analogy:") ? "analogy" : /mild praise/.test(w) ? "mild praise" : "other";
+        acc[k] = (acc[k] ?? 0) + 1;
+        return acc;
+      }, {}),
     cost_micro_usd: turns.reduce((s, t) => s + t.cost_micro_usd, 0),
     moves,
     explain_per_question: asked ? (moves.explain ?? 0) / asked : NaN,
@@ -100,20 +111,29 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     "",
     `| Measure | Value |`,
     `|---|---|`,
+    `| Scenarios run | ${result.records.length} |`,
     `| Turns run / completed | ${m.turns} / ${m.completed} |`,
+    `| Cost per turn (mean) | ${m.turns ? usd(Math.round(result.total_micro_usd / m.turns)) : "n/a"} |`,
+    `| Repair rate (turns with an answer that needed a repair) | ${pct(m.repaired[1], m.after_repair[1])} |`,
     `| Structural validator, first try | ${pct(...m.first_try_structural)} |`,
     `| Both validators (structural + pedagogy), first try | ${pct(...m.first_try_both)} |`,
     `| Repairs that passed | ${pct(...m.repaired)} |`,
     `| Passed after repair (of turns with an answer) | ${pct(...m.after_repair)} |`,
     `| Automatic expectations met | ${pct(...m.expectations)} |`,
-    `| Latency median / slowest 5% | ${m.latency_median_ms} ms / ${m.latency_p95_ms} ms |`,
+    `| Latency median / slowest 5% / worst | ${m.latency_median_ms} ms / ${m.latency_p95_ms} ms / ${m.latency_max_ms} ms |`,
     `| Moves | ${movesText(m.moves)} |`,
     `| Explain moves per question asked | ${Number.isNaN(m.explain_per_question) ? "n/a" : m.explain_per_question.toFixed(2)} |`,
     `| Most questions in a row | ${m.max_consecutive_questions} |`,
     `| Failures | ${movesText(m.failures)} |`,
-    `| Warnings (semantic, for review; never a rejection) | ${m.warnings} |`,
+    `| Warnings (semantic, for review; never a rejection) | ${m.warnings}${m.warnings ? ` (${movesText(m.warnings_by_type)})` : ""} |`,
     `| Prompts re-attached from stored state (engine fallback) | ${m.reattached} |`,
     `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
+    "",
+    "## Failures",
+    "",
+    ...(all.filter((t) => t.outcome !== "done").length
+      ? result.records.flatMap((r) => r.turns.filter((t) => t.outcome !== "done").map((t) => `- ${r.scenario.id} turn ${t.index}: ${t.outcome}: ${t.checks.at(-1)?.errors.join("; ") || (t.events.at(-1) as { details?: string[] } | undefined)?.details?.join("; ") || ""}`))
+      : ["- none"]),
     "",
     "## Per scenario",
     "",

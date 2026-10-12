@@ -35,6 +35,9 @@ import { args, loadConfig, loadFixtureRegistry, loadTemplates, readJson, repoRoo
 //
 //   npm run bakeoff -w @aili/engine -- [--scenario id,id] [--category spec] [--runs 1] [--max-turns N] [--keep-going]
 //   npm run bakeoff:live -w @aili/engine -- --scenario s03-true-beginner --max-turns 1 [--record] [--cap-usd 0.10]
+//     [--stop-after-scenarios 10 --max-repair-share 0.5] [--keep-going]
+// A hard-coded number reaching the learner, or a position given up without new evidence, always
+// stops the run at once.
 // --cap-usd can only LOWER the config cap for this run. Live mode checks the cap before every
 // provider attempt too (CapGuardProvider). Live mode prints the provider's own error type and message
 // (scrubbed, 300 characters) and each response's stop reason and tokens to the TERMINAL (stderr) only;
@@ -121,6 +124,8 @@ async function main() {
     config,
     maxTurns,
     stopOnUnexpected: a["keep-going"] !== true,
+    repairShareStop:
+      typeof a["stop-after-scenarios"] === "string" ? { afterScenarios: Number(a["stop-after-scenarios"]), maxRepairOrFailShare: typeof a["max-repair-share"] === "string" ? Number(a["max-repair-share"]) : 0.5 } : undefined,
     live: mode === "live" ? { hasKey } : undefined,
     killSwitch: () => process.env.AILI_AI_KILL_SWITCH === "1",
     make: (s, run, spent) => {
