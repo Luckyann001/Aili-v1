@@ -120,3 +120,14 @@ describe("the router sees the open question (Lucky's decision 2026-10-12)", () =
     expect(assembleRouterPrompt(ROUTER, { text: "hi", history, open_prompt: false, open_question: q }).input).toContain(`"open_question":null`);
   });
 });
+
+describe("router.v1: short replies count as answers (Lucky's decision 2026-10-12)", () => {
+  it("says a short or partial reply on the topic counts, with one format-only example on another topic", () => {
+    const s = assembleRouterPrompt(ROUTER, { text: "x", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }).system;
+    expect(s).toMatch(/A short or partial reply on the question's topic counts as an answer \("Not much", "a little", a single example\)/);
+    expect(s).toMatch(/Example \(format only\): open_question "Have you ever used a soldering iron\?", reply "Once, at school\." gives answered_prompt true\./);
+    const example = s.split("\n").find((l) => l.includes("Example (format only)"))!;
+    expect(example).not.toMatch(/robot|Lego|servo|torque/i); // a different topic from the lessons
+    expect(s).not.toContain("<!--");
+  });
+});
