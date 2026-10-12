@@ -15,7 +15,7 @@ import {
 } from "../index";
 import { fixtureRegistry } from "../__fixtures__/registry";
 import valid from "../__recordings__/valid-explain.hand-written.json";
-import { ANTHROPIC_VERSION, AnthropicProvider, createProfessorProvider, fromAnthropicShape, toAnthropicSchema } from "./index";
+import { ANTHROPIC_VERSION, AnthropicProvider, createProfessorProvider, fromAnthropicShape, scrubProviderMessage, toAnthropicSchema, type AnthropicDiagnostic } from "./index";
 import { errors, message, refusal, SECRET_BODY_TEXT, type MockReply } from "./__fixtures__/anthropicResponses";
 import { mockServer } from "./__fixtures__/mockServer";
 
@@ -280,5 +280,43 @@ describe("a planted key never leaks", () => {
     expect(all).not.toContain(PLANTED);
     expect(all).not.toContain(PLANTED.slice(0, 12));
     expect(all).not.toContain(SECRET_BODY_TEXT);
+  });
+});
+
+describe("live diagnostics (terminal only)", () => {
+  it("scrubs the key itself, anything key-like, and cuts at 300 characters", () => {
+    const m = scrubProviderMessage(`bad key ${PLANTED} or sk-ant-api03-abcDEF_123-xyz and ${"A".repeat(40)} ` + "x".repeat(400), PLANTED);
+    expect(m).not.toContain(PLANTED);
+    expect(m).not.toContain("sk-ant-");
+    expect(m).not.toContain("A".repeat(32));
+    expect(m.length).toBeLessThanOrEqual(301);
+    expect(m).toContain("[redacted]");
+  });
+
+  it("reports the provider's error type and scrubbed message to the hook only; the thrown error carries a kind and status", async () => {
+    const srv = await mockServer([{ status: 400, body: { type: "error", error: { type: "invalid_request_error", message: `schema rejected; key was ${PLANTED}` } } }]);
+    const c = config();
+    const seen: AnthropicDiagnostic[] = [];
+    const p = new AnthropicProvider({ config: c, model: "professor", env: () => envWithKey(c), baseUrl: srv.url, onDiagnostic: (d) => seen.push(d) });
+    const err = await p.complete(simpleRequest()).catch((e: unknown) => e);
+    expect(seen).toEqual([{ type: "error", model: "professor", status: 400, error_type: "invalid_request_error", message: "schema rejected; key was [redacted]" }]);
+    expect(String(err)).toBe("ProviderError: provider: bad_request (HTTP 400)");
+  });
+
+  it("reports a response's stop reason and tokens, thinking tokens included when the provider reports them", async () => {
+    const r = message('{"a":"x"}', { input: 100, output: 50 });
+    (r.body.usage as Record<string, unknown>).output_tokens_details = { thinking_tokens: 30 };
+    const srv = await mockServer([r]);
+    const c = config();
+    const seen: AnthropicDiagnostic[] = [];
+    await new AnthropicProvider({ config: c, model: "router", env: () => envWithKey(c), baseUrl: srv.url, onDiagnostic: (d) => seen.push(d) }).complete(simpleRequest());
+    expect(seen[0]).toMatchObject({ type: "response", model: "router", stop_reason: "end_turn", input_tokens: 100, output_tokens: 50, thinking_tokens: 30 });
+  });
+
+  it("a hook that throws never breaks the call", async () => {
+    const srv = await mockServer([message('{"a":"x"}')]);
+    const c = config();
+    const p = new AnthropicProvider({ config: c, model: "router", env: () => envWithKey(c), baseUrl: srv.url, onDiagnostic: () => { throw new Error("boom"); } });
+    await expect(p.complete(simpleRequest())).resolves.toMatchObject({ json: { a: "x" } });
   });
 });

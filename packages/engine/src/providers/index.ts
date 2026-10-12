@@ -9,7 +9,7 @@ export function createProfessorProvider(
   config: AiConfig,
   model: RuntimeModel,
   env: () => Record<string, string | undefined>,
-  opts: Pick<AnthropicProviderOptions, "baseUrl" | "fetchImpl" | "now"> = {},
+  opts: Pick<AnthropicProviderOptions, "baseUrl" | "fetchImpl" | "now" | "onDiagnostic"> = {},
 ): ProfessorProvider {
   switch (config.models[model].provider) {
     case "anthropic":
@@ -19,5 +19,5 @@ export function createProfessorProvider(
   }
 }
 
-export { AnthropicProvider, ANTHROPIC_VERSION, type AnthropicProviderOptions } from "./anthropic";
+export { AnthropicProvider, ANTHROPIC_VERSION, scrubProviderMessage, type AnthropicDiagnostic, type AnthropicProviderOptions } from "./anthropic";
 export { toAnthropicSchema, fromAnthropicShape, type ReducedSchema } from "./anthropicSchema";

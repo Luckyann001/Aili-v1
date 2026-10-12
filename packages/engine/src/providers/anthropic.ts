@@ -35,6 +35,23 @@ export interface AnthropicProviderOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  /**
+   * LIVE RUNS ONLY (the bake-off command prints these to the terminal): the provider's error type and
+   * message (first 300 characters, scrubbed of anything key-like), or a response's stop reason and
+   * token counts. Never passed into events, the ledger, transcripts or log files.
+   */
+  onDiagnostic?: (d: AnthropicDiagnostic) => void;
+}
+
+export type AnthropicDiagnostic =
+  | { type: "error"; model: RuntimeModel; status: number; error_type: string; message: string }
+  | { type: "response"; model: RuntimeModel; status: number; stop_reason: string; served_model: string; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+
+/** At most 300 characters, with the key itself and anything key-like replaced. */
+export function scrubProviderMessage(message: string, key?: string): string {
+  let m = key ? message.split(key).join("[redacted]") : message;
+  m = m.replace(/sk-ant-[\w-]+/g, "[redacted]").replace(/\bsk-[\w-]{8,}/g, "[redacted]").replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]");
+  return m.length > 300 ? `${m.slice(0, 300)}…` : m;
 }
 
 export class AnthropicProvider implements ProfessorProvider {
@@ -46,6 +63,15 @@ export class AnthropicProvider implements ProfessorProvider {
     const local = url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]");
     if (url.protocol !== "https:" && !local) throw new Error("baseUrl must be https (or http on this computer, for tests)");
     this.baseUrl = url.origin;
+  }
+
+  /** A diagnostic hook that throws must never break a call. */
+  private diagnose(d: AnthropicDiagnostic) {
+    try {
+      this.o.onDiagnostic?.(d);
+    } catch {
+      /* ignore */
+    }
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
@@ -82,10 +108,31 @@ export class AnthropicProvider implements ProfessorProvider {
     const latencyMs = now() - started;
     const parsed = parseJson(text);
 
-    if (!res.ok) throw new ProviderError(kindOfFailure(res.status, parsed), res.status, usageOf(parsed, this.o.model));
+    if (!res.ok) {
+      const e = (parsed as { error?: { type?: unknown; message?: unknown } } | undefined)?.error;
+      this.diagnose({ type: "error", model: this.o.model, status: res.status, error_type: typeof e?.type === "string" ? e.type : "(none)", message: scrubProviderMessage(typeof e?.message === "string" ? e.message : text.slice(0, 600), key) });
+      throw new ProviderError(kindOfFailure(res.status, parsed), res.status, usageOf(parsed, this.o.model));
+    }
     const msg = parsed as { content?: unknown; stop_reason?: unknown } | null;
     if (!msg || !Array.isArray(msg.content)) throw new ProviderError("server", res.status); // not a message: treat as a server fault
     const usage = usageOf(msg, this.o.model);
+    if (this.o.onDiagnostic) {
+      const u = (msg as { usage?: Record<string, unknown> }).usage ?? {};
+      const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+      const r = msg as { stop_reason?: unknown; model?: unknown };
+      this.diagnose({
+        type: "response",
+        model: this.o.model,
+        status: res.status,
+        stop_reason: String(r.stop_reason),
+        served_model: String(r.model),
+        input_tokens: num(u.input_tokens),
+        output_tokens: num(u.output_tokens),
+        thinking_tokens: num((u.output_tokens_details as Record<string, unknown> | undefined)?.thinking_tokens),
+        cache_read_input_tokens: num(u.cache_read_input_tokens),
+        cache_creation_input_tokens: num(u.cache_creation_input_tokens),
+      });
+    }
     if (msg.stop_reason === "refusal") throw new ProviderError("refused", undefined, usage);
     const answer = msg.content
       .filter((b): b is { type: "text"; text: string } => !!b && typeof b === "object" && b.type === "text" && typeof b.text === "string")
