@@ -162,7 +162,7 @@ Used by the beginner lever analogy to drive an illustrative, unitless effort gau
 4. The **validator** checks that IDs exist, values are in bounds, citations exist, narration contains no hard-coded engineering numbers, and pedagogy rules hold (for example, no more than one open question).
 5. The solver runs any calculation requests.
 6. The server compiles narration, scene actions, equations, evidence and the learner prompt, and sends events to the client over WebSocket or SSE. The client renders and interpolates locally.
-7. State is saved. *(Until the database stage, state is not saved on the server: in the M2 fake-director demo the session history and scene round-trip through the client. That is for scripted turns only; see the M3 hard rule in `docs/m2-plan.md`. [Oct 12 2026])* A newer learner input (including an interrupt) invalidates stale queued narration and actions (sequence numbers, request IDs, idempotency).
+7. State is saved. *(Until the database stage, session state (history, open prompt, scene) is kept on the server in memory, keyed by page session, and is lost on restart; the client sends only its text. [Oct 12 2026, M3 slice 1])* A newer learner input (including an interrupt) invalidates stale queued narration and actions (sequence numbers, request IDs, idempotency).
 
 ```json
 {

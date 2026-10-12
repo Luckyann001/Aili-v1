@@ -168,3 +168,4 @@ Every slice ends with lint, typecheck, unit tests and the e2e run, followed by s
 
 - **Session history and scene state live on the server.** A client must never be able to alter what the pedagogy validator and the structural validator read: the history, the open prompt, the scene on stage, the posture and the learner level.
 - The current round trip, where the client sends its history and scene with each turn and gets the new state back in `turn.done`, is **fake-director only** (M2 slice 6 demo, `NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1`). It must be replaced before any real director runs.
+- **Met in M3 slice 1 (Oct 12 2026):** the client sends only its page session ID, revision and text; the round trip is removed, and history and scene state are kept on the server (in memory until the database stage).
