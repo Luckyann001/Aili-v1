@@ -3,7 +3,7 @@
 AILI (Artificial Intelligence Learning Interface) is an interactive learning-and-building environment. A person understands a complex technical topic through a one-on-one AI professor using 3D visuals, analogies, calculation and simulation, then is guided into building a real project. Core loop: **understand → visualize → experiment → reason → build.**
 
 Stack and structure approved Oct 9 2026. M0 (foundations) is complete and merged locally into `main`.
-**M1 paused Oct 11 2026 (not finished):** sign-in (slice 8), saved sessions and migration (slice 9), landing page polish, the waitlist and the registry database sync are deferred to the last stage (after M6, before M7, and before any public deployment or real AI key); do not start them unless asked. **M2 (engine) is next:** follow `docs/m2-plan.md`.
+**M1 paused Oct 11 2026 (not finished):** sign-in (slice 8), saved sessions and migration (slice 9), landing page polish, the waitlist and the registry database sync are deferred to the last stage (after M6, before M7, and before any public deployment); do not start them unless asked. **A real AI key may be used on Lucky's laptop only, never deployed and never on any hosting service, until the database stage** (decided Oct 12 2026). **M2 (engine) is complete. M3 (live professor) is next:** follow `docs/m3-plan.md`, one slice at a time.
 
 ## Scope (do not exceed)
 - AILI is a **platform**; **robotics is the only module** for now. No other subjects, no whiteboard, no search, no mascot, no AI/ML module, no AR/VR (design for it later, build nothing now).

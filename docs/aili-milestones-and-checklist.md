@@ -52,7 +52,7 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Inside-the-servo/gearing lab; feedback-control lab
 - [ ] Reference library UI, 30–40 verified items
 
-**Deferred stage (after M6, before M7, and before any public deployment or real AI key)** — decided Oct 11 2026
+**Deferred stage (after M6, before M7, and before any public deployment)** — decided Oct 11 2026. A real AI key may be used on Lucky's laptop only, never deployed and never on any hosting service, until this stage is done (Oct 12 2026).
 - [ ] Sign-in (M1 slice 8)
 - [ ] Saved sessions and migration (M1 slice 9)
 - [ ] Landing page polish
@@ -65,6 +65,7 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Spend cap per user, error monitoring, backups
 - [ ] Billing decision recorded (beta free with caps; no forced paywall)
 - [ ] Frontier Lab: 5–10 verified cards (primary sources only)
+- [ ] A plain notice that learner text is sent to the AI provider, and the data-region and consent decision (added Oct 12 2026)
 
 **M8 — Beta run**
 - [ ] 20–30 invited users; weekly check-ins; one-week transfer question; summary of what worked
