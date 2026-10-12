@@ -280,7 +280,7 @@ describe("no provider or model name in code", () => {
   const files = (dir: string): string[] =>
     readdirSync(dir).flatMap((name) => {
       const p = join(dir, name);
-      if (name === "node_modules" || name.startsWith(".next") || name === "test-results") return [];
+      if (name === "node_modules" || name.startsWith(".next") || name === "test-results" || name === ".script-build") return []; // build output
       if (statSync(p).isDirectory()) return files(p);
       return /\.(ts|tsx|js|mjs)$/.test(name) && !p.endsWith("provider.test.ts") ? [p] : [];
     });

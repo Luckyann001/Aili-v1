@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "dry-run": "rolldown scripts/dryRun.ts --platform node --format esm --file .script-build/dryRun.mjs --log-level warn && node .script-build/dryRun.mjs"
   },
   "dependencies": {
     "@aili/schemas": "^0.0.0",
