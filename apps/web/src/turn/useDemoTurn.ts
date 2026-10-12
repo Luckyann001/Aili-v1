@@ -22,6 +22,8 @@ export interface StageSnapshot {
   activeScene: SceneId;
   selectedId: string | null;
   leverDistance_m: number;
+  /** Whether fixture content (from an earlier, completed turn) was already on stage. */
+  fixture: boolean;
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
@@ -40,7 +42,7 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, fixture: useStageContent.getState().fixture };
 };
 
 function restoreStage(snap: StageSnapshot) {
@@ -48,7 +50,7 @@ function restoreStage(snap: StageSnapshot) {
   s.setScene(snap.activeScene);
   s.setLeverDistance(snap.leverDistance_m);
   s.highlight(snap.selectedId);
-  useStageContent.getState().setFixture(false);
+  useStageContent.getState().setFixture(snap.fixture);
 }
 
 function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"]) {
