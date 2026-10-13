@@ -20,7 +20,7 @@ One app, **two stages, one shared engine**. This replaces the earlier "one stage
 └───────────────────────────────────────┴──────────────────┘
 ```
 - **Top bar:** logo (→ Home/Resume), menu (plan/table of contents, notes, settings, help, sign out). Thin; no mode dashboards.
-- **Stage:** large rounded canvas, one scene at a time. Orbit/zoom/pan, select, labelled anatomy, exploded view, reset camera. Selecting a part opens a temporary inspector with sliders (units + bounds). Status badge: *Prepared* / *Live* / *Illustrative (AI-composed)*. Numbers come only from solvers. Reduced-motion: cuts, no tweens.
+- **Stage:** large rounded canvas, one scene at a time. Orbit/zoom/pan, select, labelled anatomy, exploded view, reset camera. Selecting a part opens a temporary inspector with sliders (units + bounds). Status badge: *Prepared* / *Live AI* / *Illustrative (AI-composed)*. A live answer that uses test-fixture content also shows *Test fixture content*. Numbers come only from solvers. Reduced-motion: cuts, no tweens.
 - **Voice (bottom-centre):** states idle / listening / thinking / speaking / error. **Interrupt** stops audio and queued actions immediately (stale actions invalidated by sequence numbers). Text box beside it; quick-reply chips for Aili's questions. Voice optional; falls back to text. Provider behind config; browser speech first.
 - **Captions:** because the right panel is closed most of the time, a short caption overlay sits above the voice button, synchronised with speech.
 - **Text explanation panel (right, on demand):** current explanation, equations with live values, evidence chips, open question, assumptions/limits; scrollable history; copy / pin note / "explain differently". Show only the current step by default (split-attention).
