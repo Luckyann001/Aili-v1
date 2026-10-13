@@ -97,7 +97,8 @@ export const Prediction = z
     /** The question as asked, so a later turn can re-offer it (Lucky's decision 2026-10-12). */
     question: z.string().min(1).optional(),
     guess: z.string().min(1).nullable(),
-    status: z.enum(["open", "guessed", "revealed"]),
+    /** "unsure": the learner answered "Not sure" / "I don't know"; not a guess, so nothing to reveal (spec A1a). */
+    status: z.enum(["open", "guessed", "revealed", "unsure"]),
     outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]).optional(),
   })
   .strict();

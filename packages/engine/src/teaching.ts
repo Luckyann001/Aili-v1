@@ -5,17 +5,25 @@ import type { DirectorResponse, ReplyClassification, TeachingState } from "@aili
 // the turn completes (so a failed turn changes nothing).
 
 /** What the learner's reply changes: a prediction's guess, a safety-critical waiver acknowledged. */
+/** Answers that say the learner does not know: not a guess (behavior spec A1a: "no idea" is a valid commitment). */
+export const NOT_SURE = /^(not sure|i don['’]?t know|idk|no idea)[.!]?$/i;
+
 export function applyLearnerReply(t: TeachingState, c: ReplyClassification, today: string): TeachingState {
   let predictions = t.predictions;
+  let open_items = t.open_items;
   const open = predictions.find((p) => p.status === "open");
-  if (open && c.guess !== null) predictions = predictions.map((p) => (p === open ? { ...p, guess: c.guess, status: "guessed" as const } : p));
+  if (open && c.guess !== null && NOT_SURE.test(c.guess.trim())) {
+    // Not a guess: the prediction closes as "unsure", with nothing to reveal or calculate (spec A1a, A4).
+    predictions = predictions.map((p) => (p === open ? { ...p, guess: null, status: "unsure" as const } : p));
+    open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === open.id));
+  } else if (open && c.guess !== null) predictions = predictions.map((p) => (p === open ? { ...p, guess: c.guess, status: "guessed" as const } : p));
   let waivers = t.waivers;
   let safety_acks = t.safety_acks ?? [];
   if (c.acknowledged) {
     waivers = waivers.map((w) => (w.acknowledged === null ? { ...w, acknowledged: { by: "learner" as const, on: today } } : w));
     safety_acks = safety_acks.map((a) => (a.acknowledged === null ? { ...a, acknowledged: { by: "learner" as const, on: today } } : a));
   }
-  return { ...t, predictions, waivers, safety_acks };
+  return { ...t, predictions, open_items, waivers, safety_acks };
 }
 
 /** What a validated director answer changes, as the Aili turn numbered `turn`. */

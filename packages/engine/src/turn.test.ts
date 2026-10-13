@@ -393,3 +393,39 @@ describe("narration split in a turn (Lucky's decision 2026-10-13)", () => {
     expect(checks[0]!.warnings.join()).toMatch(/^narration split: narration\[0\]/);
   });
 });
+
+describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky's decision 2026-10-13)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  it.each(["Not sure", "I don't know", "idk", "No idea."])("\"%s\" closes the prediction as unsure, with no reveal or calculation required", async (reply) => {
+    const { applyLearnerReply } = await import("./teaching");
+    const t = { predictions: [{ id: "p1", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], guess: null, status: "open" as const }], open_items: [{ kind: "prediction" as const, ref: "p1", opened_turn: 1 }], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
+    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: reply, wants_stop: false, asks_for_source: null };
+    const after = applyLearnerReply(t, c, "2026-10-13");
+    expect(after.predictions[0]).toMatchObject({ status: "unsure", guess: null });
+    expect(after.open_items).toEqual([]);
+  });
+
+  it("a real choice is still a guess, which must be tested and revealed", async () => {
+    const { applyLearnerReply } = await import("./teaching");
+    const t = { predictions: [{ id: "p1", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], guess: null, status: "open" as const }], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
+    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: "More", wants_stop: false, asks_for_source: null };
+    expect(applyLearnerReply(t, c, "2026-10-13").predictions[0]).toMatchObject({ status: "guessed", guess: "More" });
+  });
+
+  it("in a turn: after \"Not sure\" to a prediction, an explanation without a calculation passes (the f1 failure)", async () => {
+    const prompt = { ...(VALID.prompt as object), kind: "prediction" };
+    const director: Director = {
+      async respond(req) {
+        return req.request_id === "turn_1"
+          ? { response: { ...VALID, prompt, prediction: { id: "weight-out", concept: "mech.torque.static" } } }
+          : { response: { ...VALID, request_id: "turn_2", state_rev: 2, move: "explain", narration: [{ id: "n1", text: "Here is the idea: the farther out the weight, the bigger its twist on your hand." }], calc_requests: [], prompt: undefined } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: true, guess: "Not sure", frustrated: true }] }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Why is it hard?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "idk" }, (e) => events.push(e));
+    expect(events.at(-1)).toMatchObject({ type: "turn.done", move: "explain" });
+    expect(s.state.teaching!.predictions[0]).toMatchObject({ id: "weight-out", status: "unsure" });
+  });
+});
