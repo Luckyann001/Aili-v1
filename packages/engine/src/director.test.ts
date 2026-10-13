@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -458,5 +458,20 @@ describe("an unsupported topic is answered with move answer or explain (spec A4,
   it("answer and explain pass", () => {
     expect(unsupported("answer")).toEqual([]);
     expect(unsupported("explain")).toEqual([]);
+  });
+});
+
+describe("guide question substituted (Lucky's decision 2026-10-13)", () => {
+  const graded = { teach_back_check: { reading: "read.fx-moments", claims_covered: [], misconceptions_seen: [], next: "application_question" } };
+  it("replaces a paraphrase with the guide's exact application question, keeping kind and choices, with a warning", () => {
+    const r = substituteGuideQuestion({ ...graded, prompt: { kind: "question", text: "So what happens if it tilts?", chips: ["Not sure"] } }, SL);
+    expect((r.raw as { prompt: unknown }).prompt).toEqual({ kind: "question", text: "What changes when the arm tilts", chips: ["Not sure"] });
+    expect(r.warning).toBe(`guide question substituted: the prompt was "So what happens if it tilts?"; the guide's exact application question "What changes when the arm tilts" was used`);
+  });
+  it("does nothing when the text already matches, for a follow-up, or for a reading not in the shortlist", () => {
+    const exact = { ...graded, prompt: { kind: "question", text: "What changes when the arm tilts", chips: [] } };
+    expect(substituteGuideQuestion(exact, SL).warning).toBeNull();
+    expect(substituteGuideQuestion({ teach_back_check: { ...graded.teach_back_check, next: "follow_up" }, prompt: { kind: "question", text: "x", chips: [] } }, SL).warning).toBeNull();
+    expect(substituteGuideQuestion({ teach_back_check: { ...graded.teach_back_check, reading: "read.unknown" } }, SL).warning).toBeNull();
   });
 });

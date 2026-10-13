@@ -1,4 +1,4 @@
-import { EMPTY_ANSWER, NARRATION_SPLIT } from "../director";
+import { EMPTY_ANSWER, GUIDE_QUESTION_SUBSTITUTED, NARRATION_SPLIT } from "../director";
 import { OPEN_QUESTION_REOFFERED } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
@@ -70,6 +70,8 @@ export interface Metrics {
   narration_split: number;
   /** Turns whose FIRST answer was empty or action-only (no narration and no prompt). */
   empty_first: number;
+  /** Turns where the engine used the guide's exact application question after the repair paraphrased it. */
+  guide_substituted: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -105,7 +107,9 @@ export function metrics(turns: TurnRecord[]): Metrics {
     warnings_by_type: turns
       .flatMap((t) => t.warnings)
       .reduce<Record<string, number>>((acc, w) => {
-        const k = w.startsWith(NARRATION_SPLIT)
+        const k = w.startsWith(GUIDE_QUESTION_SUBSTITUTED)
+          ? "guide question substituted"
+          : w.startsWith(NARRATION_SPLIT)
             ? "narration split"
             : w.startsWith(OPEN_QUESTION_REOFFERED)
             ? "open question re-offered"
@@ -127,6 +131,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
     router_missed: turns.filter((t) => t.router_missed_answer).length,
+    guide_substituted: turns.filter((t) => t.warnings.some((w) => w.startsWith(GUIDE_QUESTION_SUBSTITUTED))).length,
     empty_first: turns.filter((t) => t.checks.find((c) => c.attempt === 1)?.errors.includes(EMPTY_ANSWER)).length,
     narration_split: turns.filter((t) => t.warnings.some((w) => w.startsWith(NARRATION_SPLIT))).length,
     reoffered: turns.filter((t) => t.warnings.some((w) => w.startsWith(OPEN_QUESTION_REOFFERED))).length,
@@ -173,6 +178,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Open questions re-offered (instead of a new question) | ${m.reoffered} |`,
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
     `| Empty or action-only first answers (no narration, no prompt) | ${m.empty_first} |`,
+    `| Guide application question substituted (engine, after the repair) | ${m.guide_substituted} |`,
     "",
     "## By scenario family",
     "",

@@ -354,3 +354,25 @@ export function splitLongNarration(raw: unknown): { raw: unknown; warnings: stri
   if (out.length > NARRATION_MAX_SEGMENTS) return none; // splitting would pass the segment limit: reject as before
   return { raw: { ...(raw as object), narration: out }, warnings };
 }
+
+/** The warning when the engine puts the guide's exact application question in the prompt (Lucky's decision 2026-10-13). */
+export const GUIDE_QUESTION_SUBSTITUTED = "guide question substituted";
+
+/**
+ * Fallback after a repair that still paraphrased the guide's application question: if the answer
+ * grades a teach-back as covering the guide (teach_back_check.next "application_question") and the
+ * reading is in the shortlist, the prompt's text becomes the guide's exact question (kind and choices
+ * kept), with a warning. The reading's human-written guide is the source of truth (spec A8).
+ */
+export function substituteGuideQuestion(raw: unknown, sl: Shortlist): { raw: unknown; warning: string | null } {
+  const none = { raw, warning: null };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return none;
+  const r = raw as { teach_back_check?: { reading?: unknown; next?: unknown }; prompt?: Record<string, unknown> };
+  if (r.teach_back_check?.next !== "application_question") return none;
+  const rd = sl.readings.find((x) => x.id === r.teach_back_check!.reading);
+  if (!rd) return none;
+  const q = rd.guide.application_question;
+  if (r.prompt?.text === q) return none;
+  const prompt = { kind: "question", chips: [], ...(r.prompt ?? {}), text: q };
+  return { raw: { ...(raw as object), prompt }, warning: `${GUIDE_QUESTION_SUBSTITUTED}: the prompt was "${String(r.prompt?.text ?? "(none)")}"; the guide's exact application question "${q}" was used` };
+}

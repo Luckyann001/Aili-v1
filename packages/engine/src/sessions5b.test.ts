@@ -71,9 +71,16 @@ describe("A14 #8 teach-back: graded only against the guide; a vague answer gets 
     };
     expect(await after({ move: "explain", narration: say("Moments are torques.") })).toMatch(/rule teach-back-graded/);
     expect(await after({ ...followUp, teach_back_check: { ...followUp.teach_back_check as object, claims_covered: ["Torque is energy"] } } as Answer)).toMatch(/"Torque is energy" is not one of the guide's key claims/);
-    expect(await after({ ...application, prompt: ask("Now explain gears") })).toMatch(/ask the guide's application question/);
     expect(await after({ ...followUp, prompt: undefined })).toMatch(/a vague teach-back gets a follow-up question, not a verdict/);
     expect(await after({ ...application, narration: say("You've mastered moments.") })).toMatch(/rule no-mastery-claim/);
+  });
+
+  it("a paraphrased application question that survives the repair is replaced by the guide's exact text (Lucky's decision 2026-10-13)", async () => {
+    const t = scriptedSession(registry, [askTeachBack, { ...application, prompt: ask("Now explain gears") }]);
+    await t.reply("I read it");
+    const events = await t.reply("force times the distance from the pivot");
+    done(events);
+    expect((events.find((e) => e.type === "prompt") as { text: string }).text).toBe(GUIDE.application_question);
   });
 
   it("the response schema has no verdict, score or mastery field anywhere", () => {

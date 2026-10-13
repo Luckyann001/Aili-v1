@@ -2,7 +2,7 @@ import type { DirectorResponse, SessionHistory } from "@aili/schemas";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
-import { splitLongNarration, validateDirectorResponse } from "./director";
+import { splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, OPEN_QUESTION_REOFFERED } from "./teaching";
@@ -379,6 +379,15 @@ export class TurnSession {
       if (reply === "stale") return;
       if (typeof reply === "string") return fail(reply, [`director: ${reply}`, ...first.errors]);
       checked = check(reply.response);
+      // The repair still paraphrased the guide's application question: use the guide's exact text
+      // (no further model call), with a visible warning (Lucky's decision 2026-10-13).
+      if ("errors" in checked && checked.errors.some((e) => e.includes("ask the guide's application question"))) {
+        const sub = substituteGuideQuestion(reply.response, sl);
+        if (sub.warning) {
+          const again = check(sub.raw);
+          if (!("errors" in again)) checked = { ...again, warnings: [sub.warning, ...again.warnings] };
+        }
+      }
       observe(2, checked);
       if ("errors" in checked) return fail(checked.reason, [...checked.errors, "(after one repair attempt)"]);
     }
