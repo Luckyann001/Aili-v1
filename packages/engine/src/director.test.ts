@@ -448,3 +448,15 @@ describe("ROS 2 is a product name (Lucky's decision 2026-10-13); nothing broader
     expect(checkNarration(t, []).join()).toContain(`"${n}"`);
   });
 });
+
+describe("an unsupported topic is answered with move answer or explain (spec A4, A14 test 11; Lucky's decision 2026-10-13)", () => {
+  const empty = { scenes: [], simulations: [], solvers: [], analogies: [], readings: [], sources: [], ids: new Set<string>(), concepts: [] };
+  const unsupported = (move: string) => errs({ move, coverage: "unsupported", concepts: [], evidence: [], actions: [], calc_requests: [], prompt: undefined, narration: [{ id: "n1", text: "That isn't supported here yet; the nearest topic is the lever." }] }, { shortlist: empty });
+  it("the o1 answer's move \"hold\" is rejected", () => {
+    expect(unsupported("hold")).toEqual([`move: an unsupported topic is answered with move "answer" or "explain" (say so and offer the nearest supported route), not "hold" (behavior spec A4, A14 test 11)`]);
+  });
+  it("answer and explain pass", () => {
+    expect(unsupported("answer")).toEqual([]);
+    expect(unsupported("explain")).toEqual([]);
+  });
+});

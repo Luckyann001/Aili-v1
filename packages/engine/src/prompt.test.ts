@@ -211,6 +211,7 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toMatch(/keep its content and change only what the errors name; add what the errors name, even if that changes the answer/);
     expect(s).toMatch(/If the learner answers a prediction with "Not sure" or "I don't know", that is not a guess: no reveal or calculation is needed\. Explain the idea/);
     expect(s).toMatch(/If session_state has direct_answer_requested true .* no "prompt" at all; state the assumptions and cite a reading in "evidence"\. You may state an offer in narration/);
+    expect(s).toMatch(/set "coverage": "unsupported" with move "answer" or "explain"/);
     expect(s).toMatch(/A prompt contains exactly one question mark: one question, never two, and no "does that make sense\?" checks/);
     expect(s).toMatch(/Assumptions and limitations contain no digits: write them in words \("level", "no payload"/);
     expect(s).toMatch(/Do not open with a judgement of the learner's background or answer \(such as "that's a fine start" or "nice try"\); start with the substance\./);

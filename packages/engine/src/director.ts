@@ -245,6 +245,8 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
 
   // Nothing in the shortlist: say it is not supported (coverage "unsupported"), and do nothing on stage.
   if (sl.ids.size === 0 && r.coverage !== "unsupported") errors.push(`coverage: the shortlist is empty for this topic; set coverage "unsupported" and say so plainly`);
+  if (r.coverage === "unsupported" && r.move !== "answer" && r.move !== "explain")
+    errors.push(`move: an unsupported topic is answered with move "answer" or "explain" (say so and offer the nearest supported route), not "${r.move}" (behavior spec A4, A14 test 11)`);
   if (r.coverage === "unsupported" && (r.actions.length > 0 || r.calc_requests.length > 0))
     errors.push(`coverage: an unsupported topic changes nothing on stage and calculates nothing (actions ${r.actions.length}, calc_requests ${r.calc_requests.length})`);
 

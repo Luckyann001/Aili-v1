@@ -94,7 +94,7 @@ describe("narration: no hard-coded numbers", () => {
   });
 
   it("allows known placeholders and the documented digit words only", () => {
-    expect(ALLOWED_DIGIT_WORDS).toEqual(["3D", "2D"]);
+    expect(ALLOWED_DIGIT_WORDS).toEqual(["3D", "2D", "ROS 2", "ROS2"]); // ROS 2: Lucky's decision 2026-10-13
     expect(checkNarration("About {{effort_far_vs_near}} times the effort, in the 3D view.", PLACEHOLDERS)).toEqual([]);
     expect(checkNarration("In 3Dx space", PLACEHOLDERS).join()).toMatch(/"3"/);
     expect(checkNarration("{{torque_nm}} newton metres", PLACEHOLDERS).join()).toMatch(/unknown placeholder \{\{torque_nm\}\}/);
