@@ -78,10 +78,17 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
 
 24. **After the first 5-turn check stopped (Oct 12 2026), decided by Lucky:**
     - **The professor now sees the real teaching state:** open predictions (id, question, choices), open items, waivers, and the open prompt's text, kind and choices. They had been sent as fixed empty lists since slice 3, so the model could not know a prediction was still waiting. A test fails if they are hard-coded again.
-    - **An open prediction the learner has not answered** is kept open: Aili answers what they said in one sentence and re-offers the same question more simply (same prediction id). The one-open-question rule allows exactly this re-offer; any new question is still rejected.
+    - **An open prediction the learner has not answered** is kept open: Aili answers what they said in one sentence and re-offers the same question more simply (same kind and choices; the id is kept, decision 25). The one-open-question rule allows exactly this re-offer; any new question is still rejected.
     - **Learner level "unknown"** (a goal statement): one baseline question finds the level. Scenario s02 uses it.
     - **Scripted scenario replies** may say what Aili's previous answer must be (`after`). If it no longer fits, the bake-off reports "script diverged" and skips the rest of that scenario; this is not a professor failure.
     - **Mild praise** ("that's a fine start") is a warning only (`flattery_warn`), never a rejection.
+
+25. **After the first full bake-off (Oct 13 2026; stopped after 10 scenarios, 7 needed a repair or failed), decided by Lucky:**
+    - **Predictions are recorded by the engine.** The director's answer has no prediction object any more (adding a question and choices to it made the schema too large to compile). A prompt of kind "prediction" makes the engine record the prediction: id `p-turn-N`, concept = the first of the answer's `concepts`, which the prompt asks to list first. A prediction prompt with no concepts is rejected. A re-offer (same kind and choices) keeps the id. Reveals and session_state use the engine's ids. A prediction can no longer arrive without its prompt, so the prompt-re-attach fallback was removed.
+    - **Narration over 200 characters** is split by the engine at sentence ends (never inside a placeholder) into parts of at most 200, with a warning; one over-long sentence, or a split that would pass four segments, is rejected as before.
+    - **"Not sure" / "I don't know" to a prediction is not a guess** (behavior spec A1a: "no idea" is a valid commitment, then explain): the prediction closes as `unsure`, no reveal or calculation is required, and Aili explains; the help ladder is for repeated "I don't know" (A4, A6).
+    - **Count adjectives are not numbers:** a fixed list (N-axis, N-DOF, N-link, N-wheel(ed), N-joint, with N one digit; plus 3D/2D). Nothing the learner typed is exempted.
+    - **Report:** "most questions in a row" resets per scenario; the summary groups results by scenario family and gives the first-attempt pass rate with and without the f and o families.
 
 ## Design summary
 
