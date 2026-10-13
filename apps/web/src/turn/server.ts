@@ -2,7 +2,7 @@ import { createFakeDirector, createFakeRouter, encodeEvent, InMemoryLedger, InMe
 import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
-import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts } from "./live";
+import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, logCheck } from "./live";
 
 // Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Two modes:
 // - the fake director (NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1): no provider, no key, no network;
@@ -84,7 +84,7 @@ export async function handleTurn(request: Request): Promise<Response> {
     concepts: live ? LIVE_CONCEPTS : ["mech.torque.static"],
     level: live ? LIVE_LEVEL : "L2",
     startRev: req.state_rev - 1,
-    ...(live ? {} : { timeoutMs: TIMEOUT_MS }),
+    ...(live ? { onCheck: logCheck(req.session_id, req.state_rev) } : { timeoutMs: TIMEOUT_MS }),
     // The kill switch is read on every request (server-only env, so it can be flipped without a rebuild).
     meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env), ...(live ? { live: live.live } : {}) },
   });

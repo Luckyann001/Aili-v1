@@ -73,3 +73,22 @@ export function liveTurnParts(config: AiConfig) {
     live: { hasKey },
   };
 }
+
+/** A short, key-free summary of what the model sent, for the dev terminal: move, prompt kind, narration lengths. */
+export function summarizeAttempt(raw: unknown): string {
+  const r = (raw ?? {}) as { move?: unknown; prompt?: { kind?: unknown } | null; narration?: Array<{ text?: unknown }>; actions?: Array<{ type?: unknown }>; calc_requests?: unknown[] };
+  const lengths = Array.isArray(r.narration) ? r.narration.map((n) => (typeof n?.text === "string" ? n.text.length : "?")).join("+") : "none";
+  const actions = Array.isArray(r.actions) ? r.actions.map((a) => String(a?.type)).join(",") || "none" : "none";
+  return `move=${String(r.move)} prompt=${r.prompt ? String(r.prompt.kind ?? "question") : "none"} narration=${lengths} chars actions=${actions} calcs=${Array.isArray(r.calc_requests) ? r.calc_requests.length : 0}`;
+}
+
+type CheckLog = { attempt: 1 | 2; outcome: string; errors: string[]; warnings: string[]; raw?: unknown };
+/**
+ * Live mode only: each attempt's outcome, rule messages and a summary of what the model sent, to the
+ * dev server's terminal. Never the learner's text, a key or a header.
+ */
+export const logCheck = (sessionId: string, rev: number) => (c: CheckLog) => {
+  console.error(`[live] session ${sessionId.slice(0, 8)} turn ${rev} attempt ${c.attempt}: ${c.outcome} · ${summarizeAttempt(c.raw)}`);
+  for (const e of c.errors) console.error(`[live]   rejected: ${e}`);
+  for (const w of c.warnings) console.error(`[live]   warning: ${w}`);
+};

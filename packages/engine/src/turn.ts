@@ -194,7 +194,8 @@ export interface TurnSessionOptions {
    */
   /** Observes the router's validated classification each turn, and whether a question was open (bake-off logs). */
   onRoute?: (r: { classification: ReplyClassification; question_open: boolean }) => void;
-  onCheck?: (c: { attempt: 1 | 2; outcome: "pass" | "validation" | "pedagogy"; errors: string[]; warnings: string[]; response?: DirectorResponse }) => void;
+  /** Each director attempt's check: the validated response when it passed, else what the model sent (`raw`, for logs). */
+  onCheck?: (c: { attempt: 1 | 2; outcome: "pass" | "validation" | "pedagogy"; errors: string[]; warnings: string[]; response?: DirectorResponse; raw?: unknown }) => void;
   /**
    * Metering (slice 7): the kill switch and this session's cap are checked before the director is
    * called, and the director's token usage is recorded at config prices. Omit to run unmetered (tests).
@@ -400,10 +401,10 @@ export class TurnSession {
     let reply = await callDirector();
     if (reply === "stale") return;
     if (typeof reply === "string") return fail(reply, [`director: ${reply}`]);
-    const observe = (attempt: 1 | 2, c: ReturnType<typeof check>) =>
-      this.opts.onCheck?.("errors" in c ? { attempt, outcome: c.reason, errors: c.errors, warnings: c.warnings } : { attempt, outcome: "pass", errors: [], warnings: c.warnings, response: c.r });
+    const observe = (attempt: 1 | 2, c: ReturnType<typeof check>, raw: unknown) =>
+      this.opts.onCheck?.("errors" in c ? { attempt, outcome: c.reason, errors: c.errors, warnings: c.warnings, raw } : { attempt, outcome: "pass", errors: [], warnings: c.warnings, response: c.r, raw });
     let checked = check(reply.response);
-    observe(1, checked);
+    observe(1, checked, reply.response);
     if ("errors" in checked) {
       const first = checked;
       reply = await callDirector({ errors: first.errors, previous: reply.response });
@@ -419,7 +420,7 @@ export class TurnSession {
           if (!("errors" in again)) checked = { ...again, warnings: [sub.warning, ...again.warnings] };
         }
       }
-      observe(2, checked);
+      observe(2, checked, reply.response);
       if ("errors" in checked) return fail(checked.reason, [...checked.errors, "(after one repair attempt)"]);
     }
     const r = checked.r;

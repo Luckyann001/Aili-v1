@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSseParser, RecordedProvider, type Recording, type TurnEvent } from "@aili/engine";
 import realConfig from "../../../../config/ai.json";
-import { isLocalRequest, liveEnabled } from "./live";
+import { isLocalRequest, liveEnabled, summarizeAttempt } from "./live";
 
 // Live turns on the laptop (docs/m3-live-browser-plan.md slice 1). No key and no network: the
 // provider is a recorded one (a bake-off recording), and the keys are placeholders whose presence
@@ -63,6 +63,25 @@ describe("when live mode is on", () => {
     for (const h of ["192.168.100.5:3000", "aili.example.com", "localhost.evil.com"]) expect(isLocalRequest(req(h), {}), h).toBe(false);
     expect(isLocalRequest(req(), {})).toBe(false);
     expect(isLocalRequest(req("192.168.100.5:3000"), { AILI_LIVE_ALLOW_LAN: "1" })).toBe(true);
+  });
+});
+
+describe("the dev terminal's attempt log (live only)", () => {
+  it("summarizes what the model sent: move, prompt kind, narration lengths; no text", () => {
+    expect(summarizeAttempt({ move: "probe", prompt: { kind: "prediction", text: "secret?" }, narration: [{ text: "abc" }, { text: "hello" }], actions: [{ type: "select_scene" }], calc_requests: [] })).toBe("move=probe prompt=prediction narration=3+5 chars actions=select_scene calcs=0");
+    expect(summarizeAttempt(undefined)).toBe("move=undefined prompt=none narration=none chars actions=none calcs=0");
+  });
+  it("a live turn logs each attempt's outcome and rejection reasons", async () => {
+    const { handleTurn } = await load();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await readAll(await handleTurn(post(body())));
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    log.mockRestore();
+    // The recording's first answer has a hard-coded number (rejected); the repair passes.
+    expect(lines.some((l) => /attempt 1: validation · move=explain/.test(l))).toBe(true);
+    expect(lines.some((l) => /rejected: .*hard-coded/i.test(l) || /rejected: .*number/i.test(l))).toBe(true);
+    expect(lines.some((l) => /attempt 2: pass/.test(l))).toBe(true);
+    expect(lines.join("\n")).not.toMatch(/What is a servo/); // never the learner's text
   });
 });
 
