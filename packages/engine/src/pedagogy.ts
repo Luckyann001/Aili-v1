@@ -233,7 +233,9 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   //     be stated in narration, never asked), and the answer states its assumptions and cites a source.
   if (ctx.directAnswer) {
     if (r.prompt) fail("direct-answer", `the learner asked for a direct answer: no "prompt" this turn; you may state an offer in narration, without a question`);
-    if (r.assumptions.length === 0) fail("direct-answer", `a direct answer states its assumptions ("assumptions")`);
+    // Assumptions only when the answer explains or calculates; a "not supported" answer has none to state.
+    const teaches = r.coverage !== "unsupported" && (r.move === "explain" || r.move === "answer" || r.calc_requests.length > 0);
+    if (teaches && r.assumptions.length === 0) fail("direct-answer", `a direct answer states its assumptions ("assumptions")`);
     if (ctx.libraryAvailable && r.evidence.length === 0) fail("direct-answer", `a direct answer cites a source from the library ("evidence")`);
   }
 

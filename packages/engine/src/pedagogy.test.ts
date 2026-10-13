@@ -230,3 +230,15 @@ describe("direct answer asked for this turn (router wants_direct_answer; Lucky's
     expect(validatePedagogy(r, h, {}, { libraryAvailable: true }).join()).not.toMatch(/direct-answer/);
   });
 });
+
+describe("direct-answer assumptions only when the answer explains or calculates (Lucky's decision 2026-10-13)", () => {
+  const ctx = { directAnswer: true, libraryAvailable: false };
+  it("a coverage-unsupported answer (the o2 / s11 case) needs no assumptions", () => {
+    const r = resp({ move: "answer", coverage: "unsupported", narration: [{ id: "n1", text: "ROS launch files aren't supported here yet." }], assumptions: [], evidence: [] });
+    expect(validatePedagogy(r, hist([]), {}, ctx).join()).not.toMatch(/states its assumptions/);
+  });
+  it("an answer that explains, or calculates, still states them", () => {
+    const r = resp({ move: "answer", narration: [{ id: "n1", text: "Torque is force times moment arm." }], assumptions: [], evidence: [] });
+    expect(validatePedagogy(r, hist([]), {}, ctx).join()).toMatch(/a direct answer states its assumptions/);
+  });
+});
