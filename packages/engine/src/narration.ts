@@ -20,6 +20,9 @@ export const ALLOWED_COUNT_ADJECTIVES = [
   /(?<![\d.,])\b[1-9]-joint\b/gi,
 ] as const;
 
+/** A calculation ID written out (c1, c12), outside any {{placeholder}}. */
+const CALC_ID = /(?<![\w.{])c\d+\b(?!\.\w)/g;
+
 // A placeholder is a plain name ({{effort_far_vs_near}}) or a calculation output ({{c1.torque_nm}}).
 const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?)\s*\}\}/g;
 
@@ -32,6 +35,12 @@ export function checkNarration(text: string, allowedPlaceholders: readonly strin
     }
   }
   let rest = text.replace(PLACEHOLDER, " ");
+  // A calculation ID (c1, c2) is internal: name the cause rather than "hard-coded number" (Lucky's decision 2026-10-13).
+  const ids = rest.match(CALC_ID);
+  if (ids) {
+    errors.push(`${where}: calculation ID in text ${[...new Set(ids)].map((n) => `"${n}"`).join(", ")} — never name a calculation; show its result only through a {{placeholder}} such as {{c1.torque_nm}}`);
+    rest = rest.replace(CALC_ID, " ");
+  }
   for (const word of ALLOWED_DIGIT_WORDS) rest = rest.replace(new RegExp(`\\b${word}\\b`, "g"), " ");
   for (const pattern of ALLOWED_COUNT_ADJECTIVES) rest = rest.replace(pattern, " ");
   const numbers = rest.match(/\d+(?:[.,]\d+)*/g);

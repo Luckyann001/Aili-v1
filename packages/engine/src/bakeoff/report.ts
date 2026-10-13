@@ -28,6 +28,7 @@ export function repairCause(error: string): string {
   if (/^rule ([a-z-]+)/.test(error)) return `pedagogy: ${/^rule ([a-z-]+)/.exec(error)![1]}`;
   if (/characters, at most/.test(error)) return "narration too long";
   if (/segments, at most/.test(error)) return "too many narration segments";
+  if (/calculation ID in text/.test(error)) return "calculation ID in text";
   if (/hard-coded number/.test(error)) return "hard-coded number";
   if (/move "probe" asks/.test(error)) return "probe without a prompt";
   if (/question marks in/.test(error)) return "more than one question in the prompt";

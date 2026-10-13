@@ -475,3 +475,15 @@ describe("guide question substituted (Lucky's decision 2026-10-13)", () => {
     expect(substituteGuideQuestion({ teach_back_check: { ...graded.teach_back_check, reading: "read.unknown" } }, SL).warning).toBeNull();
   });
 });
+
+describe("calculation IDs in learner text are named as such (Lucky's decision 2026-10-13, s04)", () => {
+  it("the s04 repair sentence is rejected for its calculation IDs, not as hard-coded numbers", () => {
+    const e = checkNarration("Calculation c1 has the weight near the hand, c2 has it far out.", []);
+    expect(e).toEqual([`narration: calculation ID in text "c1", "c2" — never name a calculation; show its result only through a {{placeholder}} such as {{c1.torque_nm}}`]);
+  });
+  it("placeholders are not IDs; a real number next to an ID is still a hard-coded number", () => {
+    expect(checkNarration("Near gives {{c1.torque_nm}} N·m.", ["c1.torque_nm"])).toEqual([]);
+    expect(checkNarration("c1 gives 2.5 N·m", []).join("\n")).toMatch(/calculation ID in text "c1"[\s\S]*hard-coded number "2.5"/);
+    expect(checkNarration("The CO2 sensor", [])).toEqual([`narration: hard-coded number "2" — numbers must come from a solver through a {{placeholder}}`]); // not an ID
+  });
+});
