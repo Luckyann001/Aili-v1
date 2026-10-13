@@ -410,11 +410,14 @@ describe("long narration split at sentence ends (Lucky's decision 2026-10-13)", 
     expect(r.warnings).toEqual([]);
     expect(errs({ narration: (r.raw as { narration: unknown[] }).narration })).toEqual([`narration[0].text: ${one.length} characters, at most 200`]);
   });
-  it("a split that would make more than four segments is not done (rejected as before)", () => {
-    const r = splitLongNarration({ narration: [{ id: "a", text: "One." }, { id: "b", text: "Two." }, { id: "c", text: "Three." }, { id: "d", text: `${s1} ${s2}` }] });
-    expect(r.warnings).toEqual([]);
-    expect((r.raw as { narration: unknown[] }).narration).toHaveLength(4);
+  it("a split that would make more than five segments, or a narration over 700 characters, is not done (Lucky's decision 2026-10-13)", () => {
+    const five = splitLongNarration({ narration: [{ id: "a", text: "One." }, { id: "b", text: "Two." }, { id: "c", text: "Three." }, { id: "d", text: "Four." }, { id: "e", text: `${s1} ${s2}` }] });
+    expect(five.warnings).toEqual([]); // would make six
+    const long = "x".repeat(180) + "."; // 3 × 181 + 211 = 754 characters in total
+    const over = splitLongNarration({ narration: [{ id: "a", text: long }, { id: "b", text: long }, { id: "c", text: long }, { id: "d", text: `${s1} ${s2}` }] });
+    expect(over.warnings).toEqual([]); // five segments, but more than 700 characters in total
   });
+
 });
 
 describe("an answer gives the learner something, and a probe asks (Lucky's decisions 2026-10-13; spec A1a)", () => {
@@ -504,5 +507,39 @@ describe("reveal.calc is one valid calculation ID (Lucky's decision 2026-10-13, 
   });
   it("a single ID passes the format check (and must still be a calculation of this turn)", () => {
     expect(errs({ reveal: { prediction: "p-turn-1", calc: "c9", outcome: "not_as_predicted" } }).join()).toMatch(/reveal.calc: "c9" is not a calculation requested in this turn/);
+  });
+});
+
+describe("split up to five segments within 700 characters: the live c1, j1 and f1 cases (Lucky's decision 2026-10-13)", () => {
+  // A sentence of exactly n characters (ending with a full stop).
+  const sentence = (n: number) => "A" + "b".repeat(n - 2) + ".";
+  const long = (n: number) => `${sentence(Math.floor((n - 1) / 2))} ${sentence(n - 1 - Math.floor((n - 1) / 2))}`;
+  const four = (lengths: number[]) => lengths.map((n, i) => ({ id: `n${i + 1}`, text: n > 200 ? long(n) : sentence(n) }));
+  it.each([
+    ["c1", [123, 126, 150, 215]],
+    ["j1", [112, 130, 112, 222]],
+    ["f1", [114, 136, 204, 139]],
+  ])("%s: four segments, one too long, become five; total within 700; placeholders kept", (_, lengths) => {
+    const narration = four(lengths as number[]);
+    expect(narration.reduce((t, n) => t + n.text.length, 0)).toBeLessThanOrEqual(700);
+    const r = splitLongNarration({ narration });
+    const out = (r.raw as { narration: Array<{ text: string }> }).narration;
+    expect(out).toHaveLength(5);
+    expect(out.every((n) => n.text.length <= 200)).toBe(true);
+    expect(r.warnings).toHaveLength(1);
+    // the engine-split answer passes with the five-segment allowance, not with the model's own limit
+    expect(errs({ narration: out }, { ...CTX, maxSegments: 5 })).toEqual([]);
+    expect(errs({ narration: out })).toEqual(["narration: 5 segments, at most 4"]);
+  });
+  it("a single sentence over 200 is still rejected (not split)", () => {
+    const r = splitLongNarration({ narration: [{ id: "n1", text: sentence(215) }] });
+    expect(r.warnings).toEqual([]);
+  });
+  it("placeholders stay intact across the split", () => {
+    const text = `Near gives {{c1.torque_nm}} newton-metres, which is the payload's share plus the arm's own share at its middle, measured from the pivot. ${"Far " + "out ".repeat(15).trim()} gives {{c2.torque_nm}} instead, so the hold gets harder.`;
+    const parts = (splitLongNarration({ narration: [{ id: "a", text: "One." }, { id: "b", text: "Two." }, { id: "c", text: "Three." }, { id: "d", text }] }).raw as { narration: Array<{ text: string }> }).narration;
+    expect(parts).toHaveLength(5);
+    expect(parts.map((p) => p.text).join(" ")).toContain("{{c1.torque_nm}}");
+    expect(parts.map((p) => p.text).join(" ")).toContain("{{c2.torque_nm}}");
   });
 });

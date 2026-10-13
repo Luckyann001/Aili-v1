@@ -532,3 +532,19 @@ describe("a teach-back question follows up the open reading's question (Lucky's 
     expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
   });
 });
+
+describe("five segments after a split, in a turn (Lucky's decision 2026-10-13)", () => {
+  it("four segments with one too long are shown as five, with the split warning", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const long = "A servo arm carries its load all the time, so the motor must keep pushing to hold it level against gravity. That steady push is the torque it must give, and it grows with the distance from the pivot to the load.";
+    const narration = [{ id: "n1", text: "One idea first." }, { id: "n2", text: "Torque is a turning effect." }, { id: "n3", text: "Distance matters." }, { id: "n4", text: long }];
+    const checks: Array<{ warnings: string[] }> = [];
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, narration, calc_requests: [], prompt: undefined } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "Why is it hard?" }, (e) => events.push(e));
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(events.filter((e) => e.type === "narration")).toHaveLength(5);
+    expect(checks[0]!.warnings.join()).toMatch(/narration split: narration\[3\]/);
+  });
+});

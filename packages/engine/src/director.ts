@@ -23,6 +23,13 @@ import { findPhrases, WARN_PHRASES } from "./pedagogy";
 /** Behavior spec A5: about 30–40 s of narration without learner input, in short segments. */
 export const NARRATION_MAX_SEGMENTS = 4;
 /**
+ * After the engine splits a long segment, up to this many segments are allowed, as long as the whole
+ * narration is at most NARRATION_SPLIT_MAX_TOTAL characters (Lucky's decision 2026-10-13). The
+ * model's own answers are still held to NARRATION_MAX_SEGMENTS.
+ */
+export const NARRATION_SPLIT_MAX_SEGMENTS = 5;
+export const NARRATION_SPLIT_MAX_TOTAL = 700;
+/**
  * Hard limit per segment: 200 characters ≈ 31 words ≈ 12 s of speech. Raised from 160 to 180 (2026-10-12)
  * and to 200 (2026-10-13) by Lucky after live answers kept landing just over it; the prompt still asks
  * for 140, and a segment over NARRATION_WARN_CHARS is a warning (never a rejection).
@@ -41,6 +48,8 @@ export interface TurnContext {
   expected?: { request_id: string; state_rev: number };
   /** IDs of safety-critical concepts and items (from the registry), whatever the director declares. */
   safetyCritical?: ReadonlySet<string>;
+  /** The segment limit for this answer: NARRATION_SPLIT_MAX_SEGMENTS when the engine split it, else the default. */
+  maxSegments?: number;
 }
 
 /** The error for an answer with no narration and no prompt (actions alone tell the learner nothing). */
@@ -55,11 +64,11 @@ const valid = (ids: readonly string[]) => (ids.length ? `valid: ${ids.join(", ")
  * gets every error at once: narration count and length; concepts and evidence against this turn's
  * shortlist (indexes the format check already flagged are skipped, so nothing is reported twice).
  */
-function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> = new Set(), warnings?: string[]): string[] {
+function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> = new Set(), warnings?: string[], maxSegments = NARRATION_MAX_SEGMENTS): string[] {
   const errors: string[] = [];
   const r = (raw && typeof raw === "object" ? raw : {}) as { narration?: unknown; concepts?: unknown; evidence?: unknown };
   if (Array.isArray(r.narration)) {
-    if (r.narration.length > NARRATION_MAX_SEGMENTS) errors.push(`narration: ${r.narration.length} segments, at most ${NARRATION_MAX_SEGMENTS}`);
+    if (r.narration.length > maxSegments) errors.push(`narration: ${r.narration.length} segments, at most ${maxSegments}`);
     r.narration.forEach((n, i) => {
       const text = (n as { text?: unknown } | null)?.text;
       if (typeof text === "string" && text.length > NARRATION_MAX_CHARS) errors.push(`narration[${i}].text: ${text.length} characters, at most ${NARRATION_MAX_CHARS}`);
@@ -99,7 +108,7 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
       const hint = i.path[0] === "concepts" ? ` (${valid(sl.concepts)})` : i.path[0] === "evidence" ? ` (${valid(sl.readings.map((x) => x.id))})` : "";
       return `${field || "(response)"}: ${i.message}${hint}`;
     });
-    return { response: null, errors: [...formatErrors, ...shapeChecks(raw, sl, flagged)], warnings: [] };
+    return { response: null, errors: [...formatErrors, ...shapeChecks(raw, sl, flagged, undefined, ctx.maxSegments)], warnings: [] };
   }
   const r = parsed.data;
   const errors: string[] = [];
@@ -113,7 +122,7 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
 
   // Narration count and length, concepts and evidence in this turn's shortlist (shared with the
   // format-failure path); then narration IDs unique.
-  errors.push(...shapeChecks(r, sl, new Set(), warnings));
+  errors.push(...shapeChecks(r, sl, new Set(), warnings, ctx.maxSegments));
   r.narration.forEach((n, i) => {
     if (r.narration.findIndex((o) => o.id === n.id) !== i) errors.push(`narration[${i}].id: duplicate "${n.id}"`);
   });
@@ -325,7 +334,8 @@ function sentences(text: string): string[] {
  * Splits narration segments longer than NARRATION_MAX_CHARS at sentence boundaries into parts of at
  * most that length (deterministic; placeholders are never split), before validation, with a warning.
  * A segment is left as it is (and rejected by the validator, as before) if one sentence alone is too
- * long, or if splitting would make more than NARRATION_MAX_SEGMENTS segments.
+ * long, or if splitting would make more than NARRATION_SPLIT_MAX_SEGMENTS segments, or if the whole
+ * narration is over NARRATION_SPLIT_MAX_TOTAL characters (Lucky's decision 2026-10-13).
  */
 export function splitLongNarration(raw: unknown): { raw: unknown; warnings: string[] } {
   const none = { raw, warnings: [] };
@@ -355,7 +365,9 @@ export function splitLongNarration(raw: unknown): { raw: unknown; warnings: stri
     });
     warnings.push(`${NARRATION_SPLIT}: narration[${i}] (${text.length} characters) split into ${parts.length} parts at sentence boundaries`);
   });
-  if (out.length > NARRATION_MAX_SEGMENTS) return none; // splitting would pass the segment limit: reject as before
+  // The split may make up to five segments, if the whole narration stays within 700 characters.
+  const total = out.reduce((n, x) => n + (typeof x.text === "string" ? x.text.length : 0), 0);
+  if (out.length > NARRATION_SPLIT_MAX_SEGMENTS || total > NARRATION_SPLIT_MAX_TOTAL) return none; // reject as before
   return { raw: { ...(raw as object), narration: out }, warnings };
 }
 
