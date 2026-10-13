@@ -19,15 +19,16 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 
 | Rule (added after the first live runs, 2026-10-12) | Kind | Checks |
 |---|---|---|
-| narration length | error | at most 4 segments of at most **180** characters (the prompt asks for 140) |
+| narration length | error / **warning** | at most 4 segments of at most **200** characters (error); a segment over 160 is a warning; the prompt asks for 140 |
 | concepts | error | each ID is one of this turn's shortlist concepts (`Shortlist.concepts`); the error lists the valid IDs |
 | evidence | error | each ID is a shortlist reading; the error lists the valid reading IDs |
 | prediction needs its prompt | error | a `prediction` with no `prompt` (`prompt: missing …`), or with a prompt not of kind `prediction` (`prompt.kind …`) |
 | actions | error | the provider schema is flattened, so the strict action union checks each action's required fields, field types, no foreign fields, no unknown type |
 | mild praise | **warning** | `flattery_warn` phrases in `config/pedagogy-phrases.json` ("a fine start"); never a rejection. The prompt also says not to open with a judgement of the learner's background or answer |
 | prompt re-attached | **warning** (engine fallback) | an answer that re-offers an ALREADY-OPEN prediction id without its prompt gets the stored question and choices attached verbatim, before validation; counted in the bake-off summary. Never for a new prediction id |
+| numbers in assumptions and limitations | prompt rule | written in words ("level", "no payload"); the number validator is unchanged and still rejects digits there |
 | no pushback on a first turn | engine rule | the router's `pushback: true` is ignored when there is no earlier Aili turn (nothing to push against), so it cannot force a "hold"; from the second turn the hold-under-pushback rule applies as before |
-| one open question | error (pedagogy) | no new prompt while one is open; the one exception is re-offering the SAME open prediction (prompt kind `prediction`, same id), which updates it, never duplicates it |
+| one open question | error (pedagogy) | no new prompt while one is open. Exception: re-offering the open question itself, either the SAME open prediction (kind `prediction`, same id; it updates, never duplicates) or the same plain question (same kind and the same choices; the text may be reworded). Every re-offer is a **warning**, "open question re-offered", counted in the bake-off summary |
 | analogy explained | **warning** | a tagged analogy's narration has a word from its title or mapping and a breakdown phrase (breaks down, unlike, differs, doesn't hold, not like, but a servo, whereas) |
 | every error at once | — | when the format check fails, narration length, concepts and evidence are still checked; the repair gets every error and the previous answer, and is told to keep the content but add what the errors name, within four segments |
 
