@@ -472,3 +472,37 @@ describe("teach-back reading filled in (Lucky's decision 2026-10-13, s08)", () =
     expect(s.state.teaching!.pending_teach_back).toBe("read.fx-moments");
   });
 });
+
+describe("a guess on an open prediction is never pushback (Lucky's decision 2026-10-13: s04, c1)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const flow = async (reply: string, guess: string) => {
+    const prompt = { text: "Does sliding the weight out change the twist?", chips: ["It grows", "No change", "Not sure"], kind: "prediction" };
+    const answers: Record<string, object> = {
+      turn_1: { move: "probe", calc_requests: [], narration: [{ id: "n1", text: "Let's test it." }], prompt },
+      // turn 2: the mechanism, the calculation and the reveal (move explain), as the prediction rule asks
+      turn_2: { move: "explain", prompt: undefined, reveal: { prediction: "p-turn-1", calc: "c1", outcome: "not_as_predicted" } },
+    };
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...answers[req.request_id] } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: true, pushback: true, new_evidence: false, guess }] }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Does it matter how far out the weight sits?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: reply }, (e) => events.push(e));
+    return { s, events };
+  };
+  it("s04: \"makes no difference\" is a guess; the router's pushback flag is ignored, so explain + test + reveal passes", async () => {
+    const { s, events } = await flow("I think it makes no difference where the weight is.", "No change");
+    expect(events.at(-1)).toMatchObject({ type: "turn.done", move: "explain" });
+    expect(s.state.history.entries[2]).toMatchObject({ kind: "learner", pushback: false });
+  });
+  it("c1: a confident guess is still a guess, not a pushback that demands hold", async () => {
+    const { events } = await flow("No, it doesn't grow, the arm is light.", "No change");
+    expect(JSON.stringify(events.at(-1))).not.toMatch(/hold-under-pushback/);
+  });
+  it("effectivePushback: a first turn, or a guess, is never pushback", async () => {
+    const { effectivePushback } = await import("./turn");
+    const h = { posture: "learning" as const, learner_level: "some_knowledge" as const, entries: [{ kind: "aili" as const, move: "explain" as const, asked: true, gave_back: true, concepts: [], safety: false }] };
+    expect(effectivePushback({ pushback: true, guess: null }, h)).toBe(true);
+    expect(effectivePushback({ pushback: true, guess: "No change" }, h)).toBe(false);
+    expect(effectivePushback({ pushback: true, guess: null }, { ...h, entries: [] })).toBe(false);
+  });
+});

@@ -183,7 +183,8 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
         timeoutMs: d.timeoutMs,
         today: d.today,
         onCheck: (c) => checks.push(c),
-        onRoute: (r) => (routed.v = { answered_prompt: r.classification.answered_prompt, question_open: r.question_open, pushback: r.classification.pushback, new_evidence: r.classification.new_evidence }),
+        // The pushback the engine acts on (a guess on a prediction, or a first turn, is not pushback).
+        onRoute: (r) => (routed.v = { answered_prompt: r.classification.answered_prompt, question_open: r.question_open, pushback: r.classification.pushback && r.classification.guess === null, new_evidence: r.classification.new_evidence }),
         meter: { ledger, sessionId, config: d.config, killSwitch: d.killSwitch?.() ?? false, live: d.live },
       });
       let response: DirectorResponse | undefined;

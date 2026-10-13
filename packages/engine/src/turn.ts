@@ -107,6 +107,11 @@ export interface Director {
 
 /** Assumed router input when the router gives no estimate (its prompt is small; slice 6 measures it). */
 export const ROUTER_INPUT_ALLOWANCE_TOKENS = 1000;
+/** The pushback the engine acts on: not on a first turn, and never when the reply is a guess on a prediction. */
+export function effectivePushback(c: Pick<ReplyClassification, "pushback" | "guess">, history: SessionHistory): boolean {
+  return c.pushback && c.guess === null && history.entries.some((e) => e.kind === "aili");
+}
+
 /** The open prompt's text, kind and choices, when the stored last prompt is the one still open. */
 function openQuestion(s: SessionState): RouterRequest["open_question"] {
   const open = openPrompt(s.history);
@@ -304,8 +309,9 @@ export class TurnSession {
           // Frustration releases an open question that was not answered (spec A4; Lucky's decision 2026-10-13).
           released_prompt: c.frustrated && !c.answered_prompt && openPrompt(before.history) !== null,
           // Pushback needs a position to push against: on a first turn (no earlier Aili turn) the
-          // router's flag is ignored (Lucky's decision 2026-10-12, after s05 turn 1).
-          pushback: c.pushback && before.history.entries.some((e) => e.kind === "aili"),
+          // router's flag is ignored (Lucky's decision 2026-10-12, after s05 turn 1); and a guess on an
+          // open prediction is never pushback (Lucky's decision 2026-10-13, after s04 and c1).
+          pushback: effectivePushback(c, before.history),
           new_evidence: c.new_evidence,
           frustrated: c.frustrated,
           wants_another_example: c.wants_another_example,
