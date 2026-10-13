@@ -242,3 +242,19 @@ describe("direct-answer assumptions only when the answer explains or calculates 
     expect(validatePedagogy(r, hist([]), {}, ctx).join()).toMatch(/a direct answer states its assumptions/);
   });
 });
+
+describe("open-items: naming the open reading again is a reminder (Lucky's decision 2026-10-13, s07)", () => {
+  const teaching = { open_items: [{ kind: "reading" as const, ref: "read.fx-moments", opened_turn: 1 }] };
+  const assign = (reading: string) => resp({ move: "assign", reading, narration: [{ id: "n1", text: "I can't verify that. Your open reading is still the best next step." }] });
+  it("the same open reading again passes", () => {
+    expect(validatePedagogy(assign("read.fx-moments"), hist([]), teaching, { libraryAvailable: true }).join()).not.toMatch(/open-items/);
+  });
+  it("a different reading while one is open is still another assignment: rejected", () => {
+    expect(validatePedagogy(assign("read.fx-lever-basics"), hist([]), teaching, { libraryAvailable: true }).join()).toMatch(/rule open-items .*a reading is already assigned and open/);
+  });
+  it("a reminder is not recorded twice in the open items", async () => {
+    const { applyResponse } = await import("./teaching");
+    const t = { predictions: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 }, ...teaching };
+    expect(applyResponse(t, assign("read.fx-moments"), 2, "2026-10-13").open_items).toEqual(teaching.open_items);
+  });
+});

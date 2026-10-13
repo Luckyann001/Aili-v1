@@ -56,7 +56,9 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
       open_items = [...open_items, { kind: "prediction", ref: id, opened_turn: turn }];
     }
   }
-  if (r.reading && r.move === "assign") open_items = [...open_items, { kind: "reading", ref: r.reading, opened_turn: turn }];
+  // Re-naming the open reading is a reminder: it is not recorded twice (s07).
+  if (r.reading && r.move === "assign" && !open_items.some((o) => o.kind === "reading" && o.ref === r.reading))
+    open_items = [...open_items, { kind: "reading", ref: r.reading, opened_turn: turn }];
   if (r.reading && r.move === "teach_back") open_items = open_items.filter((o) => !(o.kind === "reading" && o.ref === r.reading));
   if (r.waiver)
     waivers = [

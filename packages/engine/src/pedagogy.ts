@@ -178,10 +178,12 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   }
 
   // 14. Do not pile on open items (spec A5): a new prediction or reading waits while too many are open.
-  const opensItem = r.prompt?.kind === "prediction" || (r.move === "assign" && r.reading !== undefined);
+  // Naming the reading that is already open is a reminder, not a new item (Lucky's decision 2026-10-13, s07).
+  const reminder = r.move === "assign" && !!r.reading && teaching.open_items.some((o) => o.kind === "reading" && o.ref === r.reading);
+  const opensItem = r.prompt?.kind === "prediction" || (r.move === "assign" && r.reading !== undefined && !reminder);
   if (opensItem && teaching.open_items.length >= MAX_OPEN_ITEMS)
     fail("open-items", `${teaching.open_items.length} items are already open (at most ${MAX_OPEN_ITEMS}); close one before opening another`);
-  if (r.move === "assign" && r.reading && teaching.open_items.some((o) => o.kind === "reading"))
+  if (r.move === "assign" && r.reading && !reminder && teaching.open_items.some((o) => o.kind === "reading"))
     fail("open-items", `a reading is already assigned and open; resume it (teach_back) before assigning another`);
 
   // 15. Safety-critical waivers need explicit acknowledgement (spec A9, architecture §8).

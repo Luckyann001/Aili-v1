@@ -205,11 +205,13 @@ describe("A14 #15 build intent, skip theory: the minimum, and the waiver recorde
 
 describe("A14 #16 return after reading: resumed, not piled on, no replay", () => {
   const assign: Answer = () => ({ move: "assign", reading: "read.fx-moments", narration: say("This short reading explains moments.") });
-  it("an assigned reading stays open; another is not assigned on top; teach-back resumes and closes it", async () => {
-    const t = session([assign, () => ({ move: "assign", reading: "read.fx-moments", narration: say("Read this too.") }), () => ({ move: "teach_back", reading: "read.fx-moments", narration: say("Welcome back."), prompt: ask("In your own words, what is a moment") })]);
+  it("an assigned reading stays open; naming it again is a reminder, not a second item; teach-back resumes and closes it", async () => {
+    // (A DIFFERENT reading on top is rejected by open-items: see pedagogy.test.ts, Lucky's decision 2026-10-13.)
+    const t = session([assign, () => ({ move: "assign", reading: "read.fx-moments", narration: say("Your reading is still the one to do.") }), () => ({ move: "teach_back", reading: "read.fx-moments", narration: say("Welcome back."), prompt: ask("In your own words, what is a moment") })]);
     done(await t.reply("I want to go deeper"));
     expect(t.s.state.teaching!.open_items).toEqual([{ kind: "reading", ref: "read.fx-moments", opened_turn: 1 }]);
-    rejectedBy(await t.reply("ok"), "open-items");
+    done(await t.reply("ok"));
+    expect(t.s.state.teaching!.open_items).toEqual([{ kind: "reading", ref: "read.fx-moments", opened_turn: 1 }]); // not recorded twice
     const back = await t.reply("I'm back, I read it");
     done(back);
     expect(back.filter((e) => e.type === "narration").map((e) => (e as Extract<TurnEvent, { type: "narration" }>).text)).toEqual(["Welcome back."]); // only this turn's line
