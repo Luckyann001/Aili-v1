@@ -319,3 +319,11 @@ describe("open questions re-offered are counted (Lucky's decision 2026-10-13)", 
     expect(summaryMarkdown(r as never, { mode: "recorded", started: "now", models: "x" })).toContain("| Open questions re-offered (instead of a new question) | 1 |");
   });
 });
+
+describe("most questions in a row resets per scenario (Lucky's decision 2026-10-13)", () => {
+  it("counts consecutive questions within a scenario only", () => {
+    const t = (index: number, asks: boolean) => ({ index, learner: "x", events: [], latency_ms: 1, outcome: "done", move: "explain", response: { prompt: asks ? { text: "Q", chips: [], kind: "question" } : undefined }, checks: [], warnings: [], expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    // scenario A: 2 in a row; scenario B: 3 in a row; across the boundary it would have been 5
+    expect(metrics([t(1, true), t(2, true), t(1, true), t(2, true), t(3, true)]).max_consecutive_questions).toBe(3);
+  });
+});

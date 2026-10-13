@@ -54,6 +54,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
   let run = 0;
   let maxRun = 0;
   for (const t of turns) {
+    if (t.index === 1) run = 0; // a new scenario starts: questions in a row never span two scenarios
     if (t.move) moves[t.move] = (moves[t.move] ?? 0) + 1;
     if (t.outcome !== "done") failures[t.outcome] = (failures[t.outcome] ?? 0) + 1;
     const q = !!t.response?.prompt;
