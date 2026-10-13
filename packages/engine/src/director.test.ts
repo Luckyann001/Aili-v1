@@ -153,7 +153,7 @@ describe("rule: at most four narration segments, each within the length cap", ()
   });
 
   it("a segment over the cap is refused, naming its length", () => {
-    const long = "word ".repeat(40).trim(); // 199 characters
+    const long = "word ".repeat(41).trim(); // 204 characters
     expect(errs({ narration: [{ id: "n1", text: long }] })).toContain(`narration[0].text: ${long.length} characters, at most ${NARRATION_MAX_CHARS}`);
     expect(errs({ narration: [{ id: "n1", text: "x".repeat(NARRATION_MAX_CHARS) }] })).toEqual([]);
   });
@@ -299,13 +299,20 @@ describe("the prediction example in professor.v1.md (Lucky's decision 2026-10-12
   });
 });
 
-describe("narration hard limit (Lucky's decision 2026-10-12: 180; the prompt asks for 140)", () => {
-  it("180 characters pass, 181 are rejected with the limit named", () => {
-    expect(NARRATION_MAX_CHARS).toBe(180);
-    expect(errs({ narration: [{ id: "n1", text: "a".repeat(180) }] })).toEqual([]);
-    expect(errs({ narration: [{ id: "n1", text: "a".repeat(181) }] })).toEqual(["narration[0].text: 181 characters, at most 180"]);
+describe("narration hard limit 200, warning above 160 (Lucky's decisions 2026-10-12/13; the prompt asks for 140)", () => {
+  it("200 characters pass, 201 are rejected with the limit named", () => {
+    expect(NARRATION_MAX_CHARS).toBe(200);
+    expect(errs({ narration: [{ id: "n1", text: "a".repeat(200) }] })).toEqual([]);
+    expect(errs({ narration: [{ id: "n1", text: "a".repeat(201) }] })).toEqual(["narration[0].text: 201 characters, at most 200"]);
+  });
+  it("161 to 200 characters are accepted with a warning; 160 has none", () => {
+    expect(run({ narration: [{ id: "n1", text: "a".repeat(160) }] }).warnings).toEqual([]);
+    const r = run({ narration: [{ id: "n1", text: "a".repeat(190) }] });
+    expect(r.response).not.toBeNull();
+    expect(r.warnings).toEqual(["narration[0].text: 190 characters (over 160; the aim is 140; for review, not a rejection)"]);
   });
 });
+
 
 describe("a prediction always comes with its prompt (Lucky's decision 2026-10-12)", () => {
   const prediction = { id: "weight-out", concept: "mech.torque.static" };

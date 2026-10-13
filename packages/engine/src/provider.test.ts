@@ -262,13 +262,13 @@ describe("repair feedback", () => {
     const repair = provider.requests[1]!.input;
     expect(repair).toContain("concepts[0]:");
     expect(repair).toContain("evidence[0]:");
-    expect(repair).toContain("narration[0].text: 223 characters, at most 180");
+    expect(repair).toContain("narration[0].text: 223 characters, at most 200");
     expect(repair).toContain("valid: mech.moment-arm, mech.torque.static");
     // the previous answer travels with the errors, as escaped data, so the content can be kept
     expect(repair).toContain("<previous_answer>");
     expect(repair).toContain('"concepts":["servo"]');
     expect(repair).toContain("Keep its content and change only what these errors name; add what the errors name, even if that changes the answer.");
-    expect(repair).toContain("If you add anything, fit it within the four segments (at most 180 characters each)");
+    expect(repair).toContain("If you add anything, fit it within the four segments (at most 200 characters each)");
   });
 });
 

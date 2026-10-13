@@ -23,10 +23,13 @@ import { findPhrases, WARN_PHRASES } from "./pedagogy";
 /** Behavior spec A5: about 30–40 s of narration without learner input, in short segments. */
 export const NARRATION_MAX_SEGMENTS = 4;
 /**
- * Hard limit per segment: 180 characters ≈ 28 words ≈ 11 s of speech; four segments ≈ 45 s. Raised from
- * 160 by Lucky (2026-10-12) after live answers kept landing just over it; the prompt still asks for 140.
+ * Hard limit per segment: 200 characters ≈ 31 words ≈ 12 s of speech. Raised from 160 to 180 (2026-10-12)
+ * and to 200 (2026-10-13) by Lucky after live answers kept landing just over it; the prompt still asks
+ * for 140, and a segment over NARRATION_WARN_CHARS is a warning (never a rejection).
  */
-export const NARRATION_MAX_CHARS = 180;
+export const NARRATION_MAX_CHARS = 200;
+/** Above this a segment is accepted with a warning, for review (Lucky's decision 2026-10-13). */
+export const NARRATION_WARN_CHARS = 160;
 
 const QUESTION = /[?？]/g;
 
@@ -48,7 +51,7 @@ const valid = (ids: readonly string[]) => (ids.length ? `valid: ${ids.join(", ")
  * gets every error at once: narration count and length; concepts and evidence against this turn's
  * shortlist (indexes the format check already flagged are skipped, so nothing is reported twice).
  */
-function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> = new Set()): string[] {
+function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> = new Set(), warnings?: string[]): string[] {
   const errors: string[] = [];
   const r = (raw && typeof raw === "object" ? raw : {}) as { narration?: unknown; concepts?: unknown; evidence?: unknown };
   if (Array.isArray(r.narration)) {
@@ -56,6 +59,8 @@ function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> =
     r.narration.forEach((n, i) => {
       const text = (n as { text?: unknown } | null)?.text;
       if (typeof text === "string" && text.length > NARRATION_MAX_CHARS) errors.push(`narration[${i}].text: ${text.length} characters, at most ${NARRATION_MAX_CHARS}`);
+      else if (typeof text === "string" && text.length > NARRATION_WARN_CHARS && warnings)
+        warnings.push(`narration[${i}].text: ${text.length} characters (over ${NARRATION_WARN_CHARS}; the aim is 140; for review, not a rejection)`);
     });
   }
   if (Array.isArray(r.concepts))
@@ -104,7 +109,7 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
 
   // Narration count and length, concepts and evidence in this turn's shortlist (shared with the
   // format-failure path); then narration IDs unique.
-  errors.push(...shapeChecks(r, sl));
+  errors.push(...shapeChecks(r, sl, new Set(), warnings));
   r.narration.forEach((n, i) => {
     if (r.narration.findIndex((o) => o.id === n.id) !== i) errors.push(`narration[${i}].id: duplicate "${n.id}"`);
   });
