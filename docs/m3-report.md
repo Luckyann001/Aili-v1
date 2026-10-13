@@ -31,8 +31,9 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
 - **Unit tests:** 411 engine tests and 205 web tests pass, with no key and no network; lint and typecheck
   are clean.
 - **Live runs** (Anthropic only: Sonnet 5.5 professor, Haiku 5.5 router), test-fixture content:
-  - **All 28 scenarios at each one's latest result:** **96.0% after repair** (48 of 50 turns),
-    **74% first attempt** (37 of 50). The two remaining failures are listed under weak spots.
+  - **All 28 scenarios at each one's latest result:** **100% after repair** (50 of 50 turns),
+    **76% first attempt** (38 of 50). Caveat: s08's latest run covers only turns 1–2 (the cost cap
+    stopped it); its turns 3–4 have not run since the fix that made turn 2 pass.
   - **Cost:** about **0.024 USD per turn** at verified list prices. **Latency:** median **6.3 s**;
     the slowest turn in the latest results took 18.2 s, the slowest seen in any run 30.3 s (under the
     45 s turn budget).
@@ -47,7 +48,7 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
   - **No hard-coded number reached a learner** and no held position was given up without evidence in
     any run (automatic stop checks, plus reading the confident-but-wrong transcripts).
 - **Spend:** the engine's own ledger matched the provider Console (2.77 USD) to within 0.003 USD when
-  compared; the ledger total since the first live call is now about **3.99 USD**.
+  compared; the ledger total since the first live call is now about **4.09 USD**.
 
 ## What was NOT verified
 
@@ -57,8 +58,8 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
 - **The web app does not call the live model yet**; no live turn has run in a browser.
 - **No load testing and no mobile testing** of live turns; latency was measured from a laptop only.
 - **Test fixtures only:** two concepts, two readings, two analogies; no published content exists yet.
-- **The latest fixes were not all re-run live:** s08 (teach-back follow-up) was stopped by the cost cap
-  before it ran; the consistency check is incomplete for c4, c5 and s05.
+- **Not every fix was re-run in full:** s08 turns 3–4 have not run since its fix (the cost cap stopped
+  the run); the consistency check is incomplete for c4, c5 and s05 (two runs each, not three).
 - **Recordings from live runs are not reviewed or kept** for CI; CI replays two hand-written ones.
 
 ## Known weak spots
@@ -66,8 +67,9 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
 - **First attempts:** about one turn in four needs a repair (about 0.02 USD and 5 s extra). Recurring
   causes: narration segments over the limit, a probe without its question, rule conflicts that were
   fixed one at a time as they appeared.
-- **Remaining failures:** c1 turn 2 (a repair with a 215-character segment when four segments were
-  already used, so the engine could not split it) and s08 turn 2 (fixed in code, not yet re-run live).
+- **Earlier failures, fixed and re-run:** c1 turn 2 (a 215-character segment in a four-segment answer;
+  the split may now make five segments within 700 characters) passed; s08 turn 2 (teach-back question
+  without its reading, and a second open question) passed on the first attempt.
 - **The router is a model:** it has misread replies (answered or not, pushback, direct-answer requests);
   several engine rules now correct for the known cases, not every case.
 - **Engine fallbacks** keep turns working but hide model mistakes; they are counted so they stay visible.
