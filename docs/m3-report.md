@@ -67,9 +67,10 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
 - **First attempts:** about one turn in four needs a repair (about 0.02 USD and 5 s extra). Recurring
   causes: narration segments over the limit, a probe without its question, rule conflicts that were
   fixed one at a time as they appeared.
-- **Earlier failures, fixed and re-run:** c1 turn 2 (a 215-character segment in a four-segment answer;
-  the split may now make five segments within 700 characters) passed; s08 turn 2 (teach-back question
-  without its reading, and a second open question) passed on the first attempt.
+- **Earlier failures, fixed and re-run:** c1 turn 2 passed (its earlier failure was a 215-character
+  segment in a four-segment answer; the split may now make five segments within 700 characters, which
+  is unit-tested but was not needed in the re-run); s08 turn 2 (a teach-back question without its
+  reading, then a second open question) passed on the first attempt.
 - **The router is a model:** it has misread replies (answered or not, pushback, direct-answer requests);
   several engine rules now correct for the known cases, not every case.
 - **Engine fallbacks** keep turns working but hide model mistakes; they are counted so they stay visible.
