@@ -495,3 +495,14 @@ describe("a teach-back question names its reading (Lucky's decision 2026-10-13, 
     );
   });
 });
+
+describe("reveal.calc is one valid calculation ID (Lucky's decision 2026-10-13, s04)", () => {
+  it("\"c1 and c2\" is rejected with an exact message", () => {
+    expect(errs({ reveal: { prediction: "p-turn-1", calc: "c1 and c2", outcome: "not_as_predicted" } })).toContain(
+      'reveal.calc: names ONE calculation requested this turn, by its id only (such as "c2"), not a list or a phrase',
+    );
+  });
+  it("a single ID passes the format check (and must still be a calculation of this turn)", () => {
+    expect(errs({ reveal: { prediction: "p-turn-1", calc: "c9", outcome: "not_as_predicted" } }).join()).toMatch(/reveal.calc: "c9" is not a calculation requested in this turn/);
+  });
+});

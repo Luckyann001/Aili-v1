@@ -53,7 +53,7 @@ export const DirectorResponse = z
     limitations: z.array(z.string().min(1)).default([]),
     /** Shows a calculated result against the learner's prediction (prediction → test → reveal); `prediction` is the engine's id from session_state. */
     reveal: z
-      .object({ prediction: KebabId, calc: z.string().regex(/^c[0-9]+$/), outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]) })
+      .object({ prediction: KebabId, calc: z.string().regex(/^c[0-9]+$/, 'names ONE calculation requested this turn, by its id only (such as "c2"), not a list or a phrase'), outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]) })
       .strict()
       .optional(),
     /** Need-to-know mode: the learner skips a concept (behavior spec A9, §8 of the architecture doc). */
