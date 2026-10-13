@@ -99,23 +99,23 @@ describe("A14 #4 wrong prediction: test it, show the result against it, explain 
   const predict: Answer = () => ({
     move: "probe",
     narration: say("Let us test an idea before I explain it."),
+    concepts: [C], // the engine records the prediction as "p-turn-1" under this concept
     prompt: ask("Which is harder to hold: the weight near you or far out", "prediction", ["Close to you", "Far out", "Not sure"]),
-    prediction: { id: "reach", concept: C },
   });
   const reveal: Answer = () => ({
     move: "explain",
     calc_requests: [CALC],
     narration: say("Holding it takes {{c1.torque_nm}} newton-metres; further out takes more, because the moment arm is longer."),
-    reveal: { prediction: "reach", calc: "c1", outcome: "not_as_predicted" },
+    reveal: { prediction: "p-turn-1", calc: "c1", outcome: "not_as_predicted" },
   });
 
   it("predict → the learner commits (wrongly) → calculation + reveal + explain: passes, and the state records it", async () => {
     const t = session([predict, reveal]);
     done(await t.reply("Show me torque"));
-    expect(t.s.state.teaching!.predictions).toMatchObject([{ id: "reach", status: "open", guess: null }]);
-    expect(t.s.state.teaching!.open_items).toEqual([{ kind: "prediction", ref: "reach", opened_turn: 1 }]);
+    expect(t.s.state.teaching!.predictions).toMatchObject([{ id: "p-turn-1", concept: C, status: "open", guess: null }]);
+    expect(t.s.state.teaching!.open_items).toEqual([{ kind: "prediction", ref: "p-turn-1", opened_turn: 1 }]);
     done(await t.reply("Close to you"));
-    expect(t.s.state.teaching!.predictions).toMatchObject([{ id: "reach", status: "revealed", guess: "Close to you", outcome: "not_as_predicted" }]);
+    expect(t.s.state.teaching!.predictions).toMatchObject([{ id: "p-turn-1", status: "revealed", guess: "Close to you", outcome: "not_as_predicted" }]);
     expect(t.s.state.teaching!.open_items).toEqual([]);
   });
 
@@ -126,13 +126,15 @@ describe("A14 #4 wrong prediction: test it, show the result against it, explain 
   });
 
   it("revealing before the learner has committed is rejected", async () => {
-    const t = session([() => ({ ...predict({} as DirectorRequest), calc_requests: [CALC], reveal: { prediction: "reach", calc: "c1", outcome: "as_predicted" } })]);
+    const t = session([() => ({ ...predict({} as DirectorRequest), calc_requests: [CALC], reveal: { prediction: "p-turn-1", calc: "c1", outcome: "as_predicted" } })]);
     rejectedBy(await t.reply("Show me torque"), "reveal-after-guess");
   });
 
-  it("a prediction prompt without 'Not sure', or without saying what is predicted, fails the shape check", async () => {
+  it("a prediction prompt without 'Not sure', or without a concept to record it under, fails the shape check", async () => {
     const t = session([() => ({ ...predict({} as DirectorRequest), prompt: ask("Which is harder", "prediction", ["Close", "Far"]) })]);
     expect(((await t.reply("Show me torque")).at(-1) as Extract<TurnEvent, { type: "turn.error" }>).details.join()).toMatch(/prompt\.chips: a prediction offers "Not sure"/);
+    const u = session([() => ({ ...predict({} as DirectorRequest), concepts: [] })]);
+    expect(((await u.reply("Show me torque")).at(-1) as Extract<TurnEvent, { type: "turn.error" }>).details.join()).toMatch(/concepts: a prediction prompt needs the concept it tests, listed first/);
   });
 });
 

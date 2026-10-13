@@ -173,16 +173,20 @@ describe("learner level unknown (Lucky's decision 2026-10-12, scenario s02)", ()
   });
 });
 
-describe("re-offering the open prediction (Lucky's decision 2026-10-12)", () => {
+describe("re-offering the open prediction (Lucky's decisions 2026-10-12/13)", () => {
   const openH = hist([aili("explain", { asked: true }), learner({ answered_prompt: false })]);
-  const teaching = { predictions: [{ id: "weight-out", concept: C, turn: 1, choices: ["More", "Less", "Not sure"], question: "What happens?", guess: null, status: "open" as const }] };
-  const reask = (id: string, kind = "prediction") => resp({ move: "explain", narration: [{ id: "n1", text: "Fair enough, let's try it another way." }], prompt: { text: "Farther out: more twist or less?", chips: ["More", "Less", "Not sure"], kind }, ...(kind === "prediction" ? { prediction: { id, concept: C } } : {}) });
-  it("the same prediction id, as a prediction prompt, keeps it open: allowed", () => {
-    expect(validatePedagogy(reask("weight-out"), openH, teaching).join()).not.toMatch(/one-open-question/);
+  const chips = ["More", "Less", "Not sure"];
+  const teaching = {
+    predictions: [{ id: "p-turn-1", concept: C, turn: 1, choices: chips, question: "What happens?", guess: null, status: "open" as const }],
+    last_prompt: { turn: 1, text: "What happens?", kind: "prediction" as const, chips },
+  };
+  const reask = (o: object = {}) => resp({ move: "explain", concepts: [C], narration: [{ id: "n1", text: "Fair enough, let's try it another way." }], prompt: { text: "Farther out: more twist or less?", chips, kind: "prediction", ...o } });
+  it("the same kind and the same choices (reworded) is a re-offer: allowed", () => {
+    expect(validatePedagogy(reask(), openH, teaching).join()).not.toMatch(/one-open-question/);
   });
-  it("a different prediction, or a plain new question, is still rejected", () => {
-    expect(validatePedagogy(reask("another-one"), openH, teaching).join()).toMatch(/one-open-question/);
-    expect(validatePedagogy(reask("weight-out", "question"), openH, teaching).join()).toMatch(/one-open-question/);
+  it("different choices, or a plain new question, is still rejected", () => {
+    expect(validatePedagogy(reask({ chips: ["Up", "Down", "Not sure"] }), openH, teaching).join()).toMatch(/one-open-question/);
+    expect(validatePedagogy(reask({ kind: "question" }), openH, teaching).join()).toMatch(/one-open-question/);
   });
 });
 

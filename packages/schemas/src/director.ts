@@ -26,8 +26,9 @@ export const DirectorPrompt = z
     chips: z.array(z.string().min(1)).max(4).default([]),
     /**
      * question: an ordinary question. prediction: the chips are the choices of a prediction (the
-     * learner commits before the test). acknowledgement: asks the learner to explicitly
-     * acknowledge something (a safety-critical waiver).
+     * learner commits before the test); the ENGINE records the prediction (id "p-turn-N", concept =
+     * the first of `concepts`), so there is no separate prediction object (Lucky's decision
+     * 2026-10-13). acknowledgement: asks the learner to explicitly acknowledge something.
      */
     kind: z.enum(["question", "prediction", "acknowledgement"]).default("question"),
   })
@@ -50,9 +51,7 @@ export const DirectorResponse = z
     prompt: DirectorPrompt.optional(),
     assumptions: z.array(z.string().min(1)).default([]),
     limitations: z.array(z.string().min(1)).default([]),
-    /** With a prediction prompt: what the prediction is about (behavior spec B2: predict before showing). */
-    prediction: z.object({ id: KebabId, concept: ConceptId }).strict().optional(),
-    /** Shows a calculated result against the learner's prediction (prediction → test → reveal). */
+    /** Shows a calculated result against the learner's prediction (prediction → test → reveal); `prediction` is the engine's id from session_state. */
     reveal: z
       .object({ prediction: KebabId, calc: z.string().regex(/^c[0-9]+$/), outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]) })
       .strict()

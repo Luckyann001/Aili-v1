@@ -285,16 +285,16 @@ describe("an analogy's mapping and breakdown in the narration: a WARNING, never 
   });
 });
 
-describe("the prediction example in professor.v1.md (Lucky's decision 2026-10-12)", () => {
-  it("is valid: kind prediction, the prediction object, a Not sure chip, and it passes the validator", () => {
+describe("the prediction example in professor.v1.md (Lucky's decisions 2026-10-12/13)", () => {
+  it("is valid: kind prediction, a Not sure chip, the concept listed in concepts, no prediction object; it passes the validator", () => {
     const template = readFileSync(new URL("../../../content/prompts/professor.v1.md", import.meta.url), "utf8");
-    const line = template.split("\n").find((l) => l.startsWith("Example (format only; write your own question, ids and wording):"))!;
+    const line = template.split("\n").find((l) => l.startsWith("Example (format only; write your own question and wording):"))!;
     const example = JSON.parse(`{${line.slice(line.indexOf('"prompt"'), line.indexOf("<!--")).trim()}}`);
     expect(example.prompt.kind).toBe("prediction");
     expect(example.prompt.chips).toContain("Not sure");
-    expect(example.prediction).toEqual({ id: "wrench-grip-distance", concept: "mech.moment-arm" });
+    expect(example.concepts).toEqual(["mech.moment-arm"]);
+    expect(example.prediction).toBeUndefined();
     expect(errs(example)).toEqual([]);
-    // a different topic from the lessons, so it is not copied into one (Lucky's decision 2026-10-12)
     expect(line).not.toMatch(/servo|weight-twice-as-far|slides twice as far/i);
   });
 });
@@ -314,19 +314,16 @@ describe("narration hard limit 200, warning above 160 (Lucky's decisions 2026-10
 });
 
 
-describe("a prediction always comes with its prompt (Lucky's decision 2026-10-12)", () => {
-  const prediction = { id: "weight-out", concept: "mech.torque.static" };
-  it("a prediction with no prompt is rejected, naming the missing field and what it must hold", () => {
-    // as the live answer of 2026-10-12, 20:00 sent it
-    expect(errs({ prediction, prompt: undefined })).toEqual([
-      `prompt: missing. "prediction" ("weight-out") always comes with "prompt": { "kind": "prediction", "text": the question, "chips": the choices plus "Not sure" }`,
-    ]);
+describe("a prediction prompt needs a concept: the engine records the prediction under the first (Lucky's decision 2026-10-13)", () => {
+  const prompt = { kind: "prediction", text: "What happens?", chips: ["More", "Less", "Not sure"] };
+  it("with no concepts it is rejected, listing the valid concept IDs", () => {
+    expect(errs({ prompt, concepts: [] })).toEqual([`concepts: a prediction prompt needs the concept it tests, listed first in "concepts" (valid: mech.moment-arm, mech.torque.static)`]);
   });
-  it("a prediction with a prompt of another kind is rejected, naming prompt.kind", () => {
-    expect(errs({ prediction, prompt: { kind: "question", text: "What happens?", chips: ["More", "Less", "Not sure"] } })).toEqual([`prompt.kind: "question" must be "prediction" when "prediction" ("weight-out") is set`]);
+  it("with a concept it passes", () => {
+    expect(errs({ prompt, concepts: ["mech.torque.static"] })).toEqual([]);
   });
-  it("a prediction with its prediction prompt passes", () => {
-    expect(errs({ prediction, prompt: { kind: "prediction", text: "What happens?", chips: ["More", "Less", "Not sure"] } })).toEqual([]);
+  it("a separate prediction object is no longer part of the answer: rejected as an unknown field", () => {
+    expect(errs({ prompt, concepts: ["mech.torque.static"], prediction: { id: "p", concept: "mech.torque.static" } }).join()).toMatch(/prediction/);
   });
 });
 
@@ -346,13 +343,14 @@ describe("mild praise is a warning only (config flattery_warn; Lucky's decision 
   });
 });
 
-describe("the re-offer example in professor.v1.md (Lucky's decision 2026-10-12)", () => {
-  it("is labelled format only, keeps the id, carries the full prompt, and passes the validator", () => {
+describe("the re-offer example in professor.v1.md (Lucky's decisions 2026-10-12/13)", () => {
+  it("is labelled format only, keeps the kind and the same choices, has no prediction object, and passes the validator", () => {
     const template = readFileSync(new URL("../../../content/prompts/professor.v1.md", import.meta.url), "utf8");
     const line = template.split("\n").find((l) => l.startsWith("Example of a re-offer (format only; write your own wording):"))!;
     const example = JSON.parse(`{${line.slice(line.indexOf('"prompt"'), line.indexOf("<!--")).trim()}}`);
-    expect(example.prediction.id).toBe("wrench-grip-distance");
-    expect(example.prompt).toEqual(expect.objectContaining({ kind: "prediction", chips: expect.arrayContaining(["Not sure"]) }));
+    expect(example.prompt).toEqual(expect.objectContaining({ kind: "prediction", chips: ["More", "Less", "The same", "Not sure"] }));
+    expect(line).toContain(`the choices ["More", "Less", "The same", "Not sure"]`);
+    expect(example.prediction).toBeUndefined();
     expect(line).not.toMatch(/servo|ruler/i);
     expect(errs(example)).toEqual([]);
   });

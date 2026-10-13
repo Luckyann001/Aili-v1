@@ -57,15 +57,14 @@ export const MAX_DEBATE_ROUNDS = 3;
 
 /**
  * Whether `r` re-offers the question that is still open, rather than asking a new one (Lucky's
- * decisions 2026-10-12/13): the SAME open prediction (prompt kind "prediction", same prediction id,
- * asked in the open turn), or the same open question (same prompt kind and the same choices as the
- * stored open prompt). Rewording the text is allowed; different choices or kind make it a new question.
+ * decisions 2026-10-12/13): the same prompt kind and the same choices as the stored open prompt
+ * (a prediction or a plain question). Rewording the text is allowed; different choices or kind make
+ * it a new question.
  */
 export function reoffersOpenQuestion(r: DirectorResponse, h: SessionHistory, teachingIn: Partial<TeachingState> = NO_TEACHING): boolean {
   const open = openPrompt(h);
   if (!open || !r.prompt) return false;
   const t: TeachingState = { ...NO_TEACHING, ...teachingIn };
-  if (r.prompt.kind === "prediction" && r.prediction && t.predictions.some((p) => p.id === r.prediction!.id && p.status === "open" && p.turn === open.turn)) return true;
   const last = t.last_prompt;
   return !!last && last.turn === open.turn && last.kind === r.prompt.kind && last.chips.length === r.prompt.chips.length && last.chips.every((c, i) => c === r.prompt!.chips[i]);
 }

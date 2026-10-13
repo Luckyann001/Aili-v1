@@ -239,7 +239,7 @@ describe("the teaching state travels to the director (Lucky's decision 2026-10-1
     const director: Director = {
       async respond(req) {
         seen.push(req);
-        if (seen.length === 1) return { response: { ...VALID, prompt, prediction: { id: "weight-out", concept: "mech.torque.static" } } };
+        if (seen.length === 1) return { response: { ...VALID, prompt } }; // the engine records the prediction (p-turn-1)
         throw new Error("stop after capturing turn 2");
       },
     };
@@ -249,7 +249,7 @@ describe("the teaching state travels to the director (Lucky's decision 2026-10-1
     expect(events.at(-1)!.type).toBe("turn.done");
     await s.run({ text: "Not much. I built a Lego car once." }, () => {});
     const t = seen[1]!.teaching!;
-    expect(t.predictions).toEqual([expect.objectContaining({ id: "weight-out", status: "open", question: (VALID.prompt as { text: string }).text, choices: (VALID.prompt as { chips: string[] }).chips })]);
+    expect(t.predictions).toEqual([expect.objectContaining({ id: "p-turn-1", concept: (VALID.concepts as string[])[0], status: "open", question: (VALID.prompt as { text: string }).text, choices: (VALID.prompt as { chips: string[] }).chips })]);
     expect(t.last_prompt).toEqual(expect.objectContaining({ turn: 1, kind: "prediction" }));
   });
 });
@@ -258,65 +258,14 @@ describe("a re-offered prediction is not duplicated", () => {
   it("applyResponse updates the open prediction's question and turn instead of adding a second", async () => {
     const { applyResponse } = await import("./teaching");
     const base = { predictions: [{ id: "weight-out", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], question: "What happens?", guess: null, status: "open" as const }], open_items: [{ kind: "prediction" as const, ref: "weight-out", opened_turn: 1 }], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
-    const r = { move: "explain", prompt: { kind: "prediction", text: "Farther out: more twist or less?", chips: ["More", "Less", "Not sure"] }, prediction: { id: "weight-out", concept: "mech.torque.static" } } as never;
+    // same kind and the same choices: a re-offer, which keeps the existing id (Lucky's decision 2026-10-13)
+    const r = { move: "explain", concepts: ["mech.torque.static"], prompt: { kind: "prediction", text: "Farther out: more twist or less?", chips: ["More", "Not sure"] } } as never;
     const t = applyResponse(base, r, 2, "2026-10-12");
     expect(t.predictions).toEqual([expect.objectContaining({ id: "weight-out", turn: 2, question: "Farther out: more twist or less?", status: "open" })]);
     expect(t.open_items).toHaveLength(1);
   });
 });
 
-describe("prompt re-attached from stored state (Lucky's decision 2026-10-12)", () => {
-  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
-  const open = { predictions: [{ id: "weight-out", concept: "mech.torque.static", turn: 1, choices: ["More", "Less", "Not sure"], question: "Farther out: more or less?", guess: null, status: "open" as const }], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
-
-  it("an already-open prediction id without a prompt gets its stored question and choices verbatim, with a warning", async () => {
-    const { reattachOpenPrompt, PROMPT_REATTACHED } = await import("./teaching");
-    const r = reattachOpenPrompt({ move: "probe", prediction: { id: "weight-out", concept: "mech.torque.static" } }, open);
-    expect((r.raw as { prompt: unknown }).prompt).toEqual({ kind: "prediction", text: "Farther out: more or less?", chips: ["More", "Less", "Not sure"] });
-    expect(r.warning).toMatch(new RegExp(`^${PROMPT_REATTACHED}: prediction "weight-out"`));
-  });
-
-  it("never applies to a new prediction id, to an answer that has a prompt, to a closed prediction, or without a stored question", async () => {
-    const { reattachOpenPrompt } = await import("./teaching");
-    const none = (raw: unknown, t = open) => expect(reattachOpenPrompt(raw, t as never)).toEqual({ raw, warning: null });
-    none({ prediction: { id: "a-new-one", concept: "mech.torque.static" } });
-    none({ prediction: { id: "weight-out", concept: "mech.torque.static" }, prompt: { kind: "prediction", text: "Mine", chips: ["A", "Not sure"] } });
-    none({ prediction: { id: "weight-out", concept: "mech.torque.static" } }, { ...open, predictions: [{ ...open.predictions[0]!, status: "guessed" as const }] } as never);
-    none({ prediction: { id: "weight-out", concept: "mech.torque.static" } }, { ...open, predictions: [{ ...open.predictions[0]!, question: undefined }] } as never);
-  });
-
-  async function twoTurns(second: Record<string, unknown>) {
-    const prompt = { ...(VALID.prompt as object), kind: "prediction" };
-    const checks: Array<{ warnings: string[]; outcome: string; errors: string[] }> = [];
-    let n = 0;
-    const director: Director = {
-      async respond() {
-        n++;
-        return n === 1 ? { response: { ...VALID, prompt, prediction: { id: "weight-out", concept: "mech.torque.static" } } } : { response: { ...VALID, request_id: "turn_2", state_rev: 2, ...second } };
-      },
-    };
-    const s = new TurnSession({ registry: fixtureRegistry().registry, director, state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
-    await s.run({ text: "Why is it hard?" }, () => {});
-    const events: TurnEvent[] = [];
-    await s.run({ text: "Not much. I built a Lego car once." }, (e) => events.push(e));
-    return { events, checks: checks.slice(1) };
-  }
-
-  it("in a turn: the re-offer without its prompt is shown with the stored question, and the fallback is logged as a warning", async () => {
-    const { events, checks } = await twoTurns({ move: "explain", narration: [{ id: "n1", text: "A Lego car is a good start." }], actions: [], calc_requests: [], prompt: undefined, prediction: { id: "weight-out", concept: "mech.torque.static" } });
-    expect(events.at(-1)!.type).toBe("turn.done");
-    const shown = events.find((e) => e.type === "prompt") as Extract<TurnEvent, { type: "prompt" }>;
-    expect(shown.text).toBe((VALID.prompt as { text: string }).text);
-    expect(checks[0]!.warnings.join()).toMatch(/prompt re-attached from stored state: prediction "weight-out"/);
-  });
-
-  it("in a turn: a NEW prediction id without a prompt is still rejected", async () => {
-    const { events, checks } = await twoTurns({ move: "explain", narration: [{ id: "n1", text: "A Lego car is a good start." }], actions: [], calc_requests: [], prompt: undefined, prediction: { id: "another-one", concept: "mech.torque.static" } });
-    expect(events.at(-1)!.type).toBe("turn.error");
-    expect(checks[0]!.errors.join()).toMatch(/prompt: missing/);
-    expect(checks[0]!.warnings.join()).not.toMatch(/re-attached/);
-  });
-});
 
 describe("the turn passes the open question to the router (Lucky's decision 2026-10-12)", () => {
   it("turn 2's router request carries turn 1's question text, kind and choices", async () => {
@@ -417,7 +366,7 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
     const director: Director = {
       async respond(req) {
         return req.request_id === "turn_1"
-          ? { response: { ...VALID, prompt, prediction: { id: "weight-out", concept: "mech.torque.static" } } }
+          ? { response: { ...VALID, prompt } }
           : { response: { ...VALID, request_id: "turn_2", state_rev: 2, move: "explain", narration: [{ id: "n1", text: "Here is the idea: the farther out the weight, the bigger its twist on your hand." }], calc_requests: [], prompt: undefined } };
       },
     };
@@ -426,6 +375,6 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
     const events: TurnEvent[] = [];
     await s.run({ text: "idk" }, (e) => events.push(e));
     expect(events.at(-1)).toMatchObject({ type: "turn.done", move: "explain" });
-    expect(s.state.teaching!.predictions[0]).toMatchObject({ id: "weight-out", status: "unsure" });
+    expect(s.state.teaching!.predictions[0]).toMatchObject({ id: "p-turn-1", status: "unsure" });
   });
 });

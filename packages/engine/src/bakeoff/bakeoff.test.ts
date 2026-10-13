@@ -234,16 +234,6 @@ describe("s02: turn 1 must be a plain question (Lucky's decision 2026-10-12)", (
   });
 });
 
-describe("the re-attach fallback is counted in the summary", () => {
-  it("turns with a re-attached prompt are counted, and shown as their own row", async () => {
-    const turn = (warnings: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [], warnings, expectations: [], usage: [], cost_micro_usd: 0, unexpected: false }) as never;
-    const m = metrics([turn(['prompt re-attached from stored state: prediction "p"']), turn([]), turn(["analogy: something"])]);
-    expect(m.reattached).toBe(1);
-    expect(m.warnings).toBe(2);
-    const r = { records: [{ scenario: byId("s03-true-beginner"), run: 1, turns: [turn(['prompt re-attached from stored state: prediction "p"'])], cost_micro_usd: 0 }], total_micro_usd: 0, cap_micro_usd: 1 };
-    expect(summaryMarkdown(r as never, { mode: "recorded", started: "now", models: "x" })).toContain("| Prompts re-attached from stored state (engine fallback) | 1 |");
-  });
-});
 
 describe("router verdicts in the bake-off (Lucky's decision 2026-10-12)", () => {
   it("every turn logs the router's answered_prompt; a scripted direct answer called unanswered is counted", async () => {

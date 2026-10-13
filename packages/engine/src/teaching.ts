@@ -26,6 +26,9 @@ export function applyLearnerReply(t: TeachingState, c: ReplyClassification, toda
   return { ...t, predictions, open_items, waivers, safety_acks };
 }
 
+/** The engine's id for a prediction asked in Aili turn `turn` (Lucky's decision 2026-10-13). */
+export const predictionId = (turn: number): string => `p-turn-${turn}`;
+
 /** What a validated director answer changes, as the Aili turn numbered `turn`. */
 export function applyResponse(t: TeachingState, r: DirectorResponse, turn: number, today: string, safetyCritical: ReadonlySet<string> = new Set(), readingTeaches: readonly string[] = []): TeachingState {
   let { predictions, open_items, waivers, analogies_used } = t;
@@ -35,14 +38,17 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
     predictions = predictions.map((p) => (p.id === id ? { ...p, status: "revealed" as const, outcome: r.reveal!.outcome } : p));
     open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === id));
   }
-  if (r.prediction && r.prompt?.kind === "prediction") {
-    const again = predictions.find((p) => p.id === r.prediction!.id && p.status === "open");
+  if (r.prompt?.kind === "prediction") {
+    // The ENGINE records the prediction (Lucky's decision 2026-10-13): id "p-turn-N", concept = the
+    // first of the answer's concepts. A re-offer (an open prediction with the same choices) keeps its id.
+    const chips = r.prompt.chips;
+    const again = predictions.find((p) => p.status === "open" && p.choices.length === chips.length && p.choices.every((c, i) => c === chips[i]));
     if (again) {
-      // Re-offered (more simply): the same prediction, asked again this turn; never a duplicate.
-      predictions = predictions.map((p) => (p === again ? { ...p, turn, choices: r.prompt!.chips, question: r.prompt!.text } : p));
-    } else {
-      predictions = [...predictions, { id: r.prediction.id, concept: r.prediction.concept, turn, choices: r.prompt.chips, question: r.prompt.text, guess: null, status: "open" }];
-      open_items = [...open_items, { kind: "prediction", ref: r.prediction.id, opened_turn: turn }];
+      predictions = predictions.map((p) => (p === again ? { ...p, turn, question: r.prompt!.text } : p));
+    } else if (r.concepts[0]) {
+      const id = predictionId(turn);
+      predictions = [...predictions, { id, concept: r.concepts[0], turn, choices: chips, question: r.prompt.text, guess: null, status: "open" }];
+      open_items = [...open_items, { kind: "prediction", ref: id, opened_turn: turn }];
     }
   }
   if (r.reading && r.move === "assign") open_items = [...open_items, { kind: "reading", ref: r.reading, opened_turn: turn }];
@@ -77,25 +83,3 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
 /** The warning text when an answer re-offers the open question instead of a new one (Lucky's decision 2026-10-13). */
 export const OPEN_QUESTION_REOFFERED = "open question re-offered";
 
-/** The warning text when the engine re-attaches a stored prompt (Lucky's decision 2026-10-12). */
-export const PROMPT_REATTACHED = "prompt re-attached from stored state";
-
-/**
- * Fallback for a re-offer that forgot its prompt: if the answer names an ALREADY-OPEN prediction id
- * and has no prompt, attach that prediction's stored question and choices verbatim (kind "prediction")
- * and say so in a warning. Never for a new prediction id, and never when no question was stored.
- */
-export function reattachOpenPrompt(raw: unknown, t: TeachingState | undefined): { raw: unknown; warning: string | null } {
-  const none = { raw, warning: null };
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return none;
-  const r = raw as Record<string, unknown>;
-  if (r.prompt !== undefined && r.prompt !== null) return none;
-  const id = (r.prediction as { id?: unknown } | undefined)?.id;
-  if (typeof id !== "string") return none;
-  const p = t?.predictions.find((x) => x.id === id && x.status === "open");
-  if (!p?.question) return none;
-  return {
-    raw: { ...r, prompt: { kind: "prediction", text: p.question, chips: [...p.choices] } },
-    warning: `${PROMPT_REATTACHED}: prediction "${id}" was re-offered without its prompt; its stored question and choices were attached verbatim`,
-  };
-}

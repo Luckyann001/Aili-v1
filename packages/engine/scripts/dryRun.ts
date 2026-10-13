@@ -95,8 +95,8 @@ async function main() {
   const chips = ["It grows", "No change", "It shrinks", "Not sure"];
   const teaching: TeachingState | undefined = second
     ? {
-        predictions: [{ id: "ruler-weight-distance", concept: "mech.moment-arm", turn: 1, choices: chips, question, guess: null, status: "open" }],
-        open_items: [{ kind: "prediction", ref: "ruler-weight-distance", opened_turn: 1 }],
+        predictions: [{ id: "p-turn-1", concept: "mech.moment-arm", turn: 1, choices: chips, question, guess: null, status: "open" }],
+        open_items: [{ kind: "prediction", ref: "p-turn-1", opened_turn: 1 }],
         waivers: [],
         analogies_used: ["analogy.fx-long-wrench"],
         safety_acks: [],

@@ -24,7 +24,7 @@ describe("A14 #1 quick question: a direct answer with the number, assumptions an
   it("a probe, a prediction quiz, a calculated answer with no assumptions or no source: each rejected", async () => {
     for (const [a, rule] of [
       [{ ...answer, move: "probe", prompt: ask("What do you think") }, /rule answer-posture/],
-      [{ ...answer, prompt: ask("Which is it", "prediction", ["Yes", "No", "Not sure"]), prediction: { id: "q", concept: C } }, /no prediction quiz/],
+      [{ ...answer, prompt: ask("Which is it", "prediction", ["Yes", "No", "Not sure"]), concepts: [C] }, /no prediction quiz/],
       [{ ...answer, assumptions: [] }, /states its assumptions/],
       [{ ...answer, evidence: [] }, /cites a source from the library/],
     ] as const) expect(lastError(await scriptedSession(registry, [a as Answer], { posture: "answer" }).reply("Will it hold?"))).toMatch(rule);

@@ -192,12 +192,11 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
 
   // Slice 5a shapes: prediction prompts, reveals, readings and analogies.
   if (r.prompt?.kind === "prediction") {
-    if (!r.prediction) errors.push(`prediction: missing; a prediction prompt says what is being predicted ({ id, concept })`);
+    // The engine records the prediction under the first concept, so one must be given (Lucky's decision 2026-10-13).
+    if (r.concepts.length === 0) errors.push(`concepts: a prediction prompt needs the concept it tests, listed first in "concepts" (${valid(sl.concepts)})`);
     if (r.prompt.chips.length < 2) errors.push(`prompt.chips: a prediction needs at least two choices (got ${r.prompt.chips.length})`);
     if (!r.prompt.chips.some((c) => /^not sure$/i.test(c))) errors.push(`prompt.chips: a prediction offers "Not sure"`);
-  } else if (r.prediction && !r.prompt) {
-    errors.push(`prompt: missing. "prediction" ("${r.prediction.id}") always comes with "prompt": { "kind": "prediction", "text": the question, "chips": the choices plus "Not sure" }`);
-  } else if (r.prediction) errors.push(`prompt.kind: "${r.prompt!.kind}" must be "prediction" when "prediction" ("${r.prediction.id}") is set`);
+  }
   if (r.reveal && !r.calc_requests.some((c) => c.id === r.reveal!.calc)) errors.push(`reveal.calc: "${r.reveal.calc}" is not a calculation requested in this turn`);
   if (r.reading) {
     const rd = sl.readings.find((x) => x.id === r.reading);

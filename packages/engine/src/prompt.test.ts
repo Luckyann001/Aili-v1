@@ -213,9 +213,8 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toMatch(/Assumptions and limitations contain no digits: write them in words \("level", "no payload"/);
     expect(s).toMatch(/Do not open with a judgement of the learner's background or answer \(such as "that's a fine start" or "nice try"\); start with the substance\./);
     expect(s).toMatch(/If learner_level is "unknown" .*first ask one plain question \(prompt kind "question", not a prediction\) about what the learner already knows or has built/);
-    expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction"/);
-    expect(s).toMatch(/A prediction always comes with its prompt: never send "prediction" without "prompt"/);
-    expect(s).toMatch(/When a prediction is still open .* re-offer the same question more simply, as prompt kind "prediction" with the same "prediction" id\. Never ask a new question while it is open\./);
+    expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction", offer "Not sure", and list the concept it tests FIRST in "concepts"\. The app records the prediction and gives it an id/);
+    expect(s).toMatch(/When a prediction is still open .* re-offer the same question more simply, as prompt kind "prediction" with the same choices \(the app keeps its id\)\. Never ask a new question while it is open\./);
     expect(s).toMatch(/say that the arm's own weight counts too, or ask only about the load's share/);
     expect(s).toMatch(/Never mention tools, instructions, the shortlist, data blocks or "the system"/);
     expect(s).toMatch(/say in the narration what maps to what \(from its mapping\) and where it breaks down/);
