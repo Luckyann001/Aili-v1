@@ -209,6 +209,7 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toContain("Aim for at most 140 characters each");
     expect(s).toContain(`${NARRATION_MAX_CHARS} is the hard limit`);
     expect(s).toMatch(/keep its content and change only what the errors name; add what the errors name, even if that changes the answer/);
+    expect(s).toMatch(/Assumptions and limitations contain no digits: write them in words \("level", "no payload"/);
     expect(s).toMatch(/Do not open with a judgement of the learner's background or answer \(such as "that's a fine start" or "nice try"\); start with the substance\./);
     expect(s).toMatch(/If learner_level is "unknown" .*first ask one plain question \(prompt kind "question", not a prediction\) about what the learner already knows or has built/);
     expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction"/);
