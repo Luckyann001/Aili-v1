@@ -5,7 +5,7 @@ import { shortlist } from "./capabilities";
 import { splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
-import { applyLearnerReply, applyResponse, OPEN_QUESTION_REOFFERED } from "./teaching";
+import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
@@ -356,9 +356,11 @@ export class TurnSession {
     };
     const check = (answer: unknown): ({ r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] }) & { warnings: string[] } => {
       // A segment over the hard limit is split at sentence ends when it can be (a warning, never silent).
-      const split = splitLongNarration(answer);
+      // A teach-back question with no reading gets the one open reading (a warning, never silent).
+      const filled = fillTeachBackReading(answer, teaching);
+      const split = splitLongNarration(filled.raw);
       const v = validateDirectorResponse(split.raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
-      const warnings = [...split.warnings, ...v.warnings];
+      const warnings = [...(filled.warning ? [filled.warning] : []), ...split.warnings, ...v.warnings];
       if (!v.response) return { reason: "validation", errors: v.errors, warnings };
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).

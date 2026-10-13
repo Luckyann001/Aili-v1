@@ -1,5 +1,5 @@
 import { EMPTY_ANSWER, GUIDE_QUESTION_SUBSTITUTED, NARRATION_SPLIT } from "../director";
-import { OPEN_QUESTION_REOFFERED } from "../teaching";
+import { OPEN_QUESTION_REOFFERED, READING_FILLED_IN } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
 // Bake-off report (docs/m3-plan.md slice 7a): numbers code can measure, and one transcript per
@@ -73,6 +73,8 @@ export interface Metrics {
   empty_first: number;
   /** Turns where the engine used the guide's exact application question after the repair paraphrased it. */
   guide_substituted: number;
+  /** Turns where the engine named the one open reading of a teach-back question. */
+  reading_filled: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -108,7 +110,9 @@ export function metrics(turns: TurnRecord[]): Metrics {
     warnings_by_type: turns
       .flatMap((t) => t.warnings)
       .reduce<Record<string, number>>((acc, w) => {
-        const k = w.startsWith(GUIDE_QUESTION_SUBSTITUTED)
+        const k = w.startsWith(READING_FILLED_IN)
+          ? "reading filled in"
+          : w.startsWith(GUIDE_QUESTION_SUBSTITUTED)
           ? "guide question substituted"
           : w.startsWith(NARRATION_SPLIT)
             ? "narration split"
@@ -132,6 +136,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
     router_missed: turns.filter((t) => t.router_missed_answer).length,
+    reading_filled: turns.filter((t) => t.warnings.some((w) => w.startsWith(READING_FILLED_IN))).length,
     guide_substituted: turns.filter((t) => t.warnings.some((w) => w.startsWith(GUIDE_QUESTION_SUBSTITUTED))).length,
     empty_first: turns.filter((t) => t.checks.find((c) => c.attempt === 1)?.errors.includes(EMPTY_ANSWER)).length,
     narration_split: turns.filter((t) => t.warnings.some((w) => w.startsWith(NARRATION_SPLIT))).length,
@@ -180,6 +185,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
     `| Empty or action-only first answers (no narration, no prompt) | ${m.empty_first} |`,
     `| Guide application question substituted (engine, after the repair) | ${m.guide_substituted} |`,
+    `| Teach-back reading filled in (engine, one open reading) | ${m.reading_filled} |`,
     "",
     "## By scenario family",
     "",

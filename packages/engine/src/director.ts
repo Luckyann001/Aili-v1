@@ -206,6 +206,10 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     if (r.prompt.chips.length < 2) errors.push(`prompt.chips: a prediction needs at least two choices (got ${r.prompt.chips.length})`);
     if (!r.prompt.chips.some((c) => /^not sure$/i.test(c))) errors.push(`prompt.chips: a prediction offers "Not sure"`);
   }
+  // A teach-back question names the reading it is about (Lucky's decision 2026-10-13, s08): without it
+  // nothing is recorded to grade later. (The engine fills it in first when exactly one reading is open.)
+  if (r.move === "teach_back" && r.prompt && !r.teach_back_check && !r.reading)
+    errors.push(`reading: missing; a teach-back question names the reading it asks about ("reading": the reading the learner was assigned; ${valid(sl.readings.map((x) => x.id))})`);
   if (r.reveal && !r.calc_requests.some((c) => c.id === r.reveal!.calc)) errors.push(`reveal.calc: "${r.reveal.calc}" is not a calculation requested in this turn`);
   if (r.reading) {
     const rd = sl.readings.find((x) => x.id === r.reading);

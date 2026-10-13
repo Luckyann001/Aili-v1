@@ -440,3 +440,35 @@ describe("j1 in a turn: \"just tell me … no questions\" is checked as a direct
     expect(s.state.history.posture).toBe("learning");
   });
 });
+
+describe("teach-back reading filled in (Lucky's decision 2026-10-13, s08)", () => {
+  const ask = { move: "teach_back", prompt: { kind: "question", text: "Explain it back", chips: [] } };
+  const t = (refs: string[]) => ({ predictions: [], open_items: refs.map((ref) => ({ kind: "reading" as const, ref, opened_turn: 1 })), waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } });
+  it("exactly one open reading: filled in, with a warning", async () => {
+    const { fillTeachBackReading } = await import("./teaching");
+    const r = fillTeachBackReading(ask, t(["read.fx-moments"]));
+    expect((r.raw as { reading: string }).reading).toBe("read.fx-moments");
+    expect(r.warning).toBe(`reading filled in: the teach-back question named no reading; the one open reading "read.fx-moments" was used`);
+  });
+  it("none or several open, a reading already named, or a grading turn: left as it is", async () => {
+    const { fillTeachBackReading } = await import("./teaching");
+    for (const [raw, refs] of [[ask, []], [ask, ["read.a", "read.b"]], [{ ...ask, reading: "read.fx-moments" }, ["read.fx-moments"]], [{ ...ask, teach_back_check: {} }, ["read.fx-moments"]]] as const)
+      expect(fillTeachBackReading(raw, t([...refs])).warning).toBeNull();
+  });
+  it("in a turn (the s08 case): assign, then a teach-back question without its reading is filled in and can be graded", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const checks: Array<{ warnings: string[] }> = [];
+    const answers: Record<string, object> = {
+      turn_1: { move: "assign", reading: "read.fx-moments", calc_requests: [], narration: [{ id: "n1", text: "Read the fixture section on moments." }], prompt: undefined },
+      turn_2: { move: "teach_back", calc_requests: [], narration: [{ id: "n1", text: "Now explain it back." }], prompt: { kind: "question", text: "What is the moment arm, in your own words", chips: [] } },
+    };
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...answers[req.request_id] } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    await s.run({ text: "Give me something short to read on moments." }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "I read it. Can I explain it back to you?" }, (e) => events.push(e));
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(checks.at(-1)!.warnings.join()).toMatch(/^reading filled in/);
+    expect(s.state.teaching!.pending_teach_back).toBe("read.fx-moments");
+  });
+});

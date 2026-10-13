@@ -370,3 +370,12 @@ describe("the leaked-number stop uses the validator's own number check (Lucky's 
     expect(leakedNumbers([ev("A 12-axis machine.")])).toEqual(["A 12-axis machine."]);
   });
 });
+
+describe("reading filled in is counted (Lucky's decision 2026-10-13)", () => {
+  it("counts turns with the warning", () => {
+    const turn = (warnings: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [], warnings, expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    const m = metrics([turn(['reading filled in: the teach-back question named no reading; the one open reading "read.fx-moments" was used'])]);
+    expect(m.reading_filled).toBe(1);
+    expect(m.warnings_by_type).toEqual({ "reading filled in": 1 });
+  });
+});

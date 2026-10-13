@@ -88,3 +88,20 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
 /** The warning text when an answer re-offers the open question instead of a new one (Lucky's decision 2026-10-13). */
 export const OPEN_QUESTION_REOFFERED = "open question re-offered";
 
+
+/** The warning when the engine names the reading of a teach-back question (Lucky's decision 2026-10-13). */
+export const READING_FILLED_IN = "reading filled in";
+
+/**
+ * A teach-back question that names no reading gets the one open reading, when exactly one is open,
+ * with a warning. With none or several open it is left as it is, and the validator rejects it.
+ */
+export function fillTeachBackReading(raw: unknown, t: TeachingState | undefined): { raw: unknown; warning: string | null } {
+  const none = { raw, warning: null };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return none;
+  const r = raw as { move?: unknown; prompt?: unknown; teach_back_check?: unknown; reading?: unknown };
+  if (r.move !== "teach_back" || !r.prompt || r.teach_back_check || r.reading) return none;
+  const open = (t?.open_items ?? []).filter((o) => o.kind === "reading");
+  if (open.length !== 1) return none;
+  return { raw: { ...(raw as object), reading: open[0]!.ref }, warning: `${READING_FILLED_IN}: the teach-back question named no reading; the one open reading "${open[0]!.ref}" was used` };
+}

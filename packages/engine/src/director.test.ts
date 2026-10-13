@@ -487,3 +487,11 @@ describe("calculation IDs in learner text are named as such (Lucky's decision 20
     expect(checkNarration("The CO2 sensor", [])).toEqual([`narration: hard-coded number "2" — numbers must come from a solver through a {{placeholder}}`]); // not an ID
   });
 });
+
+describe("a teach-back question names its reading (Lucky's decision 2026-10-13, s08)", () => {
+  it("without one it is rejected with an exact message listing the readings", () => {
+    expect(errs({ move: "teach_back", reading: undefined, teach_back_check: undefined, calc_requests: [], prompt: { kind: "question", text: "Explain the moment arm in your own words.", chips: [] } })).toContain(
+      `reading: missing; a teach-back question names the reading it asks about ("reading": the reading the learner was assigned; valid: read.fx-moments)`,
+    );
+  });
+});
