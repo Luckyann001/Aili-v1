@@ -48,7 +48,7 @@ export const FAKE_ROUTER_USAGE: TokenUsage = { model: "router", input_tokens: 30
  * - guess: for an open prediction, the choice whose text matches the reply exactly (any case);
  * - wants_stop: starts with "stop", "let's stop", "enough" or "please stop";
  * - asks_for_source: a title in quotes ("…" or “…”), else null;
- * - wants_direct_answer: mentions "just tell me" or "no questions".
+ * - wants_direct_answer: mentions "just tell me", "no questions" or "skip the explanation" (explicit requests only).
  * `script` overrides the result for the n-th call, so tests can force any classification.
  */
 export function createFakeRouter(opts: { usage?: TokenUsage; script?: Array<Partial<ReplyClassification> | "fail"> } = {}): Router & { calls: number } {
@@ -71,7 +71,7 @@ export function createFakeRouter(opts: { usage?: TokenUsage; script?: Array<Part
         guess: req.prediction_choices?.find((c) => c.toLowerCase() === text.toLowerCase()) ?? null,
         wants_stop: /^(stop|let'?s stop|enough|please stop)\b/i.test(text),
         asks_for_source: /["\u201c]([^"\u201d]{2,120})["\u201d]/.exec(text)?.[1] ?? null,
-        wants_direct_answer: /\b(just tell me|no questions)\b/i.test(text),
+        wants_direct_answer: /\b(just tell me|no questions|skip the explanation)\b/i.test(text),
       };
       return { classification: { ...base, ...scripted }, usage: opts.usage ?? FAKE_ROUTER_USAGE };
     },

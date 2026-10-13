@@ -143,10 +143,24 @@ describe("router.v1: very short confused replies count as frustrated (spec A5; L
 describe("router.v1: wants_direct_answer (Lucky's decision 2026-10-13)", () => {
   it("is described for the router, and the fake router flags \"just tell me\" and \"no questions\"", async () => {
     const s = assembleRouterPrompt(ROUTER, { text: "x", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }).system;
-    expect(s).toMatch(/- wants_direct_answer: the learner wants a direct answer now: "just tell me", "no questions", or a plain factual question/);
+    expect(s).toMatch(/- wants_direct_answer: ONLY an explicit request for a direct answer: "just tell me", "no questions", "skip the explanation"/);
+    expect(s).toMatch(/An ordinary question, however factual, is not one; neither is asking for a reading or for help with a topic\./);
     const { createFakeRouter } = await import("../router");
     const fake = createFakeRouter();
     const c = (await fake.classify({ text: "Just tell me the formula, no questions please.", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }, new AbortController().signal)).classification as { wants_direct_answer: boolean };
     expect(c.wants_direct_answer).toBe(true);
+  });
+});
+
+describe("wants_direct_answer: explicit requests only (Lucky's decision 2026-10-13)", () => {
+  const classify = async (text: string) => {
+    const { createFakeRouter } = await import("../router");
+    return ((await createFakeRouter().classify({ text, history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }, new AbortController().signal)).classification as { wants_direct_answer: boolean }).wants_direct_answer;
+  };
+  it.each(["Just tell me the formula for torque, no questions please.", "Skip the explanation, which servo?", "No questions, just the answer."])("\"%s\" sets it", async (t) => {
+    expect(await classify(t)).toBe(true);
+  });
+  it.each(["Give me a reading on moments, I'll come back.", "How do I write ROS 2 launch files?", "Will this servo hold a 300 g camera at 20 cm?", "What is a servo?"])("\"%s\" (s16 / o2 / s01 / s03 style) does not", async (t) => {
+    expect(await classify(t)).toBe(false);
   });
 });
