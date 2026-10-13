@@ -20,6 +20,8 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 | Rule (added after the first live runs, 2026-10-12) | Kind | Checks |
 |---|---|---|
 | narration length | error / **warning** | at most 4 segments of at most **200** characters (error); a segment over 160 is a warning; the prompt asks for 140 |
+| narration split | **warning** (engine) | a segment over 200 is split at sentence ends (a ".", "!" or "?" followed by a space, never inside a `{{placeholder}}`) into parts of at most 200, before validation. Not split, and rejected as before, if one sentence alone is over 200 or the split would pass four segments |
+| count adjectives | allowed digits | a fixed list: `N-axis`, `N-DOF`/`N DOF`, `N-link`, `N-wheel(ed)`, `N-joint` (N a single digit 1–9, never after a digit or decimal point), plus `3D`/`2D`. Nothing the learner typed is exempted |
 | concepts | error | each ID is one of this turn's shortlist concepts (`Shortlist.concepts`); the error lists the valid IDs |
 | evidence | error | each ID is a shortlist reading; the error lists the valid reading IDs |
 | prediction needs its prompt | error | a `prediction` with no `prompt` (`prompt: missing …`), or with a prompt not of kind `prediction` (`prompt.kind …`) |
@@ -27,6 +29,7 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 | mild praise | **warning** | `flattery_warn` phrases in `config/pedagogy-phrases.json` ("a fine start"); never a rejection. The prompt also says not to open with a judgement of the learner's background or answer |
 | prompt re-attached | **warning** (engine fallback) | an answer that re-offers an ALREADY-OPEN prediction id without its prompt gets the stored question and choices attached verbatim, before validation; counted in the bake-off summary. Never for a new prediction id |
 | numbers in assumptions and limitations | prompt rule | written in words ("level", "no payload"); the number validator is unchanged and still rejects digits there |
+| "Not sure" to a prediction | engine rule | "Not sure", "I don't know", "idk", "No idea" close the prediction as `unsure` (not a guess): no reveal or calculation is required; the prompt says explain, and move up the help ladder on repeated "I don't know" (behavior spec A1a, A4, A6) |
 | no pushback on a first turn | engine rule | the router's `pushback: true` is ignored when there is no earlier Aili turn (nothing to push against), so it cannot force a "hold"; from the second turn the hold-under-pushback rule applies as before |
 | one open question | error (pedagogy) | no new prompt while one is open. Exception: re-offering the open question itself, either the SAME open prediction (kind `prediction`, same id; it updates, never duplicates) or the same plain question (same kind and the same choices; the text may be reworded). Every re-offer is a **warning**, "open question re-offered", counted in the bake-off summary |
 | analogy explained | **warning** | a tagged analogy's narration has a word from its title or mapping and a breakdown phrase (breaks down, unlike, differs, doesn't hold, not like, but a servo, whereas) |
