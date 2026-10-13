@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, NARRATION_MAX_CHARS, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, NARRATION_MAX_CHARS, splitLongNarration, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -385,5 +385,36 @@ describe("count adjectives are not quantities (Lucky's decision 2026-10-13)", ()
   });
   it("the o1 answer from the bake-off (6-axis) now passes", () => {
     expect(errs({ narration: [{ id: "n1", text: "Inverse kinematics for a 6-axis arm isn't supported yet." }], coverage: "unsupported", actions: [], calc_requests: [], concepts: [], evidence: [] }, { shortlist: { scenes: [], simulations: [], solvers: [], analogies: [], readings: [], sources: [], ids: new Set(), concepts: [] } })).toEqual([]);
+  });
+});
+
+describe("long narration split at sentence ends (Lucky's decision 2026-10-13)", () => {
+  const s1 = "A servo arm carries its load all the time, so the motor must keep pushing to hold it level against gravity.";
+  const s2 = "That steady push is the torque it must give, and it grows with the distance from the pivot to the load.";
+  it("a segment over 200 characters splits into parts of 200 or less, ids kept unique, with a warning", () => {
+    const long = `${s1} ${s2}`;
+    expect(long.length).toBeGreaterThan(200);
+    const r = splitLongNarration({ narration: [{ id: "n1", text: "Short first." }, { id: "n2", text: long }] });
+    expect((r.raw as { narration: unknown[] }).narration).toEqual([{ id: "n1", text: "Short first." }, { id: "n2", text: s1 }, { id: "n2-2", text: s2 }]);
+    expect(r.warnings).toEqual([`narration split: narration[1] (${long.length} characters) split into 2 parts at sentence boundaries`]);
+    expect(errs({ narration: (r.raw as { narration: unknown[] }).narration })).toEqual([]);
+  });
+  it("placeholders stay whole: a dot inside {{c1.torque_nm}} is never a boundary", () => {
+    const text = `Holding it level takes {{c1.torque_nm}} newton-metres, which is the payload's share plus the arm's own share, measured from the pivot. ${s2}`;
+    const parts = (splitLongNarration({ narration: [{ id: "n1", text }] }).raw as { narration: Array<{ text: string }> }).narration;
+    expect(parts.map((p) => p.text).join(" ")).toBe(text);
+    expect(parts[0]!.text).toContain("{{c1.torque_nm}}");
+    expect(parts.every((p) => p.text.length <= 200)).toBe(true);
+  });
+  it("one sentence over 200 cannot be split: left as it is, and rejected as before", () => {
+    const one = "word ".repeat(45).trim() + ".";
+    const r = splitLongNarration({ narration: [{ id: "n1", text: one }] });
+    expect(r.warnings).toEqual([]);
+    expect(errs({ narration: (r.raw as { narration: unknown[] }).narration })).toEqual([`narration[0].text: ${one.length} characters, at most 200`]);
+  });
+  it("a split that would make more than four segments is not done (rejected as before)", () => {
+    const r = splitLongNarration({ narration: [{ id: "a", text: "One." }, { id: "b", text: "Two." }, { id: "c", text: "Three." }, { id: "d", text: `${s1} ${s2}` }] });
+    expect(r.warnings).toEqual([]);
+    expect((r.raw as { narration: unknown[] }).narration).toHaveLength(4);
   });
 });

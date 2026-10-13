@@ -285,3 +285,62 @@ export function analogyExplained(narration: string, an: { title: string; mapping
 function fieldPath(path: readonly PropertyKey[]): string {
   return path.map((p, i) => (typeof p === "number" ? `[${p}]` : `${i ? "." : ""}${String(p)}`)).join("");
 }
+
+/** The warning text when the engine splits a long narration segment (Lucky's decision 2026-10-13). */
+export const NARRATION_SPLIT = "narration split";
+
+/** Sentence ends outside {{placeholders}}: a ".", "!" or "?" followed by whitespace. */
+function sentences(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text.startsWith("{{", i)) depth++;
+    else if (text.startsWith("}}", i)) depth = Math.max(0, depth - 1);
+    else if (depth === 0 && /[.!?]/.test(text[i]!) && /\s/.test(text[i + 1] ?? "")) {
+      out.push(text.slice(start, i + 1).trim());
+      start = i + 1;
+    }
+  }
+  const tail = text.slice(start).trim();
+  if (tail) out.push(tail);
+  return out;
+}
+
+/**
+ * Splits narration segments longer than NARRATION_MAX_CHARS at sentence boundaries into parts of at
+ * most that length (deterministic; placeholders are never split), before validation, with a warning.
+ * A segment is left as it is (and rejected by the validator, as before) if one sentence alone is too
+ * long, or if splitting would make more than NARRATION_MAX_SEGMENTS segments.
+ */
+export function splitLongNarration(raw: unknown): { raw: unknown; warnings: string[] } {
+  const none = { raw, warnings: [] };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return none;
+  const r = raw as { narration?: unknown };
+  if (!Array.isArray(r.narration)) return none;
+  const items = r.narration as Array<{ id?: unknown; text?: unknown }>;
+  if (!items.some((n) => typeof n?.text === "string" && n.text.length > NARRATION_MAX_CHARS)) return none;
+  const ids = new Set(items.map((n) => n?.id).filter((x): x is string => typeof x === "string"));
+  const out: Array<Record<string, unknown>> = [];
+  const warnings: string[] = [];
+  items.forEach((n, i) => {
+    const text = n?.text;
+    if (typeof text !== "string" || text.length <= NARRATION_MAX_CHARS || typeof n.id !== "string") return void out.push(n as Record<string, unknown>);
+    const parts: string[] = [];
+    for (const s of sentences(text)) {
+      const last = parts.at(-1);
+      if (last !== undefined && last.length + 1 + s.length <= NARRATION_MAX_CHARS) parts[parts.length - 1] = `${last} ${s}`;
+      else parts.push(s);
+    }
+    if (parts.length < 2 || parts.some((p) => p.length > NARRATION_MAX_CHARS)) return void out.push(n as Record<string, unknown>); // cannot be split
+    parts.forEach((p, k) => {
+      let id = k === 0 ? n.id as string : `${n.id}-${k + 1}`;
+      while (k > 0 && ids.has(id)) id = `${id}-x`;
+      ids.add(id);
+      out.push({ ...n, id, text: p });
+    });
+    warnings.push(`${NARRATION_SPLIT}: narration[${i}] (${text.length} characters) split into ${parts.length} parts at sentence boundaries`);
+  });
+  if (out.length > NARRATION_MAX_SEGMENTS) return none; // splitting would pass the segment limit: reject as before
+  return { raw: { ...(raw as object), narration: out }, warnings };
+}

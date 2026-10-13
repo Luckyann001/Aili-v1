@@ -327,3 +327,12 @@ describe("most questions in a row resets per scenario (Lucky's decision 2026-10-
     expect(metrics([t(1, true), t(2, true), t(1, true), t(2, true), t(3, true)]).max_consecutive_questions).toBe(3);
   });
 });
+
+describe("narration splits are counted (Lucky's decision 2026-10-13)", () => {
+  it("counts turns with the warning and lists it by type", () => {
+    const turn = (warnings: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [], warnings, expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    const m = metrics([turn(["narration split: narration[2] (239 characters) split into 2 parts at sentence boundaries"]), turn([])]);
+    expect(m.narration_split).toBe(1);
+    expect(m.warnings_by_type).toEqual({ "narration split": 1 });
+  });
+});

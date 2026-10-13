@@ -2,7 +2,7 @@ import type { DirectorResponse, SessionHistory } from "@aili/schemas";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
-import { validateDirectorResponse } from "./director";
+import { splitLongNarration, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, OPEN_QUESTION_REOFFERED, reattachOpenPrompt } from "./teaching";
@@ -353,8 +353,10 @@ export class TurnSession {
     const check = (answer: unknown): ({ r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] }) & { warnings: string[] } => {
       // A re-offer of an open prediction that forgot its prompt gets the stored one back (a warning, never silent).
       const fixed = reattachOpenPrompt(answer, teaching);
-      const v = validateDirectorResponse(fixed.raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
-      const warnings = [...(fixed.warning ? [fixed.warning] : []), ...v.warnings];
+      // A segment over the hard limit is split at sentence ends when it can be (a warning, never silent).
+      const split = splitLongNarration(fixed.raw);
+      const v = validateDirectorResponse(split.raw, { shortlist: sl, activeScene: before.activeScene, expected: { request_id: turn_id, state_rev: rev }, safetyCritical });
+      const warnings = [...(fixed.warning ? [fixed.warning] : []), ...split.warnings, ...v.warnings];
       if (!v.response) return { reason: "validation", errors: v.errors, warnings };
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).

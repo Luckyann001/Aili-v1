@@ -1,3 +1,4 @@
+import { NARRATION_SPLIT } from "../director";
 import { OPEN_QUESTION_REOFFERED, PROMPT_REATTACHED } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
@@ -42,6 +43,8 @@ export interface Metrics {
   router_missed: number;
   /** Turns that re-offered the open question instead of asking a new one. */
   reoffered: number;
+  /** Turns where the engine split a long narration segment at sentence boundaries. */
+  narration_split: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -79,7 +82,9 @@ export function metrics(turns: TurnRecord[]): Metrics {
       .reduce<Record<string, number>>((acc, w) => {
         const k = w.startsWith(PROMPT_REATTACHED)
           ? "prompt re-attached"
-          : w.startsWith(OPEN_QUESTION_REOFFERED)
+          : w.startsWith(NARRATION_SPLIT)
+            ? "narration split"
+            : w.startsWith(OPEN_QUESTION_REOFFERED)
             ? "open question re-offered"
             : w.startsWith("analogy:")
               ? "analogy"
@@ -99,6 +104,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
     router_missed: turns.filter((t) => t.router_missed_answer).length,
+    narration_split: turns.filter((t) => t.warnings.some((w) => w.startsWith(NARRATION_SPLIT))).length,
     reoffered: turns.filter((t) => t.warnings.some((w) => w.startsWith(OPEN_QUESTION_REOFFERED))).length,
     reattached: turns.filter((t) => t.warnings.some((w) => w.startsWith(PROMPT_REATTACHED))).length,
   };
@@ -143,6 +149,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Prompts re-attached from stored state (engine fallback) | ${m.reattached} |`,
     `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
     `| Open questions re-offered (instead of a new question) | ${m.reoffered} |`,
+    `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
     "",
     "## Failures",
     "",
