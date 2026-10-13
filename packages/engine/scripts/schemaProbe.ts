@@ -30,11 +30,13 @@ const STEPS: Record<string, { label: string; apply: (s: Schema) => Schema }> = {
   f: { label: "without calc_requests[].simulation", apply: (s) => withoutCalcSimulation(s) },
   g: { label: "actions flattened (one shape: type list + optional fields)", apply: (s) => flattenActions(s) },
   h: { label: "prediction carries its question and choices", apply: (s) => predictionWithQuestion(s) },
+  z: { label: "the current schema, unchanged", apply: (s) => s },
 };
 
 /** The prediction object with a required question (string) and choices (string list), as fix 1 proposes. */
 function predictionWithQuestion(s: Schema): Schema {
-  const pred = structuredClone(s.properties.prediction) as Schema;
+  // (Kept for the record: the prediction object was later dropped from the schema, decision 25.)
+  const pred = structuredClone(s.properties.prediction ?? { type: "object", properties: {}, required: [], additionalProperties: false }) as Schema;
   pred.properties = { ...pred.properties, question: { type: "string" }, choices: { type: "array", items: { type: "string" } } };
   pred.required = [...pred.required, "question", "choices"];
   return { ...s, properties: { ...s.properties, prediction: pred } };
