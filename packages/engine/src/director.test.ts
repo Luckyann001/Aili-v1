@@ -434,3 +434,17 @@ describe("an answer gives the learner something, and a probe asks (Lucky's decis
     expect(errs({ move: "probe", narration: [{ id: "n1", text: "Let's start." }], prompt: undefined, calc_requests: [] })).toEqual([PROBE_ERR]);
   });
 });
+
+describe("ROS 2 is a product name (Lucky's decision 2026-10-13); nothing broader", () => {
+  it.each(["How to write ROS 2 launch files isn't supported yet.", "ROS2 isn't covered here yet."])("\"%s\" passes", (t) => {
+    expect(checkNarration(t, [])).toEqual([]);
+  });
+  it.each([
+    ["ROS 3 is different.", "3"],
+    ["An SG90 servo.", "90"],
+    ["The MG996R is stronger.", "996"],
+    ["ros 2 in lower case", "2"],
+  ])("\"%s\" is still rejected", (t, n) => {
+    expect(checkNarration(t, []).join()).toContain(`"${n}"`);
+  });
+});

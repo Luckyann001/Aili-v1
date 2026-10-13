@@ -4,7 +4,9 @@
 // ALLOWED_DIGIT_WORDS: words with digits that are names, not quantities. Keep this list short
 // and add to it only with a reason:
 //   "3D", "2D" — names of kinds of view ("the 3D view"), not measurements.
-export const ALLOWED_DIGIT_WORDS = ["3D", "2D"] as const;
+//   "ROS 2", "ROS2" — the name of a robotics software framework (Lucky's decision 2026-10-13). Exactly
+//   these two spellings; part numbers and model codes (SG90, MG996R) stay rejected.
+export const ALLOWED_DIGIT_WORDS = ["3D", "2D", "ROS 2", "ROS2"] as const;
 
 // ALLOWED_COUNT_ADJECTIVES (Lucky's decision 2026-10-13): a single digit 1–9 naming how many parts a
 // machine has, not a measurement. A fixed list in code: nothing the learner typed is ever exempted.
