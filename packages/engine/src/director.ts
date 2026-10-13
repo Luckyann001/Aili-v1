@@ -43,6 +43,10 @@ export interface TurnContext {
   safetyCritical?: ReadonlySet<string>;
 }
 
+/** The error for an answer with no narration and no prompt (actions alone tell the learner nothing). */
+export const EMPTY_ANSWER =
+  'narration, prompt: the answer gives the learner nothing (no narration and no prompt); add at least one narration segment that explains, or a "prompt" that asks';
+
 /** The valid IDs for a field, for the repair: "valid: a, b" or "none this turn (leave it empty)". */
 const valid = (ids: readonly string[]) => (ids.length ? `valid: ${ids.join(", ")}` : "none this turn (leave it empty)");
 
@@ -189,6 +193,11 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
       errors.push(`${field}: "${t}" asks a question; a question goes only in prompt.text`);
     }
   }
+
+  // Something for the learner, and a probe that asks (Lucky's decisions 2026-10-13; spec A1a).
+  if (r.narration.length === 0 && !r.prompt) errors.push(EMPTY_ANSWER);
+  if (r.move === "probe" && !r.prompt)
+    errors.push(`prompt: missing; move "probe" asks one short question (behavior spec A1a), so it needs "prompt": { "kind": "question" or "prediction", "text": the question, "chips": the choices if any }`);
 
   // Slice 5a shapes: prediction prompts, reveals, readings and analogies.
   if (r.prompt?.kind === "prediction") {

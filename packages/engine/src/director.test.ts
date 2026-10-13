@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, NARRATION_MAX_CHARS, splitLongNarration, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -414,5 +414,23 @@ describe("long narration split at sentence ends (Lucky's decision 2026-10-13)", 
     const r = splitLongNarration({ narration: [{ id: "a", text: "One." }, { id: "b", text: "Two." }, { id: "c", text: "Three." }, { id: "d", text: `${s1} ${s2}` }] });
     expect(r.warnings).toEqual([]);
     expect((r.raw as { narration: unknown[] }).narration).toHaveLength(4);
+  });
+});
+
+describe("an answer gives the learner something, and a probe asks (Lucky's decisions 2026-10-13; spec A1a)", () => {
+  const PROBE_ERR = `prompt: missing; move "probe" asks one short question (behavior spec A1a), so it needs "prompt": { "kind": "question" or "prediction", "text": the question, "chips": the choices if any }`;
+  it("the live s04 answer (probe, no narration, no prompt, one highlight) is rejected with both exact messages", () => {
+    const e = errs({ move: "probe", concepts: ["mech.moment-arm"], narration: [], actions: [{ type: "highlight_part", part: "weight" }], calc_requests: [], evidence: [], prompt: undefined });
+    expect(e).toEqual([EMPTY_ANSWER, PROBE_ERR]);
+  });
+  it("an action-only explain is rejected as empty", () => {
+    expect(errs({ move: "explain", narration: [], prompt: undefined, actions: [{ type: "highlight_part", part: "weight" }] })).toContain(EMPTY_ANSWER);
+  });
+  it("narration alone, or a prompt alone, is something", () => {
+    expect(errs({ move: "explain", narration: [{ id: "n1", text: "Holding it out is harder." }], prompt: undefined, calc_requests: [] })).toEqual([]);
+    expect(errs({ move: "probe", narration: [], calc_requests: [], prompt: { kind: "question", text: "What have you built?", chips: [] } })).toEqual([]);
+  });
+  it("a probe with narration but no prompt is still rejected: a probe asks", () => {
+    expect(errs({ move: "probe", narration: [{ id: "n1", text: "Let's start." }], prompt: undefined, calc_requests: [] })).toEqual([PROBE_ERR]);
   });
 });
