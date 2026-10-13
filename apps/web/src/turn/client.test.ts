@@ -34,6 +34,14 @@ const play = (actions: TurnClientAction<Snap>[], from: TurnClientState<Snap> = i
 const ev = (event: TurnEvent): TurnClientAction<Snap> => ({ type: "event", event });
 
 describe("in order", () => {
+  it("turn.done brings the explanation for the text panel; an error clears it", async () => {
+    const s = play([{ type: "begin", rev: 4, snapshot: SNAP }, ...(await turnEvents()).map(ev)]);
+    expect(s.explanation?.calculations[0]?.outputs).toContainEqual({ label: "Torque", value: "0.637", unit: "N·m" });
+    expect(JSON.stringify(s.explanation)).not.toMatch(/\bc\d+\b|solver\./);
+    const failed = play([{ type: "begin", rev: 5, snapshot: SNAP }, ...(await turnEvents({ case: "solver-failure", rev: 5 })).map(ev)], s);
+    expect(failed.explanation).toBeNull();
+  });
+
   it("a valid turn fills narration, actions, results and the prompt, then is done", async () => {
     const events = await turnEvents();
     const s = play([{ type: "begin", rev: 4, snapshot: SNAP }, ...events.map(ev)]);

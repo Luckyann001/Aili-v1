@@ -10,6 +10,7 @@ import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
 import { DROPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 import { useStageContent } from "./stageContent";
+import { useTurnLog } from "./turnLog";
 
 // A fake-director turn in the Learn stage (M2 slice 6b, ?demo=1 with both testing flags).
 // POST /api/turn streams events; the pure reducer (client.ts) gates them. Actions are applied to
@@ -153,7 +154,9 @@ export function useDemoTurn(voice: Voice, live = false) {
           if (after.narration.length) useStageContent.getState().setFixture(true, live);
           // The question is spoken and captioned last, so it stays on screen with its chips.
           const lines = after.narration.map((n) => ({ text: n.text, parts: toCaptionParts(n.parts) }));
-          if (after.prompt?.text) lines.push({ text: after.prompt.text, parts: toCaptionParts(after.prompt.parts) });
+          const question = after.prompt?.text ? { text: after.prompt.text, parts: toCaptionParts(after.prompt.parts) } : null;
+          if (after.explanation) useTurnLog.getState().add({ rev, source: live ? "live" : "fixture", lines: [...lines], question, explanation: after.explanation });
+          if (question) lines.push(question);
           voice.playTurn(rev, lines, after.prompt?.chips, live ? "live" : "fixture");
         }
         if (after.status === "error") fail(after.message ?? "Something went wrong. Nothing on the stage changed.");

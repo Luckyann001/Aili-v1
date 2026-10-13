@@ -1154,3 +1154,53 @@
     padding: var(--aili-space-4);
   }
 }
+
+/* The text panel for turns (slice 3): the current step, then earlier steps collapsed below. */
+.turnStep + .turnStep {
+  margin-top: var(--aili-space-6);
+  padding-top: var(--aili-space-4);
+  border-top: 1px solid var(--aili-border);
+}
+
+.history {
+  margin-top: var(--aili-space-6);
+  border-top: 1px solid var(--aili-border);
+}
+
+.history > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font: 600 0.95rem var(--aili-font-ui);
+}
+
+.calcBlock > .sampleNote {
+  margin: 0 0 var(--aili-space-1);
+}
+
+.calcList {
+  display: grid;
+  gap: var(--aili-space-1);
+  margin: 0;
+}
+
+.calcList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--aili-space-3);
+}
+
+.calcList dt {
+  font-weight: 500;
+}
+
+.calcList dd {
+  margin: 0;
+}
+
+.calcInputs {
+  margin: var(--aili-space-2) 0 0;
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
+}

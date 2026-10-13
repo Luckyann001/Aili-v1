@@ -22,13 +22,37 @@ const ON_TOPIC: Ev[] = [
   { type: "action", action: { type: "select_scene", scene: "fx-lever" } },
   { type: "action", action: { type: "highlight_part", part: "weight" } },
   { type: "prompt", text: QUESTION, parts: [{ text: QUESTION }], chips: ["Easier", "Harder", "No different", "Not sure"] },
-  { type: "turn.done", move: "probe" },
+  { type: "turn.done", move: "probe", explanation: { assumptions: [], limitations: [], evidence: [], calculations: [] } },
+];
+// A calculation turn, HAND-BUILT in the engine's event format (slice 3): what the panel must show.
+const CALC_TURN: Ev[] = [
+  { type: "turn.started" },
+  { type: "narration", id: "n1", text: "Holding it level takes 0.637 newton-metres.", parts: [{ text: "Holding it level takes " }, { value: "0.637", calc_id: "c1", output: "torque_nm" }, { text: " newton-metres." }] },
+  { type: "action", action: { type: "select_scene", scene: "fx-lever" } },
+  { type: "calc.result", calc_id: "c1", outputs: { torque_nm: 0.637 } },
+  {
+    type: "turn.done",
+    move: "explain",
+    explanation: {
+      assumptions: ["The arm is held still (static)."],
+      limitations: ["Moving the arm needs more torque than holding it."],
+      evidence: ["Fixture book, Fixture section"],
+      calculations: [
+        {
+          title: "Static holding torque of a single arm link",
+          fidelity: "verified",
+          inputs: [{ label: "Arm length", value: "0.2", unit: "m" }, { label: "Payload", value: "0.3", unit: "kg" }],
+          outputs: [{ label: "Torque", value: "0.637", unit: "N·m" }, { label: "Payload torque", value: "0.589", unit: "N·m" }],
+        },
+      ],
+    },
+  },
 ];
 const OFF_TOPIC: Ev[] = [
   { type: "turn.started" },
   say("n1", "Guitar isn't something I can teach yet; my material covers robotics, not music."),
   say("n2", "The nearest thing I can teach is how a lever, like a ruler held out with a weight, loads a joint."),
-  { type: "turn.done", move: "answer" },
+  { type: "turn.done", move: "answer", explanation: { assumptions: [], limitations: [], evidence: [], calculations: [] } },
 ];
 
 const stageLive = (p: Page) => p.locator('[data-badge="live"]');
@@ -120,6 +144,41 @@ test.describe("live mode (demo mode A), browser side, mocked server", () => {
     await expect(stageEl(page)).toHaveAttribute("data-dimmed", "");
     await expect(prepared(page)).toHaveCount(0);
     await expect(replies(page)).toHaveCount(0);
+  });
+
+  test("the explanation panel: the current step's values, units, evidence, assumptions and limits, labelled Live AI; earlier steps collapsed; no IDs", async ({ page }) => {
+    await openLive(page, [ON_TOPIC, CALC_TURN]);
+    await box(page, "What do you want to learn?").fill("teach me robotics");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(replies(page).getByRole("button")).toHaveCount(4, { timeout: 15000 });
+    await replies(page).getByRole("button", { name: "Harder" }).click();
+    await expect(page.locator("main [data-calculated]").first()).toBeVisible({ timeout: 15000 });
+    // The panel stays closed until asked for.
+    await expect(page.locator("#learn-side")).toHaveCount(0);
+    await page.getByRole("button", { name: "Explanation" }).click();
+    const panel = page.locator("#learn-tabpanel");
+    await expect(panel.getByRole("heading", { name: "This step" })).toBeVisible();
+    await expect(panel.getByText("Live AI", { exact: true }).first()).toBeVisible();
+    await expect(panel.getByText("Test fixture content", { exact: true }).first()).toBeVisible();
+    const line = panel.locator("p", { hasText: "Holding it level takes" });
+    await expect(line).toBeVisible();
+    await expect(line.locator("[data-calculated]")).toHaveText("0.637, calculated"); // marked as in the caption
+    await expect(panel.locator("dl")).toContainText("Torque");
+    await expect(panel.locator("dl [data-calculated]").first()).toHaveText("0.637 N·m, calculated");
+    await expect(panel.getByText("Using: arm length 0.2 m, payload 0.3 kg.")).toBeVisible();
+    await expect(panel.getByText("Fixture book, Fixture section")).toBeVisible();
+    await expect(panel.getByText("The arm is held still (static).")).toBeVisible();
+    await expect(panel.getByText("Moving the arm needs more torque than holding it.")).toBeVisible();
+    // Only the current step shows; the first turn waits, collapsed, under "Earlier steps".
+    const history = panel.locator("details");
+    await expect(history.locator("summary")).toHaveText("Earlier steps (1)");
+    await expect(history).not.toHaveAttribute("open", "");
+    await expect(panel.getByText(QUESTION)).toBeHidden();
+    await history.locator("summary").click();
+    await expect(panel.getByText(QUESTION)).toBeVisible();
+    // No calculation, solver, reading or source ID anywhere in the panel.
+    expect(await panel.innerText()).not.toMatch(/\bc\d+\b|solver\.|read\.|src\.|torque_nm/);
+    expect((await new AxeBuilder({ page }).include("#learn-side").withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations.map((v) => v.id)).toEqual([]);
   });
 
   test("with reduced motion the welcome goes at once", async ({ page }) => {

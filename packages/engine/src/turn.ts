@@ -11,6 +11,7 @@ import { createFakeRouter, type Router, type RouterReply, type RouterRequest } f
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
 import { openPrompt } from "./pedagogy";
 import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
+import { explainTurn, type TurnExplanation } from "./explanation";
 
 // One turn, end to end (docs/m2-plan.md slice 5):
 //   shortlist → director → validateDirectorResponse → validatePedagogy → solver → compile → events.
@@ -27,7 +28,8 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
   | { type: "action"; action: DirectorResponse["actions"][number] }
   | { type: "calc.result"; calc_id: string; outputs: Record<string, number> }
   | { type: "prompt"; text: string; parts: TextPart[]; chips: string[] }
-  | { type: "turn.done"; move: DirectorResponse["move"] }
+  /** The move, and what the text panel shows for this turn (labelled values and titles; no IDs). */
+  | { type: "turn.done"; move: DirectorResponse["move"]; explanation: TurnExplanation }
   | { type: "turn.error"; reason: TurnFailure; message: string; details: string[] }
 );
 
@@ -458,7 +460,8 @@ export class TurnSession {
       narration: r.narration.map((n) => ({ id: n.id, text: fill(n.text), parts: partsOf(n.text) })),
       prompt: r.prompt ? { text: fill(r.prompt.text), parts: partsOf(r.prompt.text), chips: r.prompt.chips.map(fill) } : null,
     };
-    const unfilled = [...compiled.narration.map((n) => n.text), compiled.prompt?.text ?? "", ...(compiled.prompt?.chips ?? [])].find((t) => /\{\{/.test(t));
+    const explanation = explainTurn(r, this.opts.registry, results, fill, formatNumber);
+    const unfilled = [...compiled.narration.map((n) => n.text), compiled.prompt?.text ?? "", ...(compiled.prompt?.chips ?? []), ...explanation.assumptions, ...explanation.limitations].find((t) => /\{\{/.test(t));
     if (unfilled) return fail("solver", [`a placeholder had no calculated value: "${unfilled}"`]);
 
     // Emit the whole turn, in order. An interrupt between events drops the rest.
@@ -478,7 +481,7 @@ export class TurnSession {
     };
     if (rev !== this.rev) return;
     this.state = next;
-    send({ type: "turn.done", move: r.move });
+    send({ type: "turn.done", move: r.move, explanation });
   }
 }
 

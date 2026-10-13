@@ -6,6 +6,8 @@ import { ContentBadge } from "@/components/ContentBadge";
 import { useLearnUi, type SideView } from "@/state/learnUi";
 import { explanationAt } from "@/lesson/runner";
 import { useLesson } from "@/lesson/store";
+import { useTurnLog, type LoggedTurn } from "@/turn/turnLog";
+import { CalcIcon, CaptionText } from "./CalcText";
 import { SAMPLE_EXPLANATION, SAMPLE_READINGS } from "./sampleContent";
 import styles from "./learn.module.css";
 
@@ -93,6 +95,9 @@ function ExplanationView() {
   const beats = useLesson((s) => s.beats);
   const status = useLesson((s) => s.status);
   const beatIndex = useLesson((s) => s.beatIndex);
+  const turns = useTurnLog((s) => s.turns);
+  // Turns (live, or the fake director's) take the panel while no prepared lesson is running.
+  if (turns.length && status === "idle") return <TurnsView turns={turns} />;
   const lesson = beats && status !== "idle" ? explanationAt(beats, beatIndex) : null;
   if (beats && status !== "idle" && !lesson) {
     return (
@@ -128,6 +133,123 @@ function ExplanationView() {
         ))}
       </ul>
     </>
+  );
+}
+
+/**
+ * The current step by default (split attention, layout doc §1); earlier steps below, collapsed.
+ * Every value is labelled with its unit and marked as calculated; no calculation ID is ever shown.
+ */
+function TurnsView({ turns }: { turns: LoggedTurn[] }) {
+  const current = turns.at(-1)!;
+  const earlier = turns.slice(0, -1).reverse();
+  return (
+    <>
+      <TurnView turn={current} heading="This step" />
+      {earlier.length > 0 && (
+        <details className={styles.history}>
+          <summary>Earlier steps ({earlier.length})</summary>
+          {earlier.map((t, i) => (
+            <TurnView key={t.rev} turn={t} heading={`Step ${earlier.length - i}`} />
+          ))}
+        </details>
+      )}
+    </>
+  );
+}
+
+const fidelityText = (f: string) => {
+  const t = f.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+function TurnView({ turn, heading }: { turn: LoggedTurn; heading: string }) {
+  const x = turn.explanation;
+  return (
+    <div className={styles.turnStep}>
+      <p className={styles.captionBadges}>
+        {turn.source === "live" ? (
+          <>
+            <ContentBadge kind="live" />
+            <ContentBadge kind="fixture-content" />
+          </>
+        ) : (
+          <ContentBadge kind="fixture" />
+        )}
+      </p>
+      <h3 className={styles.stepTitle}>{heading}</h3>
+      {turn.lines.map((l, i) => (
+        <p key={i}>{l.parts ? <CaptionText parts={l.parts} /> : l.text}</p>
+      ))}
+      {turn.question && (
+        <>
+          <h4 className={styles.listTitle}>Question</h4>
+          <p>{turn.question.parts ? <CaptionText parts={turn.question.parts} /> : turn.question.text}</p>
+        </>
+      )}
+      {x.calculations.length > 0 && (
+        <>
+          <h4 className={styles.listTitle}>Calculated values</h4>
+          {x.calculations.map((c, i) => (
+            <div key={i} className={styles.calcBlock}>
+              <p className={styles.sampleNote}>
+                {c.title} · {fidelityText(c.fidelity)}
+              </p>
+              <dl className={styles.calcList}>
+                {c.outputs.map((o) => (
+                  <div key={o.label + o.unit}>
+                    <dt>{o.label}</dt>
+                    <dd>
+                      <span className={styles.calc} data-calculated="">
+                        <CalcIcon />
+                        {o.value}
+                        {o.unit && ` ${o.unit}`}
+                        <span className={styles.srOnly}>, calculated</span>
+                      </span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {c.inputs.length > 0 && (
+                <p className={styles.calcInputs}>
+                  Using: {c.inputs.map((v) => `${v.label.toLowerCase()} ${v.value}${v.unit ? ` ${v.unit}` : ""}`).join(", ")}.
+                </p>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+      {x.evidence.length > 0 && (
+        <>
+          <h4 className={styles.listTitle}>Evidence</h4>
+          <ul>
+            {x.evidence.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {x.assumptions.length > 0 && (
+        <>
+          <h4 className={styles.listTitle}>Assumptions</h4>
+          <ul>
+            {x.assumptions.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {x.limitations.length > 0 && (
+        <>
+          <h4 className={styles.listTitle}>Where this stops applying</h4>
+          <ul>
+            {x.limitations.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
 

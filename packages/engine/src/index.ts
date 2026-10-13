@@ -18,5 +18,6 @@ export * from "./providerDirector";
 export * from "./providerRouter";
 export * from "./prompt";
 export * from "./teaching";
+export * from "./explanation";
 export * from "./providers";
 export * from "./bakeoff";

@@ -1,4 +1,4 @@
-import { admit, nextRevision, type GateState, type TextPart, type TurnEvent } from "@aili/engine";
+import { admit, nextRevision, type GateState, type TextPart, type TurnEvent, type TurnExplanation } from "@aili/engine";
 
 // Client side of a fake-director turn (M2 slice 6). Pure: the hook in 6b feeds it stream events and
 // applies what it returns (speech, captions, stage actions, a restore). Every event passes the
@@ -23,6 +23,8 @@ export interface TurnClientState<Snapshot> {
   actions: Array<Extract<TurnEvent, { type: "action" }>["action"]>;
   calcs: Array<{ calc_id: string; outputs: Record<string, number> }>;
   prompt: { text: string; parts: TextPart[]; chips: string[] } | null;
+  /** The text panel's content, sent with turn.done. */
+  explanation: TurnExplanation | null;
   /** One plain line: the error, "Stopped." or the dropped connection. */
   message: string | null;
 }
@@ -34,10 +36,10 @@ export type TurnClientAction<Snapshot> =
   | { type: "streamEnded" };
 
 export function initialTurnClient<S>(): TurnClientState<S> {
-  return { gate: { rev: 0, lastSeq: -1 }, status: "idle", turnId: null, snapshot: null, restoreTo: null, narration: [], actions: [], calcs: [], prompt: null, message: null };
+  return { gate: { rev: 0, lastSeq: -1 }, status: "idle", turnId: null, snapshot: null, restoreTo: null, narration: [], actions: [], calcs: [], prompt: null, explanation: null, message: null };
 }
 
-const cleared = (): Pick<TurnClientState<unknown>, "narration" | "actions" | "calcs" | "prompt"> => ({ narration: [], actions: [], calcs: [], prompt: null });
+const cleared = (): Pick<TurnClientState<unknown>, "narration" | "actions" | "calcs" | "prompt" | "explanation"> => ({ narration: [], actions: [], calcs: [], prompt: null, explanation: null });
 
 export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<S>): TurnClientState<S> {
   switch (a.type) {
@@ -62,7 +64,7 @@ export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<
         case "prompt":
           return { ...t, prompt: { text: e.text, parts: e.parts, chips: e.chips } };
         case "turn.done":
-          return { ...t, status: "done", snapshot: null };
+          return { ...t, status: "done", snapshot: null, explanation: e.explanation };
         case "turn.error":
           return { ...t, ...cleared(), status: "error", restoreTo: t.snapshot, snapshot: null, message: e.message };
       }
