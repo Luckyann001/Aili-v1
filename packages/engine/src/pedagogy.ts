@@ -90,7 +90,11 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   // Exception: re-offering the open question itself is not a new question (see reoffersOpenQuestion).
   const open = openPrompt(h);
   const reoffer = reoffersOpenQuestion(r, h, teaching);
-  if (asks && open && !reoffer)
+  // A teach-back question on the open reading is the follow-up to the question asked when that reading
+  // was assigned ("could you explain it after reading?"), and replaces it (Lucky's decision 2026-10-13, s08).
+  const teachBackFollowUp =
+    !!open && r.move === "teach_back" && !!r.reading && teaching.open_items.some((o) => o.kind === "reading" && o.ref === r.reading && o.opened_turn === open.turn);
+  if (asks && open && !reoffer && !teachBackFollowUp)
     fail("one-open-question", `a prompt is still open from turn ${open.turn} and unanswered; answer or close it before asking another (or re-offer that same prediction, with its id)`);
 
   // 2. Never two questions in a row without giving something back.

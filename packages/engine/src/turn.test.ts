@@ -506,3 +506,29 @@ describe("a guess on an open prediction is never pushback (Lucky's decision 2026
     expect(effectivePushback({ pushback: true, guess: null }, { ...h, entries: [] })).toBe(false);
   });
 });
+
+describe("a teach-back question follows up the open reading's question (Lucky's decision 2026-10-13, s08 turn 2)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const run = async (turn2: object) => {
+    const answers: Record<string, object> = {
+      turn_1: { move: "assign", reading: "read.fx-moments", calc_requests: [], narration: [{ id: "n1", text: "One reading on moments." }], prompt: { kind: "question", text: "After reading, could you explain the moment arm in your own words", chips: ["Yes", "Not sure"] } },
+      turn_2: { calc_requests: [], narration: [{ id: "n1", text: "Go ahead." }], ...turn2 },
+    };
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...answers[req.request_id] } }; } };
+    // the router does not count "I read it. Can I explain it back?" as answering turn 1's question
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: false }] }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Is there something I can read about turning forces?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "I read it. Can I explain it back to you?" }, (e) => events.push(e));
+    return { s, events };
+  };
+  it("the teach-back question (reading filled in) replaces the open question: shown, and pending", async () => {
+    const { s, events } = await run({ move: "teach_back", prompt: { kind: "question", text: "Explain the moment arm in your own words", chips: [] } });
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(s.state.teaching!.pending_teach_back).toBe("read.fx-moments");
+  });
+  it("any other new question while it is open is still rejected", async () => {
+    const { events } = await run({ move: "explain", prompt: { kind: "question", text: "What else would you like to know", chips: [] } });
+    expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
+  });
+});
