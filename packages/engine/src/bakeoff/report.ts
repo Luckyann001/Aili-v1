@@ -1,4 +1,4 @@
-import { NARRATION_SPLIT } from "../director";
+import { EMPTY_ANSWER, NARRATION_SPLIT } from "../director";
 import { OPEN_QUESTION_REOFFERED } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
@@ -21,6 +21,22 @@ const FAMILIES: Array<[string, (id: string) => boolean]> = [
   ["o — out of coverage", (id) => /^o\d/.test(id)],
   ["others (s spec, x safety)", (id) => !/^[cfjo]\d/.test(id)],
 ];
+
+/** A first-attempt error as a named cause, for the "Repair causes" section. */
+export function repairCause(error: string): string {
+  if (error === EMPTY_ANSWER) return "empty or action-only answer";
+  if (/^rule ([a-z-]+)/.test(error)) return `pedagogy: ${/^rule ([a-z-]+)/.exec(error)![1]}`;
+  if (/characters, at most/.test(error)) return "narration too long";
+  if (/segments, at most/.test(error)) return "too many narration segments";
+  if (/hard-coded number/.test(error)) return "hard-coded number";
+  if (/move "probe" asks/.test(error)) return "probe without a prompt";
+  if (/question marks in/.test(error)) return "more than one question in the prompt";
+  if (/asks a question; a question goes only in prompt/.test(error)) return "question outside the prompt";
+  if (/^concepts/.test(error)) return "concepts";
+  if (/^evidence/.test(error)) return "evidence";
+  if (/^prompt\.chips/.test(error)) return "prediction choices";
+  return error.split(":")[0]!.replace(/\[\d+\]/g, "[]");
+}
 
 export interface Metrics {
   turns: number;
@@ -52,6 +68,8 @@ export interface Metrics {
   reoffered: number;
   /** Turns where the engine split a long narration segment at sentence boundaries. */
   narration_split: number;
+  /** Turns whose FIRST answer was empty or action-only (no narration and no prompt). */
+  empty_first: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -109,6 +127,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
     router_missed: turns.filter((t) => t.router_missed_answer).length,
+    empty_first: turns.filter((t) => t.checks.find((c) => c.attempt === 1)?.errors.includes(EMPTY_ANSWER)).length,
     narration_split: turns.filter((t) => t.warnings.some((w) => w.startsWith(NARRATION_SPLIT))).length,
     reoffered: turns.filter((t) => t.warnings.some((w) => w.startsWith(OPEN_QUESTION_REOFFERED))).length,
   };
@@ -153,6 +172,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
     `| Open questions re-offered (instead of a new question) | ${m.reoffered} |`,
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
+    `| Empty or action-only first answers (no narration, no prompt) | ${m.empty_first} |`,
     "",
     "## By scenario family",
     "",
@@ -167,6 +187,17 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     (() => {
       const without = metrics(result.records.filter((r) => !/^[fo]\d/.test(r.scenario.id)).flatMap((r) => r.turns));
       return `First-attempt pass rate (both validators): ${pct(...m.first_try_both)} overall; ${pct(...without.first_try_both)} without the f and o families.`;
+    })(),
+    "",
+    "## Repair causes",
+    "",
+    "First-attempt errors that led to a repair (or a failure), grouped; one answer can have several.",
+    "",
+    ...(() => {
+      const causes: Record<string, number> = {};
+      for (const t of all) for (const e of t.checks.find((c) => c.attempt === 1 && c.outcome !== "pass")?.errors ?? []) causes[repairCause(e)] = (causes[repairCause(e)] ?? 0) + 1;
+      const rows = Object.entries(causes).sort((a, b) => b[1] - a[1]);
+      return rows.length ? ["| Cause | Count |", "|---|---|", ...rows.map(([k, v]) => `| ${k} | ${v} |`)] : ["- none"];
     })(),
     "",
     "## Failures",

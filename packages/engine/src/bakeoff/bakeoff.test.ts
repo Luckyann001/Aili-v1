@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AiConfig } from "@aili/schemas";
 import { fixtureRegistry } from "../__fixtures__/registry";
 import { directorResponseJsonSchema, professorPrompt, shortlist, ProviderDirector, ProviderRouter, RecordedProvider, type Recording } from "../index";
-import { CapGuardProvider, concedes, divergence, leakedNumbers, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
+import { CapGuardProvider, concedes, repairCause, divergence, leakedNumbers, liveRefusals, mentionsArmWeight, metrics, RecordingProvider, runBakeoff, Scenario, summaryMarkdown, transcriptMarkdown, type RunDeps } from "./index";
 
 // The bake-off harness (docs/m3-plan.md slice 7a), in recorded mode only: no model, key or network.
 
@@ -337,5 +337,25 @@ describe("summary by scenario family (Lucky's decision 2026-10-13)", () => {
     expect(md).toMatch(/\| others \(s spec, x safety\) \| 1 \| 1 \| 0% \(0\/1\)/);
     // s03 needed a repair (0/1 first try), o1 passed first try (1/1)
     expect(md).toContain("First-attempt pass rate (both validators): 50% (1/2) overall; 0% (0/1) without the f and o families.");
+  });
+});
+
+describe("empty first answers are counted (Lucky's decision 2026-10-13)", () => {
+  it("counts turns whose first check found an empty or action-only answer", async () => {
+    const { EMPTY_ANSWER } = await import("../director");
+    const turn = (errors: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [{ attempt: 1, outcome: "validation", errors, warnings: [] }, { attempt: 2, outcome: "pass", errors: [], warnings: [] }], warnings: [], expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    expect(metrics([turn([EMPTY_ANSWER]), turn(["narration[0].text: 230 characters, at most 200"])]).empty_first).toBe(1);
+  });
+});
+
+describe("repair causes (Lucky's decision 2026-10-13)", () => {
+  it("names the causes seen in the bake-offs", async () => {
+    const { EMPTY_ANSWER } = await import("../director");
+    expect(repairCause(EMPTY_ANSWER)).toBe("empty or action-only answer");
+    expect(repairCause("narration[2].text: 218 characters, at most 200")).toBe("narration too long");
+    expect(repairCause('assumptions[3]: hard-coded number "0" — numbers must come from a solver')).toBe("hard-coded number");
+    expect(repairCause('prompt.text: 2 question marks in "A? B?"; one open question at a time')).toBe("more than one question in the prompt");
+    expect(repairCause("rule one-open-question (turn 2): a prompt is still open")).toBe("pedagogy: one-open-question");
+    expect(repairCause('concepts: a prediction prompt needs the concept it tests')).toBe("concepts");
   });
 });
