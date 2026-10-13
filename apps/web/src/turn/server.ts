@@ -2,7 +2,8 @@ import { createFakeDirector, createFakeRouter, encodeEvent, InMemoryLedger, InMe
 import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
-import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, logCheck } from "./live";
+import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, logCheck, summarizeAttempt } from "./live";
+import { logLiveTurn, type LoggedAttempt } from "./sessionLog";
 
 // Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Two modes:
 // - the fake director (NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1): no provider, no key, no network;
@@ -76,6 +77,12 @@ export async function handleTurn(request: Request): Promise<Response> {
   const start = sessions.get(req.session_id) ?? fresh();
   // Live: the case field is ignored; the turn budget comes from config (turn and attempt timeouts).
   const live = m === "live" ? liveTurnParts(aiConfig.data) : null;
+  // Live only: what the local session log keeps for this turn (slice 5).
+  const startedAt = new Date();
+  const attempts: LoggedAttempt[] = [];
+  const sent: TurnEvent[] = [];
+  let routed: Record<string, unknown> | null = null;
+  const terminalLog = logCheck(req.session_id, req.state_rev);
   const session = new TurnSession({
     registry,
     director: live ? live.director : createFakeDirector(req.case, { slowMs: SLOW_MS }),
@@ -84,7 +91,15 @@ export async function handleTurn(request: Request): Promise<Response> {
     concepts: live ? LIVE_CONCEPTS : ["mech.torque.static"],
     level: live ? LIVE_LEVEL : "L2",
     startRev: req.state_rev - 1,
-    ...(live ? { onCheck: logCheck(req.session_id, req.state_rev) } : { timeoutMs: TIMEOUT_MS }),
+    ...(live
+      ? {
+          onCheck: (c: Parameters<typeof terminalLog>[0]) => {
+            terminalLog(c);
+            attempts.push({ attempt: c.attempt, outcome: c.outcome, summary: summarizeAttempt(c.raw), errors: c.errors, warnings: c.warnings });
+          },
+          onRoute: (r: { classification: object }) => (routed = { ...r.classification }),
+        }
+      : { timeoutMs: TIMEOUT_MS }),
     // The kill switch is read on every request (server-only env, so it can be flipped without a rebuild).
     meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env), ...(live ? { live: live.live } : {}) },
   });
@@ -96,6 +111,7 @@ export async function handleTurn(request: Request): Promise<Response> {
       running.set(key, session);
       inFlight.set(req.session_id, session);
       const emit = (e: TurnEvent) => {
+        if (live) sent.push(e);
         try {
           controller.enqueue(enc.encode(encodeEvent(e)));
         } catch {
@@ -108,7 +124,15 @@ export async function handleTurn(request: Request): Promise<Response> {
         if (session.state !== start) sessions.commit(req.session_id, req.state_rev, session.state);
       } finally {
         // Live cost to the dev server's terminal (no learner text, no key): this turn and this page session.
-        if (live) console.error(`[live] session ${req.session_id.slice(0, 8)} turn ${req.state_rev}: ${((ledger.spent(req.session_id) - spentBefore) / 1e6).toFixed(4)} USD, page session ${(ledger.spent(req.session_id) / 1e6).toFixed(4)} USD`);
+        if (live) {
+          console.error(`[live] session ${req.session_id.slice(0, 8)} turn ${req.state_rev}: ${((ledger.spent(req.session_id) - spentBefore) / 1e6).toFixed(4)} USD, page session ${(ledger.spent(req.session_id) / 1e6).toFixed(4)} USD`);
+          // The local session log (laptop only, git-ignored). A failure to write never breaks the turn.
+          try {
+            logLiveTurn(req.session_id, { rev: req.state_rev, startedAt, latencyMs: Date.now() - startedAt.getTime(), learnerText: req.input.text, router: routed, attempts, events: sent, costMicroUsd: ledger.spent(req.session_id) - spentBefore, sessionCostMicroUsd: ledger.spent(req.session_id) });
+          } catch (err) {
+            console.error(`[live] the session log could not be written: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
         running.delete(key);
         if (inFlight.get(req.session_id) === session) inFlight.delete(req.session_id);
         try {

@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSseParser, RecordedProvider, type Recording, type TurnEvent } from "@aili/engine";
 import realConfig from "../../../../config/ai.json";
@@ -21,6 +23,8 @@ const load = async (o: { config?: object } = {}) => {
   if (o.config) vi.doMock("../../../../config/ai.json", () => ({ default: { ...realConfig, ...o.config } }));
   const server = await import("./server");
   const live = await import("./live");
+  // Tests never write into the real live-sessions/ folder.
+  (await import("./sessionLog")).sessionLogDeps.dir = () => join(tmpdir(), "aili-live-sessions-test");
   const sent: string[] = [];
   live.liveDeps.provider = (_config, model) => {
     sent.push(model);
@@ -132,5 +136,44 @@ describe("POST /api/turn in live mode", () => {
     expect(errorText(await run({ env: { AILI_PROFESSOR_API_KEY: " " } }))).toMatch(/aren't set up on this computer/);
     expect(errorText(await run({ config: { provider_monthly_limit_set: null } }))).toMatch(/until a monthly spending limit is set/);
     expect(errorText(await run({ config: { session_cap_micro_usd: 1 } }))).toMatch(/reached its limit for live answers/);
+  });
+});
+
+describe("the local session log (slice 5): live turns only, laptop only", () => {
+  it("a live turn appends learner text, the answer as shown, router, attempts with rejection reasons, cost and latency; never the key", async () => {
+    const { handleTurn } = await load();
+    const { sessionLogDeps } = await import("./sessionLog");
+    const dir = mkdtempSync(join(tmpdir(), "aili-live-sessions-"));
+    sessionLogDeps.dir = () => dir;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await readAll(await handleTurn(post(body())));
+    log.mockRestore();
+    const files = readdirSync(dir);
+    expect(files).toHaveLength(1);
+    const text = readFileSync(join(dir, files[0]!), "utf8");
+    expect(text).toMatch(/^# Live session live-tes/);
+    expect(text).toContain("**Learner:** What is a servo, and why does holding an arm out make it work harder?");
+    expect(text).toMatch(/- says: /);
+    expect(text).toMatch(/- done \(move /);
+    expect(text).toMatch(/\*\*Router:\*\* /);
+    expect(text).toMatch(/- attempt 1: validation · move=explain/);
+    expect(text).toMatch(/  - rejected: /);
+    expect(text).toMatch(/- attempt 2: pass/);
+    expect(text).toMatch(/## Turn 1 · .* · \d+\.\d s · \d+\.\d{4} USD \(session \d+\.\d{4} USD\)/);
+    expect(text).not.toContain("placeholder-not-a-key");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("fake-director turns write nothing", async () => {
+    vi.resetModules();
+    vi.stubEnv("AILI_LIVE", "");
+    vi.stubEnv("NEXT_PUBLIC_AILI_FAKE_DIRECTOR", "1");
+    const { handleTurn } = await import("./server");
+    const { sessionLogDeps } = await import("./sessionLog");
+    const dir = mkdtempSync(join(tmpdir(), "aili-live-sessions-"));
+    sessionLogDeps.dir = () => dir;
+    await readAll(await handleTurn(post({ ...body(), case: "valid" })));
+    expect(readdirSync(dir)).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

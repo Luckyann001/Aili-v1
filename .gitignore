@@ -24,3 +24,6 @@ bakeoff-runs/
 
 # screenshots saved by e2e for review (apps/web/screenshots)
 screenshots/
+
+# local live-session logs (laptop only; npm run live-sessions:delete removes them)
+live-sessions/
