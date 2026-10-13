@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, matchOpenChoice, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
@@ -424,6 +424,51 @@ describe("frustration releases the open question (spec A4/A5; Lucky's decision 2
   it("without frustration, a new question while one is open is still rejected", async () => {
     const { events } = await run2("Something else entirely", "question", [{}, { answered_prompt: false, frustrated: false }]);
     expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
+  });
+});
+
+describe("a reply that is exactly one of the open choices is that choice (Lucky's decision 2026-10-13, the \"Easier\" bug)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const CHIPS = ["Easier", "Harder", "No different", "Not sure"];
+  // Turn 2 after a guess: the calculation and the reveal, as the prediction rule asks. After a
+  // released question: a simpler, new question.
+  const REVEAL = { move: "explain", prompt: undefined, reveal: { prediction: "p-turn-1", calc: "c1", outcome: "not_as_predicted" } };
+  const SIMPLER = { narration: [{ id: "n1", text: "Fewer words, then." }], calc_requests: [], prompt: { text: "Is it harder or easier far from your hand?", chips: ["Harder", "Easier", "Not sure"], kind: "question" } };
+  const run2 = async (reply: string, routerTurn2: Partial<import("@aili/schemas").ReplyClassification>, second: object) => {
+    const director: Director = {
+      async respond(req) {
+        const first = { move: "probe", calc_requests: [], narration: [{ id: "n1", text: "Let's test an idea first." }], prompt: { text: "Sliding the weight farther out: easier, harder, or no different to hold?", chips: CHIPS, kind: "prediction" } };
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.request_id === "turn_1" ? first : second) } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script: [{}, routerTurn2] }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "teach me robotics" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: reply }, (e) => events.push(e));
+    return { s, events };
+  };
+
+  it("\"Easier\" (a chip) read by the router as frustrated pushback: answered, a guess, no frustration or pushback", async () => {
+    const { s, events } = await run2("easier!", { answered_prompt: false, frustrated: true, pushback: true, guess: null }, REVEAL);
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(s.state.history.entries[2]).toMatchObject({ kind: "learner", answered_prompt: true, frustrated: false, pushback: false, released_prompt: false });
+    expect(s.state.teaching!.predictions[0]).toMatchObject({ guess: "Easier", status: "revealed" });
+  });
+
+  it("\"simpler please\" is not a choice label: the router's frustration still releases the question", async () => {
+    const { s, events } = await run2("simpler please", { answered_prompt: false, frustrated: true }, SIMPLER);
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(s.state.history.entries[2]).toMatchObject({ answered_prompt: false, frustrated: true, released_prompt: true });
+    expect(s.state.teaching!.predictions[0]).toMatchObject({ guess: null, status: "released" });
+  });
+
+  it("matches the whole label only, ignoring case and punctuation", () => {
+    const c = { answered_prompt: false, pushback: true, new_evidence: false, frustrated: true, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null, wants_direct_answer: false };
+    const labels = ["It gets easier", "It gets harder", "Not sure"];
+    expect(matchOpenChoice(c, "  it gets EASIER. ", labels)).toMatchObject({ answered_prompt: true, guess: "It gets easier", frustrated: false, pushback: false });
+    expect(matchOpenChoice(c, "Not sure", labels).guess).toBe("Not sure");
+    for (const t of ["easier", "it gets easier, I think", "", "!!"]) expect(matchOpenChoice(c, t, labels), t).toBe(c);
+    expect(matchOpenChoice(c, "It gets easier", undefined)).toBe(c); // no open question
   });
 });
 

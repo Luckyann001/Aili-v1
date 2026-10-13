@@ -112,6 +112,20 @@ export function effectivePushback(c: Pick<ReplyClassification, "pushback" | "gue
   return c.pushback && c.guess === null && history.entries.some((e) => e.kind === "aili");
 }
 
+/** Lowercase, punctuation removed, spaces collapsed: "It gets easier!" and "it gets easier" match. */
+const normalizeChoice = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+
+/**
+ * A reply that is exactly one of the open prompt's choices (ignoring case and punctuation) IS that
+ * choice: answered, a guess, and never frustration or pushback, whatever the router read into it
+ * (Lucky's decision 2026-10-13, after "Easier" was read as "make it simpler").
+ */
+export function matchOpenChoice(c: ReplyClassification, text: string, choices: readonly string[] | undefined): ReplyClassification {
+  const said = normalizeChoice(text);
+  const choice = said ? choices?.find((ch) => normalizeChoice(ch) === said) : undefined;
+  return choice === undefined ? c : { ...c, answered_prompt: true, guess: choice, frustrated: false, pushback: false };
+}
+
 /** The open prompt's text, kind and choices, when the stored last prompt is the one still open. */
 function openQuestion(s: SessionState): RouterRequest["open_question"] {
   const open = openPrompt(s.history);
@@ -297,8 +311,8 @@ export class TurnSession {
     if (rev !== this.rev) return;
     const classified = ReplyClassification.safeParse(routed.classification);
     if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
-    const c = classified.data;
-    this.opts.onRoute?.({ classification: c, question_open: openPrompt(before.history) !== null });
+    this.opts.onRoute?.({ classification: classified.data, question_open: openPrompt(before.history) !== null });
+    const c = matchOpenChoice(classified.data, input.text, openQuestion(before)?.choices);
     const history: SessionHistory = {
       ...before.history,
       entries: [
