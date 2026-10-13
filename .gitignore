@@ -21,3 +21,6 @@ test-results/
 playwright-report/
 packages/engine/.script-build/
 bakeoff-runs/
+
+# screenshots saved by e2e for review (apps/web/screenshots)
+screenshots/

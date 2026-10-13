@@ -26,6 +26,8 @@ export interface StageSnapshot {
   fixture: boolean;
   /** Whether that earlier turn was a live one. */
   live: boolean;
+  /** Whether a turn had already put a scene on stage (live mode's dimmed opening state). */
+  scenePicked: boolean;
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
@@ -45,7 +47,7 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
 };
 
 function restoreStage(snap: StageSnapshot) {
@@ -54,6 +56,7 @@ function restoreStage(snap: StageSnapshot) {
   s.setLeverDistance(snap.leverDistance_m);
   s.highlight(snap.selectedId);
   useStageContent.getState().setFixture(snap.fixture, snap.live);
+  useStageContent.getState().setScenePicked(snap.scenePicked);
 }
 
 function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: boolean) {
@@ -61,7 +64,10 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
   switch (a.type) {
     case "select_scene": {
       const model = FIXTURE_SCENE_MODEL[a.scene] ?? (a.scene in MODELS ? (a.scene as SceneId) : null);
-      if (model) s.setScene(model);
+      if (model) {
+        s.setScene(model);
+        useStageContent.getState().setScenePicked(true);
+      }
       break;
     }
     case "highlight_part":

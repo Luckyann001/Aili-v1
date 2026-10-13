@@ -27,7 +27,6 @@ export function CommandBar({
   offer,
   note,
   chipsSend = false,
-  label = "Ask Aili or answer",
 }: {
   text: string;
   onText: (text: string) => void;
@@ -39,8 +38,6 @@ export function CommandBar({
   note?: string;
   /** Aili's quick replies send at once (live turns) instead of filling the text box. */
   chipsSend?: boolean;
-  /** The text box's label and placeholder. */
-  label?: string;
 }) {
   const inputId = useId();
   const noteId = useId();
@@ -82,7 +79,7 @@ export function CommandBar({
         <VoiceButton placement="bar" onPress={onVoice} />
 
         <label htmlFor={inputId} className={styles.srOnly}>
-          {label}
+          Ask Aili or answer
         </label>
         <input
           ref={inputRef}
@@ -90,7 +87,7 @@ export function CommandBar({
           className={styles.input}
           value={text}
           onChange={(e) => onText(e.target.value)}
-          placeholder={label.endsWith("?") ? label : `${label}…`}
+          placeholder="Ask Aili or answer…"
           aria-describedby={note ? noteId : undefined}
           autoComplete="off"
         />

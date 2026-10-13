@@ -26,6 +26,7 @@ import { EffortGauge } from "./scene/EffortGauge";
 import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
 import { IconTool } from "./IconTool";
+import { LiveWelcome } from "./LiveWelcome";
 import { PlaceholderBadge } from "./PlaceholderBadge";
 import { Inspector } from "./scene/Inspector";
 import { PartsMenu } from "./scene/PartsMenu";
@@ -42,7 +43,8 @@ const SPACE_OWNERS =
 
 // Learn stage (M1). Replies are a prepared demo line, badged "Prepared". On Lucky's laptop with live
 // mode on (`npm run dev:live`, docs/m3-live-browser-plan.md), typed messages go to the live professor
-// instead: demo mode A, an empty "What do you want to learn?" box and no prepared lesson offered.
+// instead: demo mode A, a centred "What do you want to learn?" over the dimmed stage, no prepared
+// lesson offered, and no stage badge until a turn puts a scene on stage.
 const LIVE_NOTE = "Live AI: your message goes to a real AI model, on test-fixture content only.";
 export function LearnStage() {
   const side = useLearnUi((s) => s.side);
@@ -96,7 +98,12 @@ export function LearnStage() {
   // Live mode, from the server (null until it answers). It takes over the text box, so the
   // fake-director demo's case buttons are off (in live mode they would reach the real model).
   const live = useLiveMode();
-  const [askedLive, setAskedLive] = useState(false);
+  const [welcomeGone, setWelcomeGone] = useState(false);
+  const scenePicked = useStageContent((s) => s.scenePicked);
+  const showWelcome = live === true && !welcomeGone;
+  // Live mode: the stage is dimmed, with no badge or scene tools, until a turn picks a scene.
+  const dimmed = live === true && !scenePicked;
+  const sceneUi = shown && !dimmed;
   // Fake-director demo (testing only): ?demo=1 in a build with both testing flags.
   const fakeDemo = demo && FAKE_DIRECTOR && live === false;
   const demoTurn = useDemoTurn(voice, live === true);
@@ -170,21 +177,21 @@ export function LearnStage() {
   return (
     <div className={styles.learn} data-side={side ?? "closed"}>
       <h1 className={styles.srOnly}>Learn stage</h1>
-      <section className={styles.stage} aria-label="Stage">
+      <section className={styles.stage} aria-label="Stage" data-dimmed={dimmed ? "" : undefined}>
         {shown && <SceneViewport safeArea={safeArea} labels={labelEls} />}
 
         <div className={styles.stageTop}>
           <div className={styles.topRow}>
             <div className={styles.topLeft}>
-              {shown && <PlaceholderBadge />}
-              {shown && <PartsMenu />}
+              {sceneUi && <PlaceholderBadge />}
+              {sceneUi && <PartsMenu />}
             </div>
             <div className={styles.sceneTools} role="group" aria-label="View">
-              {shown && <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />}
-              {shown && MODELS[activeScene].explodable && (
+              {sceneUi && <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />}
+              {sceneUi && MODELS[activeScene].explodable && (
                 <IconTool label="Exploded view" icon={<ExplodeIcon />} aria-pressed={exploded} onClick={toggleExploded} />
               )}
-              {shown && <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />}
+              {sceneUi && <IconTool label="Reset view" icon={<ResetIcon />} onClick={resetView} />}
               <IconTool
                 label="Explanation"
                 icon={<TextIcon />}
@@ -214,6 +221,20 @@ export function LearnStage() {
             </>
           )}
         </div>
+
+        {showWelcome && (
+          <LiveWelcome
+            note={LIVE_NOTE}
+            text={text}
+            onText={setText}
+            inputRef={inputRef}
+            onSubmit={(t) => void demoTurn.start("valid", t)}
+            onGone={() => {
+              setWelcomeGone(true);
+              requestAnimationFrame(focusInput); // the bottom input takes over
+            }}
+          />
+        )}
 
         <div className={styles.overlay}>
           {(hint || error) && (
@@ -271,26 +292,24 @@ export function LearnStage() {
         </div>
       </section>
 
+      {!showWelcome && (
       <CommandBar
         text={text}
         onText={setText}
         onSubmit={
           live
-            ? (t) => {
-                setAskedLive(true);
-                void demoTurn.start("valid", t); // the case is ignored by the live route
-              }
+            ? (t) => void demoTurn.start("valid", t) // the case is ignored by the live route
             : fakeDemo
               ? (t) => void demoTurn.start("valid", t)
               : voice.submit
         }
         note={live ? LIVE_NOTE : fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
         chipsSend={live === true}
-        label={live && !askedLive ? "What do you want to learn?" : undefined}
         onVoice={() => void voice.press()}
         inputRef={inputRef}
         offer={offer}
       />
+      )}
 
       {side && <SidePanel view={side} returnFocusTo={lastTrigger} />}
 

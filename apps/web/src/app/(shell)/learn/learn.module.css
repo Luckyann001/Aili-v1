@@ -1078,3 +1078,79 @@
   color: var(--aili-text);
   font: 500 0.875rem var(--aili-font-ui);
 }
+
+/* Live mode's opening state (demo Option A): the stage is dimmed until a turn picks a scene, and a
+   calm, centred "What do you want to learn?" sits over it until the first message. */
+.canvasHost,
+.scene {
+  transition: opacity var(--aili-duration-spatial) var(--aili-ease-out);
+}
+
+.stage[data-dimmed] .canvasHost,
+.stage[data-dimmed] .scene {
+  opacity: 0.3;
+}
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: var(--aili-space-4);
+  pointer-events: none;
+  transition:
+    opacity var(--aili-duration-ui) var(--aili-ease-out),
+    transform var(--aili-duration-ui) var(--aili-ease-out);
+}
+
+.welcome[data-leaving] {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+.welcomeCard {
+  pointer-events: auto;
+  display: grid;
+  gap: var(--aili-space-3);
+  width: min(100%, 620px);
+  padding: var(--aili-space-6);
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  box-shadow: 0 2px 14px rgb(0 0 0 / 0.08);
+}
+
+.welcomeTitle {
+  margin: 0;
+  font: 500 clamp(1.6rem, 4.5vw, 2.25rem) / 1.15 var(--aili-font-display);
+  text-align: center;
+}
+
+.welcomeNote {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--aili-space-2);
+  margin: 0;
+  font: 500 0.875rem var(--aili-font-ui);
+  text-align: center;
+}
+
+.welcomeNote > svg {
+  flex: none;
+  margin-top: 0.2em;
+  color: var(--aili-accent);
+}
+
+.welcomeRow {
+  display: flex;
+  flex-wrap: wrap; /* with large text, Send moves below rather than squeezing the box */
+  gap: var(--aili-space-2);
+}
+
+@media (max-width: 599px) {
+  .welcomeCard {
+    padding: var(--aili-space-4);
+  }
+}

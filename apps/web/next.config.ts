@@ -18,6 +18,8 @@ const nextConfig = (phase: string): NextConfig => ({
   partialPrefetching: true,
   reactCompiler: true,
   allowedDevOrigins: lanHost ? [lanHost] : [],
+  // Live mode (`npm run dev:live`): no dev indicator over the input or in recordings.
+  ...(process.env.AILI_LIVE === "1" ? { devIndicators: false as const } : {}),
   turbopack: {
     resolveAlias: {
       "aili-turn-fixtures": fakeDirector || (phase === PHASE_DEVELOPMENT_SERVER && process.env.AILI_LIVE === "1") ? "./src/turn/fixtureRegistry.ts" : "./src/turn/noFixtureRegistry.ts",
