@@ -299,6 +299,8 @@ export class TurnSession {
         {
           kind: "learner",
           answered_prompt: c.answered_prompt,
+          // Frustration releases an open question that was not answered (spec A4; Lucky's decision 2026-10-13).
+          released_prompt: c.frustrated && !c.answered_prompt && openPrompt(before.history) !== null,
           // Pushback needs a position to push against: on a first turn (no earlier Aili turn) the
           // router's flag is ignored (Lucky's decision 2026-10-12, after s05 turn 1).
           pushback: c.pushback && before.history.entries.some((e) => e.kind === "aili"),

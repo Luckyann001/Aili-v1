@@ -33,7 +33,7 @@ export function openPrompt(h: SessionHistory): { turn: number } | null {
     if (e.kind === "aili") {
       turn++;
       if (e.asked) open = turn;
-    } else if (e.answered_prompt) open = null;
+    } else if (e.answered_prompt || e.released_prompt) open = null; // answered, or released on frustration
   }
   return open === null ? null : { turn: open };
 }

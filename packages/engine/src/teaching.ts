@@ -17,6 +17,11 @@ export function applyLearnerReply(t: TeachingState, c: ReplyClassification, toda
     predictions = predictions.map((p) => (p === open ? { ...p, guess: null, status: "unsure" as const } : p));
     open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === open.id));
   } else if (open && c.guess !== null) predictions = predictions.map((p) => (p === open ? { ...p, guess: c.guess, status: "guessed" as const } : p));
+  else if (open && c.frustrated) {
+    // Frustration releases the open prediction: closed without a guess, so a simpler question may follow (spec A4).
+    predictions = predictions.map((p) => (p === open ? { ...p, status: "released" as const } : p));
+    open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === open.id));
+  }
   let waivers = t.waivers;
   let safety_acks = t.safety_acks ?? [];
   if (c.acknowledged) {

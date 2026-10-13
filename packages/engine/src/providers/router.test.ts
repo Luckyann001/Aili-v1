@@ -131,3 +131,11 @@ describe("router.v1: short replies count as answers (Lucky's decision 2026-10-12
     expect(s).not.toContain("<!--");
   });
 });
+
+describe("router.v1: very short confused replies count as frustrated (spec A5; Lucky's decision 2026-10-13)", () => {
+  it("says so, with one format-only example in different words", () => {
+    const s = assembleRouterPrompt(ROUTER, { text: "x", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }).system;
+    expect(s).toMatch(/Very short confused replies \("huh", "\?", "what"\) count as frustrated too\./);
+    expect(s).toMatch(/Example \(format only\): open_question "Have you ever used a soldering iron\?", reply "eh\?\?" gives frustrated true\./);
+  });
+});

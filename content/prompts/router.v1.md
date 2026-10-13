@@ -11,7 +11,8 @@ Set each field from the learner's message alone, using the session state only fo
   Example (format only): open_question "Have you ever used a soldering iron?", reply "Once, at school." gives answered_prompt true. <!-- Lucky's decision 2026-10-12: one example, on a different topic -->
 - pushback: true if the learner disagrees with something Aili said. <!-- behavior spec A11 -->
 - new_evidence: true only if the disagreement brings something new: a named source, a measurement, or a worked calculation. Repeating the claim, or saying it more firmly, is not evidence. <!-- behavior spec A11, A14 test 5 -->
-- frustrated: "I don't know" again, very short dismissive replies, "just tell me", or plain signs of frustration. <!-- behavior spec A5, A6, A14 test 6 -->
+- frustrated: "I don't know" again, very short dismissive replies, "just tell me", or plain signs of frustration. Very short confused replies ("huh", "?", "what") count as frustrated too. <!-- behavior spec A5 ("very short replies"), A6, A14 test 6; Lucky's decision 2026-10-13 -->
+  Example (format only): open_question "Have you ever used a soldering iron?", reply "eh??" gives frustrated true. <!-- Lucky's decision 2026-10-13: one example, in different words -->
 - wants_another_example: the learner asks for another example or a different analogy. <!-- behavior spec B4, A14 test 17 -->
 - acknowledged: the learner explicitly acknowledges or accepts a warning or a waiver ("I understand", "I accept"). A vague "ok" is not an acknowledgement. <!-- behavior spec A9 waivers -->
 - guess: if a prediction is open, the one choice the learner picked, copied exactly from the listed choices; otherwise null. If the message does not clearly pick one listed choice, null. <!-- behavior spec A4 prediction -> test -> reveal -->

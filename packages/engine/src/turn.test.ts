@@ -188,7 +188,7 @@ describe("the router classifies the reply on the server", () => {
 });
 
 describe("session store (in memory)", () => {
-  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null })) } });
+  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null, released_prompt: false })) } });
 
   it("commits only a newer revision; an older turn finishing late cannot overwrite it", () => {
     const st = new InMemorySessionStore();
@@ -348,7 +348,7 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
   it.each(["Not sure", "I don't know", "idk", "No idea."])("\"%s\" closes the prediction as unsure, with no reveal or calculation required", async (reply) => {
     const { applyLearnerReply } = await import("./teaching");
     const t = { predictions: [{ id: "p1", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], guess: null, status: "open" as const }], open_items: [{ kind: "prediction" as const, ref: "p1", opened_turn: 1 }], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
-    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: reply, wants_stop: false, asks_for_source: null };
+    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: reply, wants_stop: false, asks_for_source: null, released_prompt: false };
     const after = applyLearnerReply(t, c, "2026-10-13");
     expect(after.predictions[0]).toMatchObject({ status: "unsure", guess: null });
     expect(after.open_items).toEqual([]);
@@ -357,7 +357,7 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
   it("a real choice is still a guess, which must be tested and revealed", async () => {
     const { applyLearnerReply } = await import("./teaching");
     const t = { predictions: [{ id: "p1", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], guess: null, status: "open" as const }], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
-    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: "More", wants_stop: false, asks_for_source: null };
+    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: "More", wants_stop: false, asks_for_source: null, released_prompt: false };
     expect(applyLearnerReply(t, c, "2026-10-13").predictions[0]).toMatchObject({ status: "guessed", guess: "More" });
   });
 
@@ -376,5 +376,53 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
     await s.run({ text: "idk" }, (e) => events.push(e));
     expect(events.at(-1)).toMatchObject({ type: "turn.done", move: "explain" });
     expect(s.state.teaching!.predictions[0]).toMatchObject({ id: "p-turn-1", status: "unsure" });
+  });
+});
+
+describe("frustration releases the open question (spec A4/A5; Lucky's decision 2026-10-13)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const run2 = async (reply: string, firstKind: "question" | "prediction", script?: Array<Partial<import("@aili/schemas").ReplyClassification>>) => {
+    const director: Director = {
+      async respond(req) {
+        const first = { prompt: { text: "Weight far out or close in: which is harder to hold?", chips: ["Far out", "Close in", "Not sure"], kind: firstKind } };
+        // turn 2: a simpler, NEW question with different choices (the f3 / f2 cases)
+        const second = { narration: [{ id: "n1", text: "Let's make it smaller." }], calc_requests: [], prompt: { text: "Is it harder or easier far from your hand?", chips: ["Harder", "Easier", "Not sure"], kind: "question" } };
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.request_id === "turn_1" ? first : second) } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Why is it hard?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: reply }, (e) => events.push(e));
+    return { s, events };
+  };
+  it("f3: \"I'm confused\" flagged frustrated releases the open question; a simpler new question passes", async () => {
+    // the fake router flags frustration on "just tell me"/"I don't know"; force it as the live router did for f3
+    const director: Director = {
+      async respond(req) {
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.request_id === "turn_1" ? {} : { narration: [{ id: "n1", text: "Fewer words, then." }], calc_requests: [], prompt: { text: "Harder or easier far out?", chips: ["Harder", "Easier", "Not sure"], kind: "question" } }) } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: false, frustrated: true }] }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Why is it hard?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "I'm confused, that was too many words." }, (e) => events.push(e));
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(s.state.history.entries[2]).toMatchObject({ kind: "learner", frustrated: true, released_prompt: true });
+  });
+  it("f2: \"huh\" counts as frustrated (fake router, spec A5) and releases the open question", async () => {
+    const { s, events } = await run2("huh", "question");
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(s.state.history.entries[2]).toMatchObject({ frustrated: true, released_prompt: true });
+  });
+  it("an open prediction is released too (status released, out of open items)", async () => {
+    const { s, events } = await run2("?", "prediction");
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(s.state.teaching!.predictions[0]).toMatchObject({ status: "released" });
+    expect(s.state.teaching!.open_items).toEqual([]);
+  });
+  it("without frustration, a new question while one is open is still rejected", async () => {
+    const { events } = await run2("Something else entirely", "question", [{}, { answered_prompt: false, frustrated: false }]);
+    expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
   });
 });

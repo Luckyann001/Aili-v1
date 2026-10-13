@@ -38,10 +38,11 @@ export const FAKE_ROUTER_USAGE: TokenUsage = { model: "router", input_tokens: 30
 
 /**
  * FAKE ROUTER, for tests and the demo only. Fixed rules, not language understanding:
- * - answered_prompt: a question is open and the reply is not empty;
+ * - answered_prompt: a question is open and the reply is not empty (and not a confused "huh");
  * - pushback: the reply starts with "no", "but", "I disagree" or "that's wrong";
  * - new_evidence: pushback that mentions a source, a datasheet, a measurement or a calculation;
- * - frustrated: starts with "I don't know", "idk", "no idea" or "just tell me";
+ * - frustrated: starts with "I don't know", "idk", "no idea" or "just tell me", or is a very short
+ *   confused reply ("huh", "?", "what", "eh", spec A5);
  * - wants_another_example: mentions "another example", "another analogy" or "different example";
  * - acknowledged: starts with "I understand", "I acknowledge", "understood" or "I accept";
  * - guess: for an open prediction, the choice whose text matches the reply exactly (any case);
@@ -57,12 +58,13 @@ export function createFakeRouter(opts: { usage?: TokenUsage; script?: Array<Part
       r.calls++;
       if (scripted === "fail") throw new Error("fake router failure (scripted)");
       const text = req.text.trim();
+      const confused = /^(huh|what|eh|\?+)[?!.]*$/i.test(text); // a very short confused reply: frustrated, not an answer (spec A5)
       const pushback = /^(no\b|but\b|i disagree|that'?s wrong|that is wrong)/i.test(text);
       const base: ReplyClassification = {
-        answered_prompt: req.open_prompt && text.length > 0,
+        answered_prompt: req.open_prompt && text.length > 0 && !confused,
         pushback,
         new_evidence: pushback && /\b(source|datasheet|measured|measurement|calculated|calculation)\b/i.test(text),
-        frustrated: /^(i don'?t know|idk|no idea|just tell me)/i.test(text),
+        frustrated: /^(i don'?t know|idk|no idea|just tell me)/i.test(text) || confused,
         wants_another_example: /\b(another (example|analogy)|different example)\b/i.test(text),
         acknowledged: /^(i understand|i acknowledge|understood|i accept)/i.test(text),
         guess: req.prediction_choices?.find((c) => c.toLowerCase() === text.toLowerCase()) ?? null,

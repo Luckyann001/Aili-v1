@@ -50,6 +50,11 @@ export const LearnerTurn = z
     wants_stop: z.boolean().default(false),
     /** A source the learner named ("chapter 7 of X"), for the "I can't verify that" check. */
     asks_for_source: z.string().min(1).nullable().default(null),
+    /**
+     * The learner was frustrated while a question was open: the question is released (closed without
+     * an answer) so a simpler new one may be asked (behavior spec A4; Lucky's decision 2026-10-13).
+     */
+    released_prompt: z.boolean().default(false),
   })
   .strict();
 
@@ -98,7 +103,8 @@ export const Prediction = z
     question: z.string().min(1).optional(),
     guess: z.string().min(1).nullable(),
     /** "unsure": the learner answered "Not sure" / "I don't know"; not a guess, so nothing to reveal (spec A1a). */
-    status: z.enum(["open", "guessed", "revealed", "unsure"]),
+    /** "released": the learner was frustrated while it was open; closed without a guess (spec A4). */
+    status: z.enum(["open", "guessed", "revealed", "unsure", "released"]),
     outcome: z.enum(["as_predicted", "not_as_predicted", "learner_unsure"]).optional(),
   })
   .strict();
