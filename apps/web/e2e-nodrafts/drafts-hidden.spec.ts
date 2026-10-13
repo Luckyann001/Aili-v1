@@ -62,6 +62,14 @@ test("the fake-director routes return 404", async ({ request }) => {
   expect((await request.post("/api/turn/interrupt", { data: { session_id: "nodrafts-0001", request_id: "turn_1", state_rev: 1 } })).status()).toBe(404);
 });
 
+// Live turns are laptop-only dev (docs/m3-live-browser-plan.md): this server runs with AILI_LIVE=1
+// (playwright.nodrafts.config.ts) and must still refuse it.
+test("live mode is off in production even with AILI_LIVE=1", async ({ request }) => {
+  const status = await request.get("/api/live");
+  expect(status.status()).toBe(200);
+  expect(await status.json()).toEqual({ live: false });
+});
+
 test("the production build contains nothing from content/robotics/test-fixtures", async () => {
   const { filesWithFixtureText } = await import("../e2e/fixture-text");
   expect(filesWithFixtureText(".next-nodrafts")).toEqual([]);

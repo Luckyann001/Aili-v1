@@ -2,14 +2,18 @@ import { createFakeDirector, createFakeRouter, encodeEvent, InMemoryLedger, InMe
 import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
+import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts } from "./live";
 
-// Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Fake director only:
-// no provider, no key, no network. Without NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1 both return 404, and
-// the fixture registry import below is folded away at build time.
+// Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Two modes:
+// - the fake director (NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1): no provider, no key, no network;
+// - live (AILI_LIVE=1, a dev server on this laptop only, local requests only; see live.ts): the
+//   provider-backed director and router, with the kill switch, live key checks and session cap.
+// Live wins when both are on. With neither, both routes return 404.
 
-// "aili-turn-fixtures" is a build-time alias (next.config.ts): the real fixture registry only when the
-// flag is set, otherwise a stub with no fixture data, so production builds never contain the files.
-const loadFixtureRegistry = FAKE_DIRECTOR ? () => import("aili-turn-fixtures") : null;
+// "aili-turn-fixtures" is a build-time alias (next.config.ts): the real fixture registry only for the
+// fake-director flag or a live dev server, otherwise a stub with no fixture data, so production
+// builds never contain the files.
+const loadFixtureRegistry = () => import("aili-turn-fixtures");
 
 // Prices and the session cap come only from config/ai.json, validated once at start-up.
 const aiConfig = AiConfig.safeParse(aiConfigJson);
@@ -42,9 +46,17 @@ const running = new Map<string, TurnSession>();
 
 const notFound = () => new Response("Not found", { status: 404 });
 const badRequest = (issues: string[]) => Response.json({ error: "bad request", issues }, { status: 400 });
+const notLocal = () => Response.json({ error: "Live answers only take requests from this computer." }, { status: 403 });
+
+/** Which mode answers this request, or the response that refuses it. */
+function mode(request: Request): "live" | "fake" | Response {
+  if (liveEnabled()) return isLocalRequest(request) ? "live" : notLocal();
+  return FAKE_DIRECTOR ? "fake" : notFound();
+}
 
 export async function handleTurn(request: Request): Promise<Response> {
-  if (!loadFixtureRegistry) return notFound();
+  const m = mode(request);
+  if (m instanceof Response) return m;
   let body: unknown;
   try {
     body = await request.json();
@@ -62,18 +74,21 @@ export async function handleTurn(request: Request): Promise<Response> {
   // A newer turn from the same page stops the older one (its state is never committed).
   inFlight.get(req.session_id)?.interrupt();
   const start = sessions.get(req.session_id) ?? fresh();
+  // Live: the case field is ignored; the turn budget comes from config (turn and attempt timeouts).
+  const live = m === "live" ? liveTurnParts(aiConfig.data) : null;
   const session = new TurnSession({
     registry,
-    director: createFakeDirector(req.case, { slowMs: SLOW_MS }),
-    router: createFakeRouter(),
+    director: live ? live.director : createFakeDirector(req.case, { slowMs: SLOW_MS }),
+    router: live ? live.router : createFakeRouter(),
     state: start,
-    concepts: ["mech.torque.static"],
-    level: "L2",
+    concepts: live ? LIVE_CONCEPTS : ["mech.torque.static"],
+    level: live ? LIVE_LEVEL : "L2",
     startRev: req.state_rev - 1,
-    timeoutMs: TIMEOUT_MS,
+    ...(live ? {} : { timeoutMs: TIMEOUT_MS }),
     // The kill switch is read on every request (server-only env, so it can be flipped without a rebuild).
-    meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env) },
+    meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env), ...(live ? { live: live.live } : {}) },
   });
+  const spentBefore = ledger.spent(req.session_id);
   const key = `${req.session_id}/turn_${req.state_rev}`;
   const enc = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -92,6 +107,8 @@ export async function handleTurn(request: Request): Promise<Response> {
         // Only a completed turn changes the session's state; an older turn finishing late cannot.
         if (session.state !== start) sessions.commit(req.session_id, req.state_rev, session.state);
       } finally {
+        // Live cost to the dev server's terminal (no learner text, no key): this turn and this page session.
+        if (live) console.error(`[live] session ${req.session_id.slice(0, 8)} turn ${req.state_rev}: ${((ledger.spent(req.session_id) - spentBefore) / 1e6).toFixed(4)} USD, page session ${(ledger.spent(req.session_id) / 1e6).toFixed(4)} USD`);
         running.delete(key);
         if (inFlight.get(req.session_id) === session) inFlight.delete(req.session_id);
         try {
@@ -111,7 +128,8 @@ export async function handleTurn(request: Request): Promise<Response> {
 }
 
 export async function handleInterrupt(request: Request): Promise<Response> {
-  if (!FAKE_DIRECTOR) return notFound();
+  const m = mode(request);
+  if (m instanceof Response) return m;
   let body: unknown;
   try {
     body = await request.json();

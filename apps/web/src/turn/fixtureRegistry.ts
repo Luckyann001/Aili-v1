@@ -12,8 +12,12 @@ import fxSim from "../../../../content/robotics/test-fixtures/sim.fx-servo-load.
 import fxSource from "../../../../content/robotics/test-fixtures/src.fx-book.json";
 import fxReading from "../../../../content/robotics/test-fixtures/read.fx-moments.json";
 import fxDraft from "../../../../content/robotics/test-fixtures/read.fx-draft.json";
+import fxLeverBasics from "../../../../content/robotics/test-fixtures/read.fx-lever-basics.json";
+import fxWrench from "../../../../content/robotics/test-fixtures/analogy.fx-long-wrench.json";
+import fxBag from "../../../../content/robotics/test-fixtures/analogy.fx-shopping-bag.json";
 
-// The dev-only registry for the fake director: real content (all draft) plus the test fixtures.
+// The dev-only registry for the fake director and live dev turns: real content (all draft) plus
+// every test fixture (the same files as the bake-off's registry).
 // Loaded only through `loadFixtureRegistry` in server.ts, which exists only when the flag is set,
 // so a production build never includes these files.
 export function fixtureTurnRegistry() {
@@ -25,7 +29,7 @@ export function fixtureTurnRegistry() {
         { file: "lever-analogy.json", data: lever },
         { file: "test-fixtures/scene.fx-lever.json", data: fxScene },
       ],
-      capabilities: [solver, sim, srcUp1, srcCp2, fxSolver, fxSim, fxSource, fxReading, fxDraft].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
+      capabilities: [solver, sim, srcUp1, srcCp2, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
     },
     { allowTestFixtures: true },
   );

@@ -4,7 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 // .env.local value), in its own output folder and port. Checks that draft scenes stay hidden.
 const PORT = 3300;
 // The fake-director and demo-tools flags are pinned off too, as in a real production deployment.
-const ENV = "AILI_DIST_DIR=.next-nodrafts NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=0 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=0 NEXT_PUBLIC_AILI_DEMO_TOOLS=0";
+// AILI_LIVE is pinned ON on purpose: a production build and server must refuse live mode anyway.
+const ENV = "AILI_DIST_DIR=.next-nodrafts NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=0 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=0 NEXT_PUBLIC_AILI_DEMO_TOOLS=0 AILI_LIVE=1";
 
 export default defineConfig({
   testDir: "e2e-nodrafts",

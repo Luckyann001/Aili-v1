@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "dev:lan": "AILI_LAN_HOST=$(hostname -I | cut -d\" \" -f1) next dev -H 0.0.0.0",
+    "dev:live": "AILI_LIVE=1 next dev -H 127.0.0.1",
     "test:e2e": "playwright test",
     "test:e2e:nodrafts": "playwright test -c playwright.nodrafts.config.ts"
   },
