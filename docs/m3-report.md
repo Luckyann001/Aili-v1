@@ -32,8 +32,11 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
   are clean.
 - **Live runs** (Anthropic only: Sonnet 5.5 professor, Haiku 5.5 router), test-fixture content:
   - **All 28 scenarios at each one's latest result:** **100% after repair** (50 of 50 turns),
-    **76% first attempt** (38 of 50). Caveat: s08's latest run covers only turns 1–2 (the cost cap
-    stopped it); its turns 3–4 have not run since the fix that made turn 2 pass.
+    **76% first attempt** (38 of 50). Caveat: s08's latest runs cover only turns 1–2. It was run
+    twice after its fix (13 Oct, 15:28 and 16:02); turn 2 passed both times (once first try, once after
+    a repair), and both times the cost cap stopped the run before turn 3. The bake-off's pre-turn check
+    assumes about 0.10 USD worst case per turn, so a 0.15–0.20 USD cap cannot reach turn 4. Turns 3–4
+    have not run since the fix.
   - **Cost:** about **0.024 USD per turn** at verified list prices. **Latency:** median **6.3 s**;
     the slowest turn in the latest results took 18.2 s, the slowest seen in any run 30.3 s (under the
     45 s turn budget).
@@ -48,7 +51,7 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
   - **No hard-coded number reached a learner** and no held position was given up without evidence in
     any run (automatic stop checks, plus reading the confident-but-wrong transcripts).
 - **Spend:** the engine's own ledger matched the provider Console (2.77 USD) to within 0.003 USD when
-  compared; the ledger total since the first live call is now about **4.09 USD**.
+  compared; the ledger total since the first live call is now about **4.15 USD**.
 
 ## What was NOT verified
 
