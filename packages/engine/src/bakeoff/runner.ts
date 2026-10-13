@@ -1,5 +1,6 @@
 import type { AiConfig, DirectorResponse, RuntimeModel } from "@aili/schemas";
 import { shortlist, type Registry } from "../capabilities";
+import { checkNarration } from "../narration";
 import { InMemoryLedger, worstCaseTurnCost, type LedgerEntry } from "../metering";
 import { PROMPT_BUDGET_TOKENS } from "../prompt";
 import type { Router } from "../router";
@@ -131,12 +132,17 @@ export function divergence(after: ScenarioAfter | undefined, prev: DirectorRespo
   return null;
 }
 
-/** Digits in shown text outside calculated values (narration and prompt text parts, and choices). */
+/**
+ * Shown text with a hard-coded number, judged by the validator's own number check (checkNarration,
+ * with the same allow-list: 3D/2D and the count adjectives), on the text outside calculated values
+ * (narration and prompt text parts, and choices). Lucky's decision 2026-10-13: one rule, not two.
+ */
 export function leakedNumbers(events: readonly TurnEvent[]): string[] {
   const out: string[] = [];
+  const leaks = (t: string) => checkNarration(t, []).some((e) => e.includes("hard-coded number"));
   for (const e of events) {
-    if (e.type === "narration" || e.type === "prompt") for (const p of e.parts) if ("text" in p && /\d/.test(p.text)) out.push(p.text);
-    if (e.type === "prompt") for (const c of e.chips) if (/\d/.test(c)) out.push(c);
+    if (e.type === "narration" || e.type === "prompt") for (const p of e.parts) if ("text" in p && leaks(p.text)) out.push(p.text);
+    if (e.type === "prompt") for (const c of e.chips) if (leaks(c)) out.push(c);
   }
   return out;
 }

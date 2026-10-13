@@ -359,3 +359,14 @@ describe("repair causes (Lucky's decision 2026-10-13)", () => {
     expect(repairCause('concepts: a prediction prompt needs the concept it tests')).toBe("concepts");
   });
 });
+
+describe("the leaked-number stop uses the validator's own number check (Lucky's decision 2026-10-13)", () => {
+  const ev = (text: string) => ({ turn_id: "t", seq: 1, rev: 1, type: "narration", id: "n1", text, parts: [{ text }] }) as never;
+  it("the o1 sentence with a count adjective (6-axis) is not a leak", () => {
+    expect(leakedNumbers([ev("Inverse kinematics for a 6-axis arm isn't something I can teach yet.")])).toEqual([]);
+  });
+  it("a real number is still a leak, as the validator would reject it", () => {
+    expect(leakedNumbers([ev("It needs 2.5 newton-metres.")])).toEqual(["It needs 2.5 newton-metres."]);
+    expect(leakedNumbers([ev("A 12-axis machine.")])).toEqual(["A 12-axis machine."]);
+  });
+});
