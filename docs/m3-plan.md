@@ -90,6 +90,13 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **Count adjectives are not numbers:** a fixed list (N-axis, N-DOF, N-link, N-wheel(ed), N-joint, with N one digit; plus 3D/2D). Nothing the learner typed is exempted.
     - **Report:** "most questions in a row" resets per scenario; the summary groups results by scenario family and gives the first-attempt pass rate with and without the f and o families.
 
+26. **After the frustration fixes (Oct 13 2026), decided by Lucky:**
+    - **Frustration releases the open question** (spec A4): a frustrated reply while a question is open closes it ("released"), so a simpler new question is allowed. The router counts very short confused replies ("huh", "?", "what") as frustrated (spec A5).
+    - **Direct answers:** the router flags `wants_direct_answer` ("just tell me", "no questions", a plain factual question). That turn is checked under the Answer-posture rules: no prompt, no prediction, assumptions stated and a source cited; an offer may be stated, never asked.
+    - **Backlog (a later decision, tied to spec A2):** a session-level posture switch (Learning to Answer) when the learner keeps asking for direct answers. Spec A2 has posture confirmed with the learner; not built.
+    - **Prompt:** a prompt contains exactly one question mark, no "does that make sense?" checks.
+    - **Bake-off stop check:** the leaked-number stop uses the validator's own number check and allow-list.
+
 ## Design summary
 
 - **Provider adapter:**
