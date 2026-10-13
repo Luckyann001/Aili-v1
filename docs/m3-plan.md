@@ -114,6 +114,8 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **A teach-back question on the open reading** follows up the question asked when the reading was assigned, and replaces it (s08).
     - **reveal.calc** must be one calculation ID, with an exact repair message.
 
+30. **Narration split up to five segments** (Oct 13 2026, decided by Lucky): an answer the engine splits may have five segments if the whole narration is 700 characters or less; the model's own answers stay at four; one sentence over 200 is still rejected (the c1, j1 and f1 failures were four-segment answers with one long segment).
+
 ## Design summary
 
 - **Provider adapter:**
