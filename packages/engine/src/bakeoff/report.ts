@@ -13,6 +13,15 @@ const quantile = (xs: number[], q: number) => {
   return s[Math.min(s.length - 1, Math.ceil(q * s.length) - 1)]!;
 };
 
+/** Scenario families by id prefix: c (confident but wrong), f (frustration), j (just tell me), o (out of coverage), s and x (spec, safety). */
+const FAMILIES: Array<[string, (id: string) => boolean]> = [
+  ["c — confident but wrong", (id) => /^c\d/.test(id)],
+  ["f — frustration", (id) => /^f\d/.test(id)],
+  ["j — just tell me", (id) => /^j\d/.test(id)],
+  ["o — out of coverage", (id) => /^o\d/.test(id)],
+  ["others (s spec, x safety)", (id) => !/^[cfjo]\d/.test(id)],
+];
+
 export interface Metrics {
   turns: number;
   completed: number;
@@ -150,6 +159,21 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
     `| Open questions re-offered (instead of a new question) | ${m.reoffered} |`,
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
+    "",
+    "## By scenario family",
+    "",
+    "| Family | Scenarios | Turns | 1st try (both) | After repair | Failures | Cost |",
+    "|---|---|---|---|---|---|---|",
+    ...FAMILIES.map(([name, test]) => {
+      const recs = result.records.filter((r) => test(r.scenario.id));
+      const f = metrics(recs.flatMap((r) => r.turns));
+      return `| ${name} | ${recs.length} | ${f.turns} | ${pct(...f.first_try_both)} | ${pct(...f.after_repair)} | ${movesText(f.failures)} | ${usd(recs.reduce((s, r) => s + r.cost_micro_usd, 0))} |`;
+    }),
+    "",
+    (() => {
+      const without = metrics(result.records.filter((r) => !/^[fo]\d/.test(r.scenario.id)).flatMap((r) => r.turns));
+      return `First-attempt pass rate (both validators): ${pct(...m.first_try_both)} overall; ${pct(...without.first_try_both)} without the f and o families.`;
+    })(),
     "",
     "## Failures",
     "",

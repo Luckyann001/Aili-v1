@@ -336,3 +336,16 @@ describe("narration splits are counted (Lucky's decision 2026-10-13)", () => {
     expect(m.warnings_by_type).toEqual({ "narration split": 1 });
   });
 });
+
+describe("summary by scenario family (Lucky's decision 2026-10-13)", () => {
+  it("groups by c, f, j, o and others, and gives the first-try rate with and without f and o", async () => {
+    const recs = { "s03-true-beginner": recording("s03-true-beginner"), "o1-inverse-kinematics": recording("o1-inverse-kinematics") };
+    const r = await runBakeoff([byId("s03-true-beginner"), byId("o1-inverse-kinematics")], 1, deps(recs));
+    const md = summaryMarkdown(r, { mode: "recorded", started: "now", models: "x" });
+    expect(md).toContain("## By scenario family");
+    expect(md).toMatch(/\| o — out of coverage \| 1 \| 1 \| 100% \(1\/1\)/);
+    expect(md).toMatch(/\| others \(s spec, x safety\) \| 1 \| 1 \| 0% \(0\/1\)/);
+    // s03 needed a repair (0/1 first try), o1 passed first try (1/1)
+    expect(md).toContain("First-attempt pass rate (both validators): 50% (1/2) overall; 0% (0/1) without the f and o families.");
+  });
+});
