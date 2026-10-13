@@ -29,7 +29,16 @@ const STEPS: Record<string, { label: string; apply: (s: Schema) => Schema }> = {
   e: { label: "minimal base only", apply: (s) => without(s, Object.keys(s.properties).filter((k) => !BASE.includes(k))) },
   f: { label: "without calc_requests[].simulation", apply: (s) => withoutCalcSimulation(s) },
   g: { label: "actions flattened (one shape: type list + optional fields)", apply: (s) => flattenActions(s) },
+  h: { label: "prediction carries its question and choices", apply: (s) => predictionWithQuestion(s) },
 };
+
+/** The prediction object with a required question (string) and choices (string list), as fix 1 proposes. */
+function predictionWithQuestion(s: Schema): Schema {
+  const pred = structuredClone(s.properties.prediction) as Schema;
+  pred.properties = { ...pred.properties, question: { type: "string" }, choices: { type: "array", items: { type: "string" } } };
+  pred.required = [...pred.required, "question", "choices"];
+  return { ...s, properties: { ...s.properties, prediction: pred } };
+}
 
 function withoutCalcSimulation(s: Schema): Schema {
   const calc = structuredClone(s.properties.calc_requests) as { items: Schema };
