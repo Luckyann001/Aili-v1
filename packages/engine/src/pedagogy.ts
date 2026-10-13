@@ -49,6 +49,12 @@ export interface PedagogyContext {
   unlistedSource?: string;
   /** Whether the shortlist has any verified reading to point to. */
   libraryAvailable?: boolean;
+  /**
+   * The router flagged that the learner wants a direct answer this turn ("just tell me", "no questions",
+   * a plain factual question): the turn is checked under the Answer-posture rules, with no prompt
+   * (Lucky's decision 2026-10-13). The session's posture does not change.
+   */
+  directAnswer?: boolean;
   phrases?: { flattery: readonly string[]; mastery: readonly string[]; meta_talk?: readonly string[] };
 }
 
@@ -113,8 +119,10 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
     if (used) fail("challenge-budget", `turn ${used.n} already challenged; at most one challenge in three turns unless safety is true`);
   }
 
-  // 6. Answer posture: no quiz and no challenge (a safety challenge is still allowed, spec A4).
-  if (h.posture === "answer" && NOT_IN_ANSWER_POSTURE.has(r.move) && !(r.move === "challenge" && r.safety))
+  // 6. Answer posture (for the session, or this turn when a direct answer was asked for): no quiz and
+  //    no challenge (a safety challenge is still allowed, spec A4).
+  const answerMode = h.posture === "answer" || !!ctx.directAnswer;
+  if (answerMode && NOT_IN_ANSWER_POSTURE.has(r.move) && !(r.move === "challenge" && r.safety))
     fail("answer-posture", `move "${r.move}" quizzes or challenges; in the Answer posture use "answer" or "explain"`);
 
   // 7. No flattery, no mastery claims, anywhere Aili speaks or writes.
@@ -215,10 +223,18 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
 
   // 19. Answer posture (spec A2, A14 test 1): a direct answer, no prediction quiz; a calculated
   //     answer states its assumptions and cites a source when the library has one.
-  if (h.posture === "answer") {
+  if (answerMode) {
     if (r.prompt?.kind === "prediction") fail("answer-posture", `no prediction quiz in the Answer posture`);
     if (r.calc_requests.length > 0 && r.assumptions.length === 0) fail("answer-posture", `a calculated answer states its assumptions`);
     if (r.calc_requests.length > 0 && ctx.libraryAvailable && r.evidence.length === 0) fail("answer-posture", `a calculated answer cites a source from the library (evidence)`);
+  }
+
+  // 20. A direct answer was asked for this turn (Lucky's decision 2026-10-13): no prompt (an offer may
+  //     be stated in narration, never asked), and the answer states its assumptions and cites a source.
+  if (ctx.directAnswer) {
+    if (r.prompt) fail("direct-answer", `the learner asked for a direct answer: no "prompt" this turn; you may state an offer in narration, without a question`);
+    if (r.assumptions.length === 0) fail("direct-answer", `a direct answer states its assumptions ("assumptions")`);
+    if (ctx.libraryAvailable && r.evidence.length === 0) fail("direct-answer", `a direct answer cites a source from the library ("evidence")`);
   }
 
   return errors;

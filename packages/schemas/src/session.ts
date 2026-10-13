@@ -86,6 +86,11 @@ export const ReplyClassification = z
     guess: z.string().min(1).nullable().default(null),
     wants_stop: z.boolean().default(false),
     asks_for_source: z.string().min(1).nullable().default(null),
+    /**
+     * The learner wants a direct answer this turn: "just tell me", "no questions", or a plain factual
+     * question. The turn is then checked under the Answer-posture rules (Lucky's decision 2026-10-13).
+     */
+    wants_direct_answer: z.boolean().default(false),
   })
   .strict();
 export type ReplyClassification = z.infer<typeof ReplyClassification>;

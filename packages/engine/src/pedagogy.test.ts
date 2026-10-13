@@ -204,3 +204,29 @@ describe("re-offering an open plain question (Lucky's decision 2026-10-13)", () 
     expect(validatePedagogy(ask({}), openH, {}).join()).toMatch(/one-open-question/); // nothing stored to compare with
   });
 });
+
+describe("direct answer asked for this turn (router wants_direct_answer; Lucky's decision 2026-10-13)", () => {
+  const ctx = { directAnswer: true, libraryAvailable: true };
+  const ok = { move: "answer", narration: [{ id: "n1", text: "Torque is force times moment arm. I can run the numbers for your arm." }], assumptions: ["static hold only"], evidence: ["read.fx-moments"] };
+  const h = hist([]);
+  it("a direct answer with assumptions and a source, and an offer stated (not asked), passes", () => {
+    expect(validatePedagogy(resp(ok), h, {}, ctx)).toEqual([]);
+  });
+  it("any prompt is rejected (the j1 case: an offer asked as a question)", () => {
+    const r = resp({ ...ok, prompt: { text: "Want to see it with a real arm?", chips: ["Yes, run one", "Not now"], kind: "question" } });
+    expect(validatePedagogy(r, h, {}, ctx).join()).toMatch(/rule direct-answer \(turn 1\): the learner asked for a direct answer: no "prompt" this turn/);
+  });
+  it("missing assumptions, or no source while the library has one, is rejected", () => {
+    expect(validatePedagogy(resp({ ...ok, assumptions: [] }), h, {}, ctx).join()).toMatch(/a direct answer states its assumptions/);
+    expect(validatePedagogy(resp({ ...ok, evidence: [] }), h, {}, ctx).join()).toMatch(/a direct answer cites a source/);
+    expect(validatePedagogy(resp({ ...ok, evidence: [] }), h, {}, { directAnswer: true, libraryAvailable: false })).toEqual([]);
+  });
+  it("the Answer-posture rules apply for the turn: no quiz or challenge move, no prediction", () => {
+    expect(validatePedagogy(resp({ ...ok, move: "probe" }), h, {}, ctx).join()).toMatch(/answer-posture/);
+    expect(validatePedagogy(resp({ ...ok, prompt: { text: "Which?", chips: ["A", "Not sure"], kind: "prediction" } }), h, {}, ctx).join()).toMatch(/no prediction quiz in the Answer posture/);
+  });
+  it("without the flag, the same prompt is fine in the learning posture", () => {
+    const r = resp({ ...ok, prompt: { text: "Want to see it with a real arm?", chips: ["Yes", "Not now"], kind: "question" } });
+    expect(validatePedagogy(r, h, {}, { libraryAvailable: true }).join()).not.toMatch(/direct-answer/);
+  });
+});

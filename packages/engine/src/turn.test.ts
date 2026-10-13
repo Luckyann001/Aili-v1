@@ -348,7 +348,7 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
   it.each(["Not sure", "I don't know", "idk", "No idea."])("\"%s\" closes the prediction as unsure, with no reveal or calculation required", async (reply) => {
     const { applyLearnerReply } = await import("./teaching");
     const t = { predictions: [{ id: "p1", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], guess: null, status: "open" as const }], open_items: [{ kind: "prediction" as const, ref: "p1", opened_turn: 1 }], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
-    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: reply, wants_stop: false, asks_for_source: null, released_prompt: false };
+    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: reply, wants_stop: false, asks_for_source: null, wants_direct_answer: false };
     const after = applyLearnerReply(t, c, "2026-10-13");
     expect(after.predictions[0]).toMatchObject({ status: "unsure", guess: null });
     expect(after.open_items).toEqual([]);
@@ -357,7 +357,7 @@ describe("\"Not sure\" to a prediction is not a guess (behavior spec A1a; Lucky'
   it("a real choice is still a guess, which must be tested and revealed", async () => {
     const { applyLearnerReply } = await import("./teaching");
     const t = { predictions: [{ id: "p1", concept: "mech.torque.static", turn: 1, choices: ["More", "Not sure"], guess: null, status: "open" as const }], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
-    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: "More", wants_stop: false, asks_for_source: null, released_prompt: false };
+    const c = { answered_prompt: true, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: "More", wants_stop: false, asks_for_source: null, wants_direct_answer: false };
     expect(applyLearnerReply(t, c, "2026-10-13").predictions[0]).toMatchObject({ status: "guessed", guess: "More" });
   });
 
@@ -424,5 +424,19 @@ describe("frustration releases the open question (spec A4/A5; Lucky's decision 2
   it("without frustration, a new question while one is open is still rejected", async () => {
     const { events } = await run2("Something else entirely", "question", [{}, { answered_prompt: false, frustrated: false }]);
     expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
+  });
+});
+
+describe("j1 in a turn: \"just tell me … no questions\" is checked as a direct answer (Lucky's decision 2026-10-13)", () => {
+  it("the router flag reaches the director's state; a closing question is rejected; the session posture stays learning", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const seen: DirectorRequest[] = [];
+    const director: Director = { async respond(req) { seen.push(req); return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, move: "explain" } }; } }; // VALID ends with a question
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "Just tell me the formula for torque, no questions please." }, (e) => events.push(e));
+    expect(seen[0]!.direct_answer).toBe(true);
+    expect(JSON.stringify(events.at(-1))).toMatch(/rule direct-answer/);
+    expect(s.state.history.posture).toBe("learning");
   });
 });

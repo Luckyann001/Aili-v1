@@ -17,6 +17,7 @@ Set each field from the learner's message alone, using the session state only fo
 - acknowledged: the learner explicitly acknowledges or accepts a warning or a waiver ("I understand", "I accept"). A vague "ok" is not an acknowledgement. <!-- behavior spec A9 waivers -->
 - guess: if a prediction is open, the one choice the learner picked, copied exactly from the listed choices; otherwise null. If the message does not clearly pick one listed choice, null. <!-- behavior spec A4 prediction -> test -> reveal -->
 - wants_stop: the learner asks to stop the current activity (a debate, for example). <!-- behavior spec A7 -->
+- wants_direct_answer: the learner wants a direct answer now: "just tell me", "no questions", or a plain factual question with nothing to discuss ("What is the formula for torque?"). <!-- behavior spec A2, A14 tests 1 and 6; Lucky's decision 2026-10-13 -->
 - asks_for_source: if the learner names a specific book, chapter, paper, video or other source, its name as the learner wrote it; otherwise null. <!-- behavior spec A10, A14 test 10 -->
 
 When unsure, choose false or null. <!-- conservative default: a false flag is safer than a wrong one -->

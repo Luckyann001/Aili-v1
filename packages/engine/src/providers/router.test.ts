@@ -34,7 +34,7 @@ function config() {
   c.provider_monthly_limit_set = { by: "test", on: "2026-10-12", usd: 5 };
   return AiConfig.parse(c);
 }
-const CLASSIFIED: ReplyClassification = { answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null };
+const CLASSIFIED: ReplyClassification = { answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null, wants_direct_answer: false };
 const classified = (o: Partial<ReplyClassification> = {}, usage = { input: 420, output: 40 }) => message(JSON.stringify({ ...CLASSIFIED, ...o }), usage);
 const start = (): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" });
 
@@ -137,5 +137,16 @@ describe("router.v1: very short confused replies count as frustrated (spec A5; L
     const s = assembleRouterPrompt(ROUTER, { text: "x", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }).system;
     expect(s).toMatch(/Very short confused replies \("huh", "\?", "what"\) count as frustrated too\./);
     expect(s).toMatch(/Example \(format only\): open_question "Have you ever used a soldering iron\?", reply "eh\?\?" gives frustrated true\./);
+  });
+});
+
+describe("router.v1: wants_direct_answer (Lucky's decision 2026-10-13)", () => {
+  it("is described for the router, and the fake router flags \"just tell me\" and \"no questions\"", async () => {
+    const s = assembleRouterPrompt(ROUTER, { text: "x", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }).system;
+    expect(s).toMatch(/- wants_direct_answer: the learner wants a direct answer now: "just tell me", "no questions", or a plain factual question/);
+    const { createFakeRouter } = await import("../router");
+    const fake = createFakeRouter();
+    const c = (await fake.classify({ text: "Just tell me the formula, no questions please.", history: { posture: "learning", learner_level: "unknown", entries: [] }, open_prompt: false }, new AbortController().signal)).classification as { wants_direct_answer: boolean };
+    expect(c.wants_direct_answer).toBe(true);
   });
 });

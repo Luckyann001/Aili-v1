@@ -69,6 +69,8 @@ export interface DirectorRequest {
   repair?: { errors: string[]; previous: unknown };
   /** The teaching state after the learner's reply (open predictions, open items, waivers, the last prompt). */
   teaching?: TeachingState;
+  /** The router flagged that the learner wants a direct answer this turn (shown to the director). */
+  direct_answer?: boolean;
   /**
    * Called as each provider attempt ends, so it is metered even if the turn has already timed out
    * or been interrupted (the provider may still bill it).
@@ -319,7 +321,7 @@ export class TurnSession {
     // A source the learner named that is not in the library (spec A8, A10: "I can't verify that").
     const asked = c.asks_for_source?.toLowerCase();
     const listed = asked ? reg.sources.some((s) => s.title.toLowerCase().includes(asked) || asked.includes(s.title.toLowerCase())) : true;
-    const pedagogyContext = { unlistedSource: asked && !listed ? c.asks_for_source! : undefined, libraryAvailable: sl.readings.length > 0 };
+    const pedagogyContext = { unlistedSource: asked && !listed ? c.asks_for_source! : undefined, libraryAvailable: sl.readings.length > 0, directAnswer: c.wants_direct_answer };
 
     // Director, then the checks; one repair attempt (with the errors fed back) if the checks fail.
     // Provider attempts are metered as they end (onAttempt); a director without them reports one usage.
@@ -331,7 +333,7 @@ export class TurnSession {
       let pending: Promise<DirectorReply> | undefined;
       try {
         pending = this.opts.director.respond(
-          { request_id: turn_id, state_rev: rev, shortlist: sl, history, teaching, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
+          { request_id: turn_id, state_rev: rev, shortlist: sl, history, teaching, direct_answer: c.wants_direct_answer, active_scene: before.activeScene, learner_text: input.text, deadline_ms: deadline, onAttempt: (a) => meterUsage(a.usage), ...(repair ? { repair } : {}) },
           abort.signal,
         );
         const reply = await withTimeout(pending, remaining(), abort.signal);

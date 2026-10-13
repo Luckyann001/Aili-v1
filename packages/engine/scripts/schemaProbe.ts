@@ -1,5 +1,5 @@
 import { AiConfig } from "@aili/schemas";
-import { AnthropicProvider, costMicroUsd, directorResponseJsonSchema, estimateTokens, liveRefusals, padEstimate, ProviderError, toAnthropicSchema, type AnthropicDiagnostic } from "../src/index";
+import { AnthropicProvider, costMicroUsd, directorResponseJsonSchema, routerJsonSchema, estimateTokens, liveRefusals, padEstimate, ProviderError, toAnthropicSchema, type AnthropicDiagnostic } from "../src/index";
 import { args, loadConfig, repoRoot } from "./lib";
 
 // SCHEMA PROBE (approved by Lucky, Oct 12 2026): which variant of the reduced professor schema does the
@@ -70,24 +70,26 @@ async function main() {
   if (ids.length > maxCalls) throw new Error(`${ids.length} variants but at most ${maxCalls} calls`);
   const cap = Math.round(Math.min(0.05, typeof a["cap-usd"] === "string" ? Number(a["cap-usd"]) : 0.05) * 1e6);
 
-  const full = toAnthropicSchema(directorResponseJsonSchema()).schema as Schema;
+  // --schema router: the router's classification schema on the router model (default: the professor's).
+  const target: "professor" | "router" = a.schema === "router" ? "router" : "professor";
+  const full = toAnthropicSchema(target === "router" ? routerJsonSchema() : directorResponseJsonSchema()).schema as Schema;
   const system = "Schema probe. Reply with the smallest valid JSON object.";
   const input = "Reply with a minimal valid object.";
   // A probe needs no thinking: 64 output tokens are for the JSON only (config is not changed).
-  const probeConfig = AiConfig.parse({ ...config, models: { ...config.models, professor: { ...config.models.professor, thinking: undefined, effort: "low" } } });
+  const probeConfig = AiConfig.parse({ ...config, models: { ...config.models, [target]: { ...config.models[target], thinking: target === "router" ? config.models.router.thinking : undefined, effort: "low" } } });
   let spent = 0;
   const rows: string[] = [];
   for (const id of ids) {
     const schema = id.split("+").reduce((s, l) => STEPS[l]!.apply(s), full);
     const size = JSON.stringify(schema).length;
     // Worst case: prompt + schema (the provider may add the schema to the prompt), padded, + 64 output.
-    const worst = costMicroUsd({ model: "professor", input_tokens: padEstimate(config, estimateTokens(system + input + JSON.stringify(schema)) + 300), output_tokens: 64 }, config);
+    const worst = costMicroUsd({ model: target, input_tokens: padEstimate(config, estimateTokens(system + input + JSON.stringify(schema)) + 300), output_tokens: 64 }, config);
     if (spent + worst > cap) {
       console.log(`STOP before ${id}: ${spent} micro-USD spent + ${worst} worst case would pass the ${cap} cap`);
       break;
     }
     let diag: AnthropicDiagnostic | undefined;
-    const p = new AnthropicProvider({ config: probeConfig, model: "professor", env: () => process.env, onDiagnostic: (d) => (diag = d) });
+    const p = new AnthropicProvider({ config: probeConfig, model: target, env: () => process.env, onDiagnostic: (d) => (diag = d) });
     const t0 = Date.now();
     let outcome: string;
     try {
@@ -100,7 +102,7 @@ async function main() {
     const ms = Date.now() - t0;
     const inTok = diag?.type === "response" ? (diag.input_tokens ?? 0) + (diag.cache_read_input_tokens ?? 0) + (diag.cache_creation_input_tokens ?? 0) : 0;
     const outTok = diag?.type === "response" ? (diag.output_tokens ?? 0) : 0;
-    const cost = costMicroUsd({ model: "professor", input_tokens: inTok, output_tokens: outTok }, config);
+    const cost = costMicroUsd({ model: target, input_tokens: inTok, output_tokens: outTok }, config);
     spent += cost;
     const label = id.split("+").map((l) => STEPS[l]!.label).join(" + ");
     rows.push(`| ${id} | ${label} | ${size} | ${outcome} | ${inTok} / ${outTok} | ${(cost / 1e6).toFixed(5)} USD | ${ms} ms |`);

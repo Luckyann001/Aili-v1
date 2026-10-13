@@ -92,7 +92,7 @@ export interface AssembledPrompt {
 export function assembleProfessorPrompt(o: {
   template: string;
   shortlist: Shortlist;
-  request: Pick<DirectorRequest, "request_id" | "state_rev" | "history" | "active_scene" | "learner_text" | "teaching">;
+  request: Pick<DirectorRequest, "request_id" | "state_rev" | "history" | "active_scene" | "learner_text" | "teaching" | "direct_answer">;
   budgetTokens?: number;
 }): AssembledPrompt {
   const budget = o.budgetTokens ?? PROMPT_BUDGET_TOKENS;
@@ -107,6 +107,8 @@ export function assembleProfessorPrompt(o: {
     state_rev: o.request.state_rev,
     posture: h.posture,
     learner_level: h.learner_level,
+    // This turn only: the learner asked for a direct answer (Lucky's decision 2026-10-13).
+    direct_answer_requested: o.request.direct_answer === true,
     active_scene: o.request.active_scene ?? null,
     // The open question, with its text, kind and choices when known (so it can be kept and re-offered).
     open_prompt: open ? { from_turn: open.turn, ...(lastPrompt && lastPrompt.turn === open.turn ? { kind: lastPrompt.kind, text: lastPrompt.text, choices: lastPrompt.chips } : {}) } : null,

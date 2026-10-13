@@ -163,7 +163,7 @@ describe("A14 #6 frustration: explain or answer, not another question", () => {
     const bad = session([opener, () => ({ move: "challenge", narration: say("Think harder."), prompt: ask("Where is it") })]);
     await bad.reply("Teach me torque");
     rejectedBy(await bad.reply("I don't know"), "back-off-on-frustration");
-    const good = session([opener, () => ({ move: "explain", narration: say("The pivot is the joint the arm turns around.") }), () => ({ move: "answer", narration: say("The pivot is the servo's shaft.") })]);
+    const good = session([opener, () => ({ move: "explain", narration: say("The pivot is the joint the arm turns around.") }), () => ({ move: "answer", narration: say("The pivot is the servo's shaft."), assumptions: ["static hold only"], evidence: ["read.fx-moments"] })]); // a direct answer: assumptions and a source
     await good.reply("Teach me torque");
     done(await good.reply("I don't know"));
     done(await good.reply("just tell me"));
@@ -184,7 +184,7 @@ describe("A14 #13 safety in a build: raised even when the challenge budget is us
 
 describe("A14 #15 build intent, skip theory: the minimum, and the waiver recorded", () => {
   it("an ordinary waiver is recorded as the learner's, with the date", async () => {
-    const t = session([() => ({ move: "answer", narration: say("For your arm, pick a servo with a margin over the holding torque."), waiver: { concept: C, reason: "builder skipped the theory", safety_critical: false } })], { posture: "build" });
+    const t = session([() => ({ move: "answer", narration: say("For your arm, pick a servo with a margin over the holding torque."), assumptions: ["static hold only"], evidence: ["read.fx-moments"], waiver: { concept: C, reason: "builder skipped the theory", safety_critical: false } })], { posture: "build" });
     done(await t.reply("just tell me which servo, skip the theory"));
     expect(t.s.state.teaching!.waivers).toEqual([{ concept: C, reason: "builder skipped the theory", safety_critical: false, turn: 1, acknowledged: { by: "learner", on: TODAY } }]);
   });
