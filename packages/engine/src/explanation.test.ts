@@ -22,6 +22,10 @@ describe("turn.done carries the turn's explanation", () => {
     expect(calc.inputs).toContainEqual({ label: "Arm length", value: "0.2", unit: "m" });
     expect(calc.outputs).toContainEqual({ label: "Torque", value: "0.637", unit: "N·m" }); // as in the narration
     expect(calc.outputs.find((o) => o.label === "Share of rating")?.unit ?? "").toBe("");
+    // A value the solver returns but its manifest does not declare (extra_torque_nm, seen live
+    // 13 Oct 2026) still gets a plain label and its unit from the name.
+    for (const o of calc.outputs) expect(o.label, o.label).not.toMatch(/ nm$| m$|_/);
+    expect(calc.outputs.find((o) => o.label === "Extra torque")).toMatchObject({ unit: "N·m" });
     const text = JSON.stringify(x);
     expect(text).not.toMatch(/\bc\d+\b|solver\.|read\.|src\.|\{\{/); // no calculation, solver, reading or source IDs
   });

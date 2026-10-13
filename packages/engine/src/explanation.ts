@@ -32,6 +32,10 @@ export function fieldLabel(name: string, unit: Unit): string {
 
 const unitText = (u: Unit) => (u === "ratio" ? "" : u);
 
+/** A value the manifest does not declare takes its unit from its name's suffix (the naming rule), else none. */
+const unitOf = (name: string, declared: Unit | undefined): Unit =>
+  declared ?? ((Object.entries(UNIT_SUFFIX) as Array<[Unit, string | null]>).filter(([, sfx]) => sfx && name.endsWith(sfx)).sort((a, b) => b[1]!.length - a[1]!.length)[0]?.[0] ?? "ratio");
+
 export function explainTurn(
   r: Pick<DirectorResponse, "assumptions" | "limitations" | "evidence" | "calc_requests">,
   registry: Pick<Registry, "solvers" | "readings" | "sources">,
@@ -54,11 +58,11 @@ export function explainTurn(
         title: solver.title,
         fidelity: solver.fidelity,
         inputs: Object.entries(c.inputs).map(([k, v]) => {
-          const unit = solver.inputs[k]?.unit ?? "ratio";
+          const unit = unitOf(k, solver.inputs[k]?.unit);
           return { label: fieldLabel(k, unit), value: format(v), unit: unitText(unit) };
         }),
         outputs: Object.entries(outputs).map(([k, v]) => {
-          const unit = solver.outputs[k]?.unit ?? "ratio";
+          const unit = unitOf(k, solver.outputs[k]?.unit);
           return { label: fieldLabel(k, unit), value: format(v), unit: unitText(unit) };
         }),
       },
