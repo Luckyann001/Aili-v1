@@ -3,9 +3,9 @@ import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
 import { validateDirectorResponse } from "./director";
-import { givesBack, validatePedagogy } from "./pedagogy";
+import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
-import { applyLearnerReply, applyResponse, reattachOpenPrompt } from "./teaching";
+import { applyLearnerReply, applyResponse, OPEN_QUESTION_REOFFERED, reattachOpenPrompt } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
@@ -357,6 +357,8 @@ export class TurnSession {
       const warnings = [...(fixed.warning ? [fixed.warning] : []), ...v.warnings];
       if (!v.response) return { reason: "validation", errors: v.errors, warnings };
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
+      // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
+      if (reoffersOpenQuestion(v.response, history, teaching)) warnings.push(`${OPEN_QUESTION_REOFFERED} (${v.response.prompt!.kind}): "${v.response.prompt!.text}"`);
       return p.length ? { reason: "pedagogy", errors: p, warnings } : { r: v.response, warnings };
     };
 

@@ -1,4 +1,4 @@
-import { PROMPT_REATTACHED } from "../teaching";
+import { OPEN_QUESTION_REOFFERED, PROMPT_REATTACHED } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
 // Bake-off report (docs/m3-plan.md slice 7a): numbers code can measure, and one transcript per
@@ -40,6 +40,8 @@ export interface Metrics {
   reattached: number;
   /** Turns where the router said "unanswered" to a scripted direct answer while a question was open. */
   router_missed: number;
+  /** Turns that re-offered the open question instead of asking a new one. */
+  reoffered: number;
 }
 
 export function metrics(turns: TurnRecord[]): Metrics {
@@ -74,7 +76,17 @@ export function metrics(turns: TurnRecord[]): Metrics {
     warnings_by_type: turns
       .flatMap((t) => t.warnings)
       .reduce<Record<string, number>>((acc, w) => {
-        const k = w.startsWith(PROMPT_REATTACHED) ? "prompt re-attached" : w.startsWith("analogy:") ? "analogy" : /mild praise/.test(w) ? "mild praise" : "other";
+        const k = w.startsWith(PROMPT_REATTACHED)
+          ? "prompt re-attached"
+          : w.startsWith(OPEN_QUESTION_REOFFERED)
+            ? "open question re-offered"
+            : w.startsWith("analogy:")
+              ? "analogy"
+              : /mild praise/.test(w)
+                ? "mild praise"
+                : /characters \(over/.test(w)
+                  ? "long narration"
+                  : "other";
         acc[k] = (acc[k] ?? 0) + 1;
         return acc;
       }, {}),
@@ -86,6 +98,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     failures,
     warnings: turns.reduce((n, t) => n + t.warnings.length, 0),
     router_missed: turns.filter((t) => t.router_missed_answer).length,
+    reoffered: turns.filter((t) => t.warnings.some((w) => w.startsWith(OPEN_QUESTION_REOFFERED))).length,
     reattached: turns.filter((t) => t.warnings.some((w) => w.startsWith(PROMPT_REATTACHED))).length,
   };
 }
@@ -128,6 +141,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Warnings (semantic, for review; never a rejection) | ${m.warnings}${m.warnings ? ` (${movesText(m.warnings_by_type)})` : ""} |`,
     `| Prompts re-attached from stored state (engine fallback) | ${m.reattached} |`,
     `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
+    `| Open questions re-offered (instead of a new question) | ${m.reoffered} |`,
     "",
     "## Failures",
     "",

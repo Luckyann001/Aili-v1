@@ -66,6 +66,9 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
   return { predictions, open_items, waivers, analogies_used, safety_acks, pending_teach_back, evidence, debate, last_prompt };
 }
 
+/** The warning text when an answer re-offers the open question instead of a new one (Lucky's decision 2026-10-13). */
+export const OPEN_QUESTION_REOFFERED = "open question re-offered";
+
 /** The warning text when the engine re-attaches a stored prompt (Lucky's decision 2026-10-12). */
 export const PROMPT_REATTACHED = "prompt re-attached from stored state";
 

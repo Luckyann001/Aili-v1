@@ -185,3 +185,18 @@ describe("re-offering the open prediction (Lucky's decision 2026-10-12)", () => 
     expect(validatePedagogy(reask("weight-out", "question"), openH, teaching).join()).toMatch(/one-open-question/);
   });
 });
+
+describe("re-offering an open plain question (Lucky's decision 2026-10-13)", () => {
+  const openH = hist([aili("hold", { asked: true }), learner({ answered_prompt: false, pushback: true })]);
+  const chips = ["Its share is tiny", "Something else", "Not sure"];
+  const teaching = { last_prompt: { turn: 1, text: "What evidence would show the arm's weight can be ignored?", kind: "question" as const, chips } };
+  const ask = (o: object) => resp({ move: "hold", narration: [{ id: "n1", text: "A teacher's say-so isn't evidence I can weigh here." }], prompt: { text: "Which evidence would show the arm can be ignored?", chips, kind: "question", ...o } });
+  it("same kind and same choices (reworded text): allowed", () => {
+    expect(validatePedagogy(ask({}), openH, teaching).join()).not.toMatch(/one-open-question/);
+  });
+  it("different choices, or a different kind, is a new question: still rejected", () => {
+    expect(validatePedagogy(ask({ chips: ["Yes", "No", "Not sure"] }), openH, teaching).join()).toMatch(/one-open-question/);
+    expect(validatePedagogy(ask({ kind: "acknowledgement" }), openH, teaching).join()).toMatch(/one-open-question/);
+    expect(validatePedagogy(ask({}), openH, {}).join()).toMatch(/one-open-question/); // nothing stored to compare with
+  });
+});

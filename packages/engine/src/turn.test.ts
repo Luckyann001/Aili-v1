@@ -357,3 +357,23 @@ describe("no pushback on a first turn (Lucky's decision 2026-10-12)", () => {
     expect(JSON.stringify(events.at(-1))).toMatch(/hold-under-pushback/);
   });
 });
+
+describe("open question re-offered is logged (Lucky's decision 2026-10-13)", () => {
+  it("a plain question re-asked with the same choices passes and carries the visible warning", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const p = VALID.prompt as { text: string; chips: string[] };
+    const checks: Array<{ warnings: string[] }> = [];
+    const director: Director = {
+      async respond(req) {
+        const again = req.request_id === "turn_2" ? { narration: [{ id: "n1", text: "Let's take it more slowly." }], actions: [], calc_requests: [], prompt: { text: `Put simply: ${p.text}`, chips: p.chips, kind: "question" } } : {};
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...again } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: false }] }), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    await s.run({ text: "Why is it hard?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "My teacher told me so." }, (e) => events.push(e));
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(checks.at(-1)!.warnings.join()).toMatch(/^open question re-offered \(question\): "Put simply:/);
+  });
+});

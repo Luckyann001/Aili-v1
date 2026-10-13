@@ -308,3 +308,14 @@ describe("bake-off stop rules (Lucky's decision 2026-10-12)", () => {
     expect(ok.stopped).toBeUndefined(); // 1 of 2 is not MORE than half
   });
 });
+
+describe("open questions re-offered are counted (Lucky's decision 2026-10-13)", () => {
+  it("counts turns with the warning and lists it by type", () => {
+    const turn = (warnings: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [], warnings, expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    const m = metrics([turn(['open question re-offered (question): "Q"']), turn([])]);
+    expect(m.reoffered).toBe(1);
+    expect(m.warnings_by_type).toEqual({ "open question re-offered": 1 });
+    const r = { records: [{ scenario: byId("s05-confident-wrong-pushback"), run: 1, turns: [turn(['open question re-offered (question): "Q"'])], cost_micro_usd: 0 }], total_micro_usd: 0, cap_micro_usd: 1 };
+    expect(summaryMarkdown(r as never, { mode: "recorded", started: "now", models: "x" })).toContain("| Open questions re-offered (instead of a new question) | 1 |");
+  });
+});

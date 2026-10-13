@@ -55,6 +55,21 @@ export interface PedagogyContext {
 /** Rounds a debate may run before it stops (spec A7: "limit the number of rounds"). */
 export const MAX_DEBATE_ROUNDS = 3;
 
+/**
+ * Whether `r` re-offers the question that is still open, rather than asking a new one (Lucky's
+ * decisions 2026-10-12/13): the SAME open prediction (prompt kind "prediction", same prediction id,
+ * asked in the open turn), or the same open question (same prompt kind and the same choices as the
+ * stored open prompt). Rewording the text is allowed; different choices or kind make it a new question.
+ */
+export function reoffersOpenQuestion(r: DirectorResponse, h: SessionHistory, teachingIn: Partial<TeachingState> = NO_TEACHING): boolean {
+  const open = openPrompt(h);
+  if (!open || !r.prompt) return false;
+  const t: TeachingState = { ...NO_TEACHING, ...teachingIn };
+  if (r.prompt.kind === "prediction" && r.prediction && t.predictions.some((p) => p.id === r.prediction!.id && p.status === "open" && p.turn === open.turn)) return true;
+  const last = t.last_prompt;
+  return !!last && last.turn === open.turn && last.kind === r.prompt.kind && last.chips.length === r.prompt.chips.length && last.chips.every((c, i) => c === r.prompt!.chips[i]);
+}
+
 export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachingIn: Partial<TeachingState> = NO_TEACHING, ctx: PedagogyContext = {}): string[] {
   const teaching: TeachingState = { ...NO_TEACHING, ...teachingIn };
   const phrases = ctx.phrases ?? BANNED_PHRASES;
@@ -67,10 +82,9 @@ export function validatePedagogy(r: DirectorResponse, h: SessionHistory, teachin
   const lastEntry = h.entries.at(-1);
 
   // 1. One open question at a time.
-  // Exception (Lucky's decision 2026-10-12): re-offering the SAME open prediction (prompt kind
-  // "prediction" with the same prediction id, asked in the open turn) keeps it open; it is not a new question.
+  // Exception: re-offering the open question itself is not a new question (see reoffersOpenQuestion).
   const open = openPrompt(h);
-  const reoffer = !!open && r.prompt?.kind === "prediction" && !!r.prediction && teaching.predictions.some((p) => p.id === r.prediction!.id && p.status === "open" && p.turn === open.turn);
+  const reoffer = reoffersOpenQuestion(r, h, teaching);
   if (asks && open && !reoffer)
     fail("one-open-question", `a prompt is still open from turn ${open.turn} and unanswered; answer or close it before asking another (or re-offer that same prediction, with its id)`);
 
