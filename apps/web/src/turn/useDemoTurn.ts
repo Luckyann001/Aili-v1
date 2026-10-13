@@ -24,6 +24,8 @@ export interface StageSnapshot {
   leverDistance_m: number;
   /** Whether fixture content (from an earlier, completed turn) was already on stage. */
   fixture: boolean;
+  /** Whether that earlier turn was a live one. */
+  live: boolean;
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
@@ -43,7 +45,7 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, fixture: useStageContent.getState().fixture };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live };
 };
 
 function restoreStage(snap: StageSnapshot) {
@@ -51,10 +53,10 @@ function restoreStage(snap: StageSnapshot) {
   s.setScene(snap.activeScene);
   s.setLeverDistance(snap.leverDistance_m);
   s.highlight(snap.selectedId);
-  useStageContent.getState().setFixture(snap.fixture);
+  useStageContent.getState().setFixture(snap.fixture, snap.live);
 }
 
-function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"]) {
+function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: boolean) {
   const s = useScene.getState();
   switch (a.type) {
     case "select_scene": {
@@ -70,18 +72,22 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"]) {
       break;
     // play_animation and show_choices are not used by the fake director.
   }
-  useStageContent.getState().setFixture(true);
+  useStageContent.getState().setFixture(true, live);
 }
 
 interface Voice {
   beginTurn: () => number;
-  playTurn: (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[]) => void;
+  playTurn: (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[], source?: "fixture" | "live") => void;
   settle: (rev: number) => void;
 }
 
 const toCaptionParts = (parts: ReadonlyArray<{ text: string } | { value: string }>): CaptionPart[] => parts.map((p) => ("value" in p ? { value: p.value } : { text: p.text }));
 
-export function useDemoTurn(voice: Voice) {
+/**
+ * Runs a turn against /api/turn: the fake director's scripted case, or (with `live`, when the
+ * server's live mode is on) the live professor, whose lines are badged "Live AI".
+ */
+export function useDemoTurn(voice: Voice, live = false) {
   const current = useRef<{ rev: number; abort: AbortController } | null>(null);
 
   /** Stop the turn in flight (interrupt): cancel the stream, tell the server, put the stage back. */
@@ -135,11 +141,14 @@ export function useDemoTurn(voice: Voice) {
         const before = useTurnClient.getState().state;
         const after = useTurnClient.getState().dispatch({ type: "event", event: e });
         if (after === before) return; // dropped by the gate
-        if (e.type === "action") applyAction(e.action);
+        if (e.type === "action") applyAction(e.action, live);
         if (after.status === "done") {
           current.current = null;
-          if (after.narration.length) useStageContent.getState().setFixture(true);
-          voice.playTurn(rev, after.narration.map((n) => ({ text: n.text, parts: toCaptionParts(n.parts) })), after.prompt?.chips);
+          if (after.narration.length) useStageContent.getState().setFixture(true, live);
+          // The question is spoken and captioned last, so it stays on screen with its chips.
+          const lines = after.narration.map((n) => ({ text: n.text, parts: toCaptionParts(n.parts) }));
+          if (after.prompt?.text) lines.push({ text: after.prompt.text, parts: toCaptionParts(after.prompt.parts) });
+          voice.playTurn(rev, lines, after.prompt?.chips, live ? "live" : "fixture");
         }
         if (after.status === "error") fail(after.message ?? "Something went wrong. Nothing on the stage changed.");
       };
@@ -173,7 +182,7 @@ export function useDemoTurn(voice: Voice) {
       const ended = useTurnClient.getState().dispatch({ type: "streamEnded" });
       if (ended.status === "dropped") fail(DROPPED_MESSAGE);
     },
-    [stop, voice],
+    [stop, voice, live],
   );
 
   return { start, stop };

@@ -108,10 +108,10 @@ export function useVoiceController(opts: {
     return useVoice.getState().rev;
   }, [stopEverything]);
 
-  /** Speaks a completed fake-director turn under `rev` (badged "Test fixture"), then offers its chips. */
+  /** Speaks a completed turn under `rev` (badged "Test fixture", or "Live AI" for a live one), then offers its chips. */
   const playTurn = useCallback(
-    (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[]) =>
-      playLines(rev, lines.map((l) => l.text), chips, undefined, { source: "fixture", parts: lines.map((l) => l.parts) }),
+    (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[], source: "fixture" | "live" = "fixture") =>
+      playLines(rev, lines.map((l) => l.text), chips, undefined, { source, parts: lines.map((l) => l.parts) }),
     [playLines],
   );
 

@@ -1043,6 +1043,19 @@
   color: var(--aili-text);
 }
 
+/* A live answer on test-fixture content: "Live AI" (filled circle, accent outline) and the flask. */
+.badgeLive {
+  font: 500 0.8rem var(--aili-font-ui);
+  color: var(--aili-text);
+  border-color: var(--aili-accent);
+}
+
+.captionBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1);
+}
+
 /* A value a solver calculated: calculator icon + dotted underline (behavior spec A10). */
 .calc {
   white-space: nowrap;

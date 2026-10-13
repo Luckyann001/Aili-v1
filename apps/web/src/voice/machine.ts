@@ -12,7 +12,7 @@ export interface Caption {
   rev: number;
   seq: number;
   /** Where the line came from; captions carry the matching badge. Absent means "prepared". */
-  source?: "prepared" | "fixture";
+  source?: "prepared" | "fixture" | "live";
   /** The line split so calculated values can be marked (fake-director turns). */
   parts?: CaptionPart[];
 }

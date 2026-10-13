@@ -26,6 +26,8 @@ export function CommandBar({
   inputRef,
   offer,
   note,
+  chipsSend = false,
+  label = "Ask Aili or answer",
 }: {
   text: string;
   onText: (text: string) => void;
@@ -35,12 +37,16 @@ export function CommandBar({
   offer?: ChipOffer | null;
   /** A line about what the text box does, shown above it and read with it (e.g. the scripted demo). */
   note?: string;
+  /** Aili's quick replies send at once (live turns) instead of filling the text box. */
+  chipsSend?: boolean;
+  /** The text box's label and placeholder. */
+  label?: string;
 }) {
   const inputId = useId();
   const noteId = useId();
   const replies = useVoice((s) => s.prompt?.chips ?? null);
   const chips: ChipOffer | null =
-    offer ?? (replies ? { group: "Suggested replies", items: replies.map((r) => ({ id: r, label: r })), onPick: (id) => onText(id) } : null);
+    offer ?? (replies ? { group: "Suggested replies", items: replies.map((r) => ({ id: r, label: r })), onPick: (id) => (chipsSend ? (onSubmit(id), onText("")) : onText(id)) } : null);
 
   return (
     <div className={styles.command}>
@@ -76,7 +82,7 @@ export function CommandBar({
         <VoiceButton placement="bar" onPress={onVoice} />
 
         <label htmlFor={inputId} className={styles.srOnly}>
-          Ask Aili or answer
+          {label}
         </label>
         <input
           ref={inputRef}
@@ -84,7 +90,7 @@ export function CommandBar({
           className={styles.input}
           value={text}
           onChange={(e) => onText(e.target.value)}
-          placeholder="Ask Aili or answer…"
+          placeholder={label.endsWith("?") ? label : `${label}…`}
           aria-describedby={note ? noteId : undefined}
           autoComplete="off"
         />

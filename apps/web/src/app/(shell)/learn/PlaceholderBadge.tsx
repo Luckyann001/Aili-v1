@@ -10,7 +10,8 @@ import styles from "./learn.module.css";
 
 /**
  * The stage badge shows what is on the stage now: "Prepared · …" for the scene and lesson (always),
- * and beside it "Test fixture · …" while a fake-director turn's content is on stage. The captions,
+ * and beside it "Test fixture · …" while a fake-director turn's content is on stage, or
+ * "Live AI · Test fixture content" while a live turn's content is on stage. The captions,
  * labels and text-panel toggles do not affect it, so it cannot be hidden.
  *
  * "Prepared · …" badge for the scene on the stage. A draft scene always says
@@ -21,6 +22,7 @@ export function PlaceholderBadge() {
   const id = useId();
   const activeScene = useScene((s) => s.activeScene);
   const fixture = useStageContent((s) => s.fixture);
+  const live = useStageContent((s) => s.live);
   const status = isDraft(activeScene) ? reviewLabelOf(activeScene) : "placeholder";
   const full = `Prepared content, written in advance. Not a live AI response. ${isDraft(activeScene) ? `${reviewLabelOf(activeScene)}. ` : ""}${MODELS[activeScene].note}`;
   return (
@@ -56,7 +58,16 @@ export function PlaceholderBadge() {
         {full}
       </span>
     </span>
-    {fixture && (
+    {fixture && live && (
+      <span className={`${styles.badgePill} ${styles.badgeLive}`} data-badge="live">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="currentColor">
+          <circle cx="7" cy="7" r="4.5" />
+        </svg>
+        Live AI · Test fixture content
+        <span className={styles.srOnly}>. Answered by a real AI model, using test-fixture content that is not expert-reviewed.</span>
+      </span>
+    )}
+    {fixture && !live && (
       <span className={`${styles.badgePill} ${styles.badgeFixture}`} data-badge="fixture">
         <FlaskIcon />
         Test fixture · Fake director, not live AI

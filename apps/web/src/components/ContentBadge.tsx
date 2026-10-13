@@ -1,25 +1,27 @@
 import styles from "./ContentBadge.module.css";
 
 /** Prepared vs live vs AI-composed content must always be visibly labelled (CLAUDE.md, honesty rules). */
-export type ContentKind = "prepared" | "live" | "illustrative" | "fixture";
+export type ContentKind = "prepared" | "live" | "illustrative" | "fixture" | "fixture-content";
 
 const LABEL: Record<ContentKind, string> = {
   prepared: "Prepared",
-  live: "Live",
+  live: "Live AI",
   illustrative: "Illustrative (AI-composed)",
   fixture: "Test fixture",
+  "fixture-content": "Test fixture content",
 };
 
 const DESCRIPTION: Record<ContentKind, string> = {
   prepared: "Prepared content, written in advance. Not a live AI response.",
-  live: "Live response from the AI professor.",
+  live: "Live response from a real AI model. It can be wrong; its numbers come from Aili's calculators.",
   illustrative: "Illustrative, composed by AI from library parts. No verified model.",
   fixture: "Test fixture: a scripted fake-director turn for testing. Not a live AI response.",
+  "fixture-content": "Uses test-fixture content made for testing, not expert-reviewed library content.",
 };
 
 export function ContentBadge({ kind }: { kind: ContentKind }) {
   return (
-    <span className={`${styles.badge} ${styles[kind]}`} title={DESCRIPTION[kind]}>
+    <span className={`${styles.badge} ${styles[kind] ?? ""}`} title={DESCRIPTION[kind]}>
       <BadgeIcon kind={kind} />
       <span>{LABEL[kind]}</span>
       <span className={styles.srOnly}>: {DESCRIPTION[kind]}</span>
@@ -28,7 +30,7 @@ export function ContentBadge({ kind }: { kind: ContentKind }) {
 }
 
 // Distinct shapes: square (prepared, fixed script), filled circle (live), dashed circle
-// (illustrative), flask (test fixture).
+// (illustrative), flask (test fixture, and test-fixture content under a live answer).
 function BadgeIcon({ kind }: { kind: ContentKind }) {
   const p = { width: 14, height: 14, viewBox: "0 0 14 14", "aria-hidden": true, stroke: "currentColor", strokeWidth: 1.6 } as const;
   if (kind === "prepared")
@@ -38,7 +40,7 @@ function BadgeIcon({ kind }: { kind: ContentKind }) {
         <path d="M4.5 5.5h5M4.5 8.5h3.5" />
       </svg>
     );
-  if (kind === "fixture") return <FlaskIcon />;
+  if (kind === "fixture" || kind === "fixture-content") return <FlaskIcon />;
   if (kind === "live")
     return (
       <svg {...p} fill="currentColor">

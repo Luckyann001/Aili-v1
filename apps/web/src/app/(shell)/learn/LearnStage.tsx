@@ -19,6 +19,7 @@ import { markLearnVisited } from "@/learn/visited";
 import { FAKE_DIRECTOR } from "@/turn/flags";
 import { useStageContent } from "@/turn/stageContent";
 import { useDemoTurn } from "@/turn/useDemoTurn";
+import { useLiveMode } from "@/turn/useLiveMode";
 import type { CaptionPart } from "@/voice/machine";
 import { CommandBar, type ChipOffer } from "./CommandBar";
 import { EffortGauge } from "./scene/EffortGauge";
@@ -39,7 +40,10 @@ import styles from "./learn.module.css";
 const SPACE_OWNERS =
   'input, textarea, select, button, a[href], summary, [contenteditable=""], [contenteditable="true"], [role="tab"], [role="button"], [role="textbox"], [role="checkbox"], [role="switch"], [role="option"], [role="listbox"]';
 
-// Learn stage (M1). No AI yet: replies are a prepared demo line, badged "Prepared".
+// Learn stage (M1). Replies are a prepared demo line, badged "Prepared". On Lucky's laptop with live
+// mode on (`npm run dev:live`, docs/m3-live-browser-plan.md), typed messages go to the live professor
+// instead: demo mode A, an empty "What do you want to learn?" box and no prepared lesson offered.
+const LIVE_NOTE = "Live AI: your message goes to a real AI model, on test-fixture content only.";
 export function LearnStage() {
   const side = useLearnUi((s) => s.side);
   const captionsOn = useLearnUi((s) => s.captionsOn);
@@ -89,9 +93,13 @@ export function LearnStage() {
   }, []);
   const voice = useVoiceController({ onTranscript, onUnsupported: focusInput, askConsent });
   useLessonPlayer(voice);
+  // Live mode, from the server (null until it answers). It takes over the text box, so the
+  // fake-director demo's case buttons are off (in live mode they would reach the real model).
+  const live = useLiveMode();
+  const [askedLive, setAskedLive] = useState(false);
   // Fake-director demo (testing only): ?demo=1 in a build with both testing flags.
-  const fakeDemo = demo && FAKE_DIRECTOR;
-  const demoTurn = useDemoTurn(voice);
+  const fakeDemo = demo && FAKE_DIRECTOR && live === false;
+  const demoTurn = useDemoTurn(voice, live === true);
   const lessonStatus = useLesson((s) => s.status);
   const lessonChoices = useLesson((s) => s.choices);
   const lessonRev = useLesson((s) => s.rev);
@@ -120,11 +128,12 @@ export function LearnStage() {
   }, []);
 
   // One open question at a time: the lesson's choices while it waits; otherwise Aili's quick
-  // replies; otherwise an offer to start or continue the lesson.
+  // replies; otherwise an offer to start or continue the lesson (never in live mode; until the server
+  // answers, the prepared page shows as usual, so a normal page load never shifts).
   const offer: ChipOffer | null =
     lessonStatus === "awaiting" && lessonChoices
       ? { group: "Suggested replies", items: lessonChoices, onPick: (id) => useLesson.getState().dispatch({ type: "choose", rev: lessonRev, choice: id }) }
-      : voicePrompt || busy || lessonStatus === "playing"
+      : voicePrompt || busy || lessonStatus === "playing" || live === true
         ? null
         : lessonStatus === "stopped"
           ? { group: "Lesson", items: [{ id: "resume", label: "Continue the lesson" }], onPick: () => void runLesson("resume") }
@@ -214,7 +223,15 @@ export function LearnStage() {
           )}
           {captionsOn && caption && (
             <div className={styles.caption}>
-              <ContentBadge kind={caption.source === "fixture" ? "fixture" : "prepared"} />
+              {caption.source === "live" ? (
+                // A live answer on test-fixture content carries both labels.
+                <span className={styles.captionBadges}>
+                  <ContentBadge kind="live" />
+                  <ContentBadge kind="fixture-content" />
+                </span>
+              ) : (
+                <ContentBadge kind={caption.source === "fixture" ? "fixture" : "prepared"} />
+              )}
               <p aria-live={captionLive}>{caption.parts ? <CaptionText parts={caption.parts} /> : caption.text}</p>
             </div>
           )}
@@ -257,8 +274,19 @@ export function LearnStage() {
       <CommandBar
         text={text}
         onText={setText}
-        onSubmit={fakeDemo ? (t) => void demoTurn.start("valid", t) : voice.submit}
-        note={fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
+        onSubmit={
+          live
+            ? (t) => {
+                setAskedLive(true);
+                void demoTurn.start("valid", t); // the case is ignored by the live route
+              }
+            : fakeDemo
+              ? (t) => void demoTurn.start("valid", t)
+              : voice.submit
+        }
+        note={live ? LIVE_NOTE : fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
+        chipsSend={live === true}
+        label={live && !askedLive ? "What do you want to learn?" : undefined}
         onVoice={() => void voice.press()}
         inputRef={inputRef}
         offer={offer}
