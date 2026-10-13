@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { NARRATION_MAX_CHARS, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, NARRATION_MAX_CHARS, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -367,5 +367,23 @@ describe("mild praise: a good/fine/great/nice start (Lucky's decision 2026-10-12
   });
   it("other starts do not warn", () => {
     expect(run({ narration: [{ id: "n1", text: "Let's start with one idea." }] }).warnings).toEqual([]);
+  });
+});
+
+describe("count adjectives are not quantities (Lucky's decision 2026-10-13)", () => {
+  it.each(["a 6-axis robot arm", "a 6-DOF arm", "a 6 DOF arm", "a 2-link arm", "a 4-wheel robot", "a 4-wheeled robot", "a 3-joint arm", "the 3D view", "a 2D sketch"])("\"%s\" passes", (text) => {
+    expect(checkNarration(text, [])).toEqual([]);
+  });
+  it.each([
+    ["a 12-axis machine", "12"],
+    ["a 6.5-link arm", "6.5"],
+    ["6 axis arm", "6"], // no hyphen: not a count adjective
+    ["it weighs 6 kg", "6"],
+    ["a 0-joint arm", "0"],
+  ])("\"%s\" is still rejected", (text, n) => {
+    expect(checkNarration(text, []).join()).toContain(`"${n}"`);
+  });
+  it("the o1 answer from the bake-off (6-axis) now passes", () => {
+    expect(errs({ narration: [{ id: "n1", text: "Inverse kinematics for a 6-axis arm isn't supported yet." }], coverage: "unsupported", actions: [], calc_requests: [], concepts: [], evidence: [] }, { shortlist: { scenes: [], simulations: [], solvers: [], analogies: [], readings: [], sources: [], ids: new Set(), concepts: [] } })).toEqual([]);
   });
 });
