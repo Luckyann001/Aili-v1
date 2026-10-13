@@ -97,6 +97,13 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **Prompt:** a prompt contains exactly one question mark, no "does that make sense?" checks.
     - **Bake-off stop check:** the leaked-number stop uses the validator's own number check and allow-list.
 
+27. **After the 19-scenario bake-off (Oct 13 2026), decided by Lucky:**
+    - **`wants_direct_answer` for explicit requests only** ("just tell me", "no questions", "skip the explanation"). The earlier "plain factual question" set it on 10 turns, nine of them wrongly (decision 26).
+    - **Direct-answer assumptions** are required only when the answer explains or calculates, not for a coverage-unsupported answer.
+    - **"ROS 2" and "ROS2"** are allowed as product names; part numbers and model codes stay rejected.
+    - **Unsupported topic:** coverage "unsupported" requires move "answer" or "explain" (spec A4, A14 test 11; o1 had used "hold").
+    - **Teach-back application question:** the prompt is the guide's question word for word, any lead-in in narration; if the repair still paraphrases it, the engine uses the guide's exact text with a warning ("guide question substituted").
+
 ## Design summary
 
 - **Provider adapter:**
