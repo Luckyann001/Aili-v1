@@ -104,6 +104,11 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **Unsupported topic:** coverage "unsupported" requires move "answer" or "explain" (spec A4, A14 test 11; o1 had used "hold").
     - **Teach-back application question:** the prompt is the guide's question word for word, any lead-in in narration; if the repair still paraphrases it, the engine uses the guide's exact text with a warning ("guide question substituted").
 
+28. **After the 12-scenario bake-off (Oct 13 2026; 96.1% after repair across all 28), decided by Lucky:**
+    - **Calculation IDs (s04):** "c1", "c2" in learner text is rejected and named as such; the prompt says results appear only through placeholders.
+    - **Teach-back reading (s08):** a teach-back question must name its reading; with exactly one reading open the engine fills it in (warning "reading filled in"); otherwise the validator rejects it.
+    - **Open reading reminder (s07):** naming the already-open reading again is a reminder, not another assignment. The prompt describes the path when an unlisted source is asked for while a reading is open: "I can't verify that", point back to the open reading in narration, re-offer the open question or ask none.
+
 ## Design summary
 
 - **Provider adapter:**
