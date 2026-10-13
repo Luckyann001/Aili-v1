@@ -106,7 +106,7 @@ export function LearnStage() {
   const sceneUi = shown && !dimmed;
   // Fake-director demo (testing only): ?demo=1 in a build with both testing flags.
   const fakeDemo = demo && FAKE_DIRECTOR && live === false;
-  const demoTurn = useDemoTurn(voice, live === true);
+  const demoTurn = useDemoTurn(voice, live === true, setText);
   const lessonStatus = useLesson((s) => s.status);
   const lessonChoices = useLesson((s) => s.choices);
   const lessonRev = useLesson((s) => s.rev);

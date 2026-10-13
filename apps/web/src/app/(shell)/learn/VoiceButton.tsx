@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useVoice } from "@/voice/store";
 import type { VoiceStatus } from "@/voice/machine";
 import styles from "./learn.module.css";
@@ -45,17 +46,42 @@ export function VoiceButton({ placement, onPress }: { placement: "stage" | "bar"
   );
 }
 
+/** Whole seconds since Aili started thinking (live turns take 6–25 s); 0 when not thinking. */
+function useThinkingSeconds(thinking: boolean): number {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!thinking) return;
+    const start = Date.now();
+    const t = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => {
+      clearInterval(t);
+      setSeconds(0);
+    };
+  }, [thinking]);
+  return seconds;
+}
+
+/** After this long the label says "Still thinking" (announced once), so a slow turn never looks stuck. */
+export const STILL_THINKING_S = 10;
+
 /** Visible state label, also announced to screen readers. One instance, shown at every width. */
 export function VoiceStatusLabel() {
   const status = useVoice((s) => s.status);
   const mode = useVoice((s) => s.mode);
   const note = useVoice((s) => s.note);
+  const seconds = useThinkingSeconds(status === "thinking");
   const where = status === "listening" && mode ? (mode === "on-device" ? " (on this device)" : " (online speech service)") : "";
-  const text = status === "idle" && note ? note : VOICE_LABEL[status] + where;
+  const text = status === "idle" && note ? note : status === "thinking" && seconds >= STILL_THINKING_S ? "Still thinking" : VOICE_LABEL[status] + where;
   return (
     <p className={styles.voiceLabel} role="status" data-state={status}>
       <VoiceIcon status={status} size={14} />
       <span>{text}</span>
+      {/* The count is for the eye only: announcing every second would drown everything else. */}
+      {status === "thinking" && seconds >= 3 && (
+        <span aria-hidden="true" data-elapsed="">
+          · {seconds} s
+        </span>
+      )}
     </p>
   );
 }

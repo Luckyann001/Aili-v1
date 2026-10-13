@@ -222,3 +222,83 @@ test.describe("live mode (demo mode A), browser side, mocked server", () => {
     await expect(page.getByText(/Live AI: your message/)).toHaveCount(0);
   });
 });
+
+// Slice 4: waiting, failure and interrupt states, with the server mocked as above.
+test.describe("live turns: waiting, failures and interrupt (slice 4, mocked server)", () => {
+  test.setTimeout(60_000);
+  const status = (p: Page) => p.locator('p[role="status"][data-state]');
+  const alertLine = (p: Page) => p.locator('p[role="alert"]');
+
+  /** Live mode on; /api/turn answers with `respond` (it may wait); interrupts are recorded. */
+  async function openWith(page: Page, respond: (route: Route, rev: number) => Promise<void>) {
+    const interrupts: unknown[] = [];
+    await page.route("**/api/live", (r) => r.fulfill({ json: { live: true } }));
+    await page.route("**/api/turn/interrupt", (r) => (interrupts.push(r.request().postDataJSON()), r.fulfill({ json: { stopped: true } })));
+    await page.route("**/api/turn", (r) => respond(r, (r.request().postDataJSON() as { state_rev: number }).state_rev));
+    await installVoiceFakes(page, { speakMs: 150 });
+    await page.goto("/learn");
+    await expect(welcome(page)).toBeVisible({ timeout: 20000 });
+    return interrupts;
+  }
+  const send = async (page: Page, text: string) => {
+    await box(page, "What do you want to learn?").fill(text);
+    await page.getByRole("button", { name: "Send" }).click();
+  };
+
+  test("a slow turn: Thinking with the seconds counting, then 'Still thinking'; Escape interrupts it and tells the server", async ({ page }) => {
+    const interrupts = await openWith(page, async (r) => {
+      await new Promise((res) => setTimeout(res, 20_000)); // longer than the test waits
+      await r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: "" }).catch(() => {});
+    });
+    await send(page, "teach me robotics");
+    await expect(status(page)).toHaveAttribute("data-state", "thinking");
+    await expect(status(page).locator("[data-elapsed]")).toHaveText(/· [3-9] s/, { timeout: 6000 });
+    await expect(status(page)).toContainText("Still thinking", { timeout: 12_000 });
+    await page.keyboard.press("Escape");
+    await expect(status(page)).toHaveText(/Stopped\./);
+    await expect.poll(() => interrupts.length).toBe(1);
+    await expect(stageEl(page)).toHaveAttribute("data-dimmed", ""); // nothing reached the stage
+  });
+
+  test("the Stop button interrupts too, and the next message still works", async ({ page }) => {
+    let calls = 0;
+    await openWith(page, async (r, rev) => {
+      calls += 1;
+      if (calls === 1) await new Promise((res) => setTimeout(res, 20_000));
+      await r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse(OFF_TOPIC, rev) }).catch(() => {});
+    });
+    await send(page, "teach me robotics");
+    await expect(status(page)).toHaveAttribute("data-state", "thinking");
+    await page.locator("button[data-state]:visible").click(); // the voice button is Stop while Aili thinks
+    await expect(status(page)).toHaveText(/Stopped\./);
+    await box(page, "Ask Aili or answer").fill("teach me guitar");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.locator("main").getByText(/nearest thing I can teach/)).toBeVisible({ timeout: 15000 });
+  });
+
+  for (const [reason, message] of [
+    ["spend_limit", "The monthly spending limit for live answers has been reached. Prepared lessons still work. Nothing on the stage changed."],
+    ["key_rejected", "The AI provider didn't accept the key set up on this computer. Prepared lessons still work. Nothing on the stage changed."],
+    ["timeout", "Aili took too long to answer, so the turn was stopped. Nothing on the stage changed."],
+    ["kill_switch", "Aili's live answers are switched off right now. Prepared lessons still work. Nothing on the stage changed."],
+  ] as const) {
+    test(`${reason}: the server's plain message, shown and announced; nothing on stage changes`, async ({ page }) => {
+      await openWith(page, (r, rev) => r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse([{ type: "turn.started" }, { type: "turn.error", reason, message, details: [] }], rev) }));
+      await send(page, "teach me robotics");
+      await expect(alertLine(page)).toHaveText(message);
+      await expect(stageEl(page)).toHaveAttribute("data-dimmed", "");
+      await expect(status(page)).toHaveAttribute("data-state", "idle");
+    });
+  }
+
+  test("both attempts failed the checks: a friendly line, the learner's text back in the box, the stage unchanged", async ({ page }) => {
+    await openWith(page, (r, rev) =>
+      r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse([{ type: "turn.started" }, { type: "turn.error", reason: "validation", message: "Aili's answer didn't pass its checks, so it wasn't shown. Nothing on the stage changed.", details: ["(after one repair attempt)"] }], rev) }),
+    );
+    await send(page, "robotics");
+    await expect(alertLine(page)).toHaveText(/couldn't put a good answer together for that\. Your message is back in the box: try rephrasing it, or send it again\. Nothing on the stage changed\./);
+    await expect(alertLine(page)).not.toContainText("checks");
+    await expect(box(page, "Ask Aili or answer")).toHaveValue("robotics");
+    await expect(stageEl(page)).toHaveAttribute("data-dimmed", "");
+  });
+});

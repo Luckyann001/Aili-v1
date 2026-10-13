@@ -34,6 +34,9 @@ export interface StageSnapshot {
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
 const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy" };
 
+/** Live turns whose answer failed the checks twice: what the learner sees (their text is kept). */
+export const REJECTED_LIVE_MESSAGE = "I couldn't put a good answer together for that. Your message is back in the box: try rephrasing it, or send it again. Nothing on the stage changed.";
+
 /** This page's client session ID: turn IDs repeat across pages, so the server keys turns by both. */
 const SESSION_ID = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s-${Math.random().toString(36).slice(2, 12)}-${Date.now().toString(36)}`;
 
@@ -94,7 +97,7 @@ const toCaptionParts = (parts: ReadonlyArray<{ text: string } | { value: string 
  * Runs a turn against /api/turn: the fake director's scripted case, or (with `live`, when the
  * server's live mode is on) the live professor, whose lines are badged "Live AI".
  */
-export function useDemoTurn(voice: Voice, live = false) {
+export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string) => void) {
   const current = useRef<{ rev: number; abort: AbortController } | null>(null);
 
   /** Stop the turn in flight (interrupt): cancel the stream, tell the server, put the stage back. */
@@ -145,6 +148,13 @@ export function useDemoTurn(voice: Voice, live = false) {
 
       const onEvent = (e: TurnEvent) => {
         if (!mine()) return;
+        // Live: both attempts failed the checks. A friendly line, and the learner's words go back in
+        // the box to rephrase or resend (Lucky's decision 2026-10-13); the stage is restored below.
+        if (live && e.type === "turn.error" && (e.reason === "validation" || e.reason === "pedagogy") && useTurnClient.getState().state.turnId === e.turn_id) {
+          useTurnClient.getState().dispatch({ type: "event", event: e });
+          keepText?.(text);
+          return fail(REJECTED_LIVE_MESSAGE);
+        }
         const before = useTurnClient.getState().state;
         const after = useTurnClient.getState().dispatch({ type: "event", event: e });
         if (after === before) return; // dropped by the gate
@@ -191,7 +201,7 @@ export function useDemoTurn(voice: Voice, live = false) {
       const ended = useTurnClient.getState().dispatch({ type: "streamEnded" });
       if (ended.status === "dropped") fail(DROPPED_MESSAGE);
     },
-    [stop, voice, live],
+    [stop, voice, live, keepText],
   );
 
   return { start, stop };
