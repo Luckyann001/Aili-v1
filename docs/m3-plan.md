@@ -109,6 +109,11 @@ Read with: `CLAUDE.md`, `docs/aili-professor-behavior-spec.md` (A1–A14), `docs
     - **Teach-back reading (s08):** a teach-back question must name its reading; with exactly one reading open the engine fills it in (warning "reading filled in"); otherwise the validator rejects it.
     - **Open reading reminder (s07):** naming the already-open reading again is a reminder, not another assignment. The prompt describes the path when an unlisted source is asked for while a reading is open: "I can't verify that", point back to the open reading in narration, re-offer the open question or ask none.
 
+29. **After run A and the consistency check (Oct 13 2026), decided by Lucky:**
+    - **A guess on an open prediction is never pushback:** the engine ignores the router's pushback flag when a guess is set (the s04 and c1 failures came from the hold rule and the prediction rule demanding opposite moves).
+    - **A teach-back question on the open reading** follows up the question asked when the reading was assigned, and replaces it (s08).
+    - **reveal.calc** must be one calculation ID, with an exact repair message.
+
 ## Design summary
 
 - **Provider adapter:**
