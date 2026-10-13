@@ -19,6 +19,8 @@ It returns `errors` (objective violations: the answer is rejected and gets one r
 
 | Rule (added after the first live runs, 2026-10-12) | Kind | Checks |
 |---|---|---|
+| something for the learner | error | an answer with no narration and no prompt (actions alone) is rejected: "the answer gives the learner nothing"; counted in the bake-off summary as empty first answers |
+| a probe asks | error | move `probe` requires a `prompt` (behavior spec A1a: one short question) |
 | narration length | error / **warning** | at most 4 segments of at most **200** characters (error); a segment over 160 is a warning; the prompt asks for 140 |
 | narration split | **warning** (engine) | a segment over 200 is split at sentence ends (a ".", "!" or "?" followed by a space, never inside a `{{placeholder}}`) into parts of at most 200, before validation. Not split, and rejected as before, if one sentence alone is over 200 or the split would pass four segments |
 | count adjectives | allowed digits | a fixed list: `N-axis`, `N-DOF`/`N DOF`, `N-link`, `N-wheel(ed)`, `N-joint` (N a single digit 1–9, never after a digit or decimal point), plus `3D`/`2D`. Nothing the learner typed is exempted |
