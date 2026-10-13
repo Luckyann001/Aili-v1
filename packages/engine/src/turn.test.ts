@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, matchOpenChoice, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, matchOpenChoice, selectSceneForConcept, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
@@ -591,5 +591,31 @@ describe("five segments after a split, in a turn (Lucky's decision 2026-10-13)",
     expect(events.at(-1)!.type).toBe("turn.done");
     expect(events.filter((e) => e.type === "narration")).toHaveLength(5);
     expect(checks[0]!.warnings.join()).toMatch(/narration split: narration\[3\]/);
+  });
+});
+
+describe("scene on stage: the engine selects the concept's scene when the answer put none (Lucky's decision 2026-10-13)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const noScene = { ...VALID, actions: [], calc_requests: [], narration: [{ id: "n1", text: "Torque is force times distance from the pivot." }], prompt: undefined, move: "explain" };
+  it("a turn about torque with no select_scene: the scene that teaches it goes on stage, with a visible warning", async () => {
+    const warnings: string[] = [];
+    const director: Director = { async respond(req) { return { response: { ...noScene, request_id: req.request_id, state_rev: req.state_rev } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] } }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => warnings.push(...c.warnings) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "teach me robotics" }, (e) => events.push(e));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(events.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(s.state.activeScene).toBe("fx-lever");
+    expect(warnings.some((w) => w.startsWith("scene selected by engine"))).toBe(true);
+  });
+  it("never for a concept without a scene, an unsupported topic, a scene already chosen or already on stage", () => {
+    const scenes = [{ id: "fx-lever", teaches: ["mech.torque.static"] }];
+    const r = { ...noScene, concepts: ["mech.torque.static"] } as unknown as import("@aili/schemas").DirectorResponse;
+    expect(selectSceneForConcept(r, scenes, undefined)?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(selectSceneForConcept({ ...r, concepts: ["mech.gears"] }, scenes, undefined)).toBeNull();
+    expect(selectSceneForConcept({ ...r, concepts: [] }, scenes, undefined)).toBeNull();
+    expect(selectSceneForConcept({ ...r, coverage: "unsupported" }, scenes, undefined)).toBeNull();
+    expect(selectSceneForConcept({ ...r, actions: [{ type: "select_scene", scene: "other" }] } as typeof r, scenes, undefined)).toBeNull();
+    expect(selectSceneForConcept(r, scenes, "fx-lever")).toBeNull();
   });
 });

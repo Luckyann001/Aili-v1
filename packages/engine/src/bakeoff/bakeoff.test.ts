@@ -327,6 +327,15 @@ describe("narration splits are counted (Lucky's decision 2026-10-13)", () => {
   });
 });
 
+describe("scenes selected by the engine are counted (Lucky's decision 2026-10-13)", () => {
+  it("counts turns with the warning and lists it by type", () => {
+    const turn = (warnings: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [], warnings, expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    const m = metrics([turn(['scene selected by engine: "fx-lever" for mech.torque.static (the answer put no scene on stage)']), turn([])]);
+    expect(m.scene_selected).toBe(1);
+    expect(m.warnings_by_type).toEqual({ "scene selected by engine": 1 });
+  });
+});
+
 describe("summary by scenario family (Lucky's decision 2026-10-13)", () => {
   it("groups by c, f, j, o and others, and gives the first-try rate with and without f and o", async () => {
     const recs = { "s03-true-beginner": recording("s03-true-beginner"), "o1-inverse-kinematics": recording("o1-inverse-kinematics") };

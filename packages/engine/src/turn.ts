@@ -5,7 +5,7 @@ import { shortlist } from "./capabilities";
 import { NARRATION_SPLIT_MAX_SEGMENTS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
-import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED } from "./teaching";
+import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
@@ -395,7 +395,10 @@ export class TurnSession {
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
       if (reoffersOpenQuestion(v.response, history, teaching)) warnings.push(`${OPEN_QUESTION_REOFFERED} (${v.response.prompt!.kind}): "${v.response.prompt!.text}"`);
-      return p.length ? { reason: "pedagogy", errors: p, warnings } : { r: v.response, warnings };
+      if (p.length) return { reason: "pedagogy", errors: p, warnings };
+      // A passing answer about a concept with a scene, but no scene on stage: the engine selects it.
+      const picked = selectSceneForConcept(v.response, sl.scenes, before.activeScene);
+      return picked ? { r: picked.r, warnings: [...warnings, picked.warning] } : { r: v.response, warnings };
     };
 
     let reply = await callDirector();

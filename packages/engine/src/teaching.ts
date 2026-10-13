@@ -90,6 +90,25 @@ export function applyResponse(t: TeachingState, r: DirectorResponse, turn: numbe
 /** The warning text when an answer re-offers the open question instead of a new one (Lucky's decision 2026-10-13). */
 export const OPEN_QUESTION_REOFFERED = "open question re-offered";
 
+export const SCENE_SELECTED_BY_ENGINE = "scene selected by engine";
+
+/**
+ * When the answer's first concept has a scene in this turn's shortlist (the registry's own `teaches`
+ * link) and the model put no scene on stage, the engine selects it (Lucky's decision 2026-10-13).
+ * Never for a concept without a scene, an unsupported topic, or when that scene is already on stage.
+ */
+export function selectSceneForConcept(
+  r: DirectorResponse,
+  scenes: ReadonlyArray<{ id: string; teaches: readonly string[] }>,
+  activeScene: string | undefined,
+): { r: DirectorResponse; warning: string } | null {
+  const concept = r.concepts[0];
+  if (!concept || r.coverage === "unsupported" || r.actions.some((a) => a.type === "select_scene")) return null;
+  const scene = scenes.find((s) => s.teaches.includes(concept));
+  if (!scene || scene.id === activeScene) return null;
+  return { r: { ...r, actions: [{ type: "select_scene", scene: scene.id }, ...r.actions] }, warning: `${SCENE_SELECTED_BY_ENGINE}: "${scene.id}" for ${concept} (the answer put no scene on stage)` };
+}
+
 
 /** The warning when the engine names the reading of a teach-back question (Lucky's decision 2026-10-13). */
 export const READING_FILLED_IN = "reading filled in";

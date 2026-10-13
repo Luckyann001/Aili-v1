@@ -1,5 +1,5 @@
 import { EMPTY_ANSWER, GUIDE_QUESTION_SUBSTITUTED, NARRATION_SPLIT } from "../director";
-import { OPEN_QUESTION_REOFFERED, READING_FILLED_IN } from "../teaching";
+import { OPEN_QUESTION_REOFFERED, SCENE_SELECTED_BY_ENGINE, READING_FILLED_IN } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
 // Bake-off report (docs/m3-plan.md slice 7a): numbers code can measure, and one transcript per
@@ -67,6 +67,8 @@ export interface Metrics {
   router_missed: number;
   /** Turns that re-offered the open question instead of asking a new one. */
   reoffered: number;
+  /** Turns where the engine put the concept's scene on stage because the answer did not. */
+  scene_selected: number;
   /** Turns where the engine split a long narration segment at sentence boundaries. */
   narration_split: number;
   /** Turns whose FIRST answer was empty or action-only (no narration and no prompt). */
@@ -118,6 +120,8 @@ export function metrics(turns: TurnRecord[]): Metrics {
             ? "narration split"
             : w.startsWith(OPEN_QUESTION_REOFFERED)
             ? "open question re-offered"
+            : w.startsWith(SCENE_SELECTED_BY_ENGINE)
+            ? "scene selected by engine"
             : w.startsWith("analogy:")
               ? "analogy"
               : /mild praise/.test(w)
@@ -141,6 +145,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     empty_first: turns.filter((t) => t.checks.find((c) => c.attempt === 1)?.errors.includes(EMPTY_ANSWER)).length,
     narration_split: turns.filter((t) => t.warnings.some((w) => w.startsWith(NARRATION_SPLIT))).length,
     reoffered: turns.filter((t) => t.warnings.some((w) => w.startsWith(OPEN_QUESTION_REOFFERED))).length,
+    scene_selected: turns.filter((t) => t.warnings.some((w) => w.startsWith(SCENE_SELECTED_BY_ENGINE))).length,
   };
 }
 
@@ -182,6 +187,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Warnings (semantic, for review; never a rejection) | ${m.warnings}${m.warnings ? ` (${movesText(m.warnings_by_type)})` : ""} |`,
     `| Router said "unanswered" to a scripted direct answer | ${m.router_missed} |`,
     `| Open questions re-offered (instead of a new question) | ${m.reoffered} |`,
+    `| Scene selected by the engine (the answer put none on stage) | ${m.scene_selected} |`,
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
     `| Empty or action-only first answers (no narration, no prompt) | ${m.empty_first} |`,
     `| Guide application question substituted (engine, after the repair) | ${m.guide_substituted} |`,
