@@ -213,6 +213,7 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toMatch(/If session_state has direct_answer_requested true .* no "prompt" at all; state the assumptions and cite a reading in "evidence"\. You may state an offer in narration/);
     expect(s).toMatch(/set "coverage": "unsupported" with move "answer" or "explain"/);
     expect(s).toMatch(/A prompt contains exactly one question mark: one question, never two, and no "does that make sense\?" checks/);
+    expect(s).toMatch(/A prompt asks exactly one thing: do not join two questions with "and" or "or"/);
     expect(s).toMatch(/If a reading is already open and the learner asks for a source that is not in the shortlist: say "I can't verify that", point back to the open reading in narration \(do not set "reading" again\)/);
     expect(s).toMatch(/Never write a calculation ID \(c1, c2\) in anything the learner reads; show a result only through its placeholder\./);
     expect(s).toMatch(/Assumptions and limitations contain no digits: write them in words \("level", "no payload"/);
