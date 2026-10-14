@@ -28,10 +28,14 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Per-turn flow over SSE plus a POST interrupt; stale-action invalidation
 - [ ] Cost + token metering per session
 
-**M3 — Professor (live AI)**
-- [ ] Provider adapter (config-driven); postures (Answer/Learning/Build) and moves
-- [ ] Prediction → test → reveal; teach-back; reading assignment
-- [ ] 17 professor tests in CI; provider bake-off (~30 scenarios)
+**M3 — Professor (live AI) (closed Oct 14 2026 on the numbers; see `docs/m3-report.md`)**
+- [x] Provider adapter (config-driven); postures (Answer/Learning/Build) and moves
+- [x] Prediction → test → reveal; teach-back; reading assignment
+- [x] 17 professor tests in CI; provider bake-off (28 scenarios, one provider: Anthropic)
+- Open items, not done: Lucky has not yet read transcripts s13, s11, x1 and s05; pushback and "teach me
+  guitar" not yet tried by Lucky in the browser; s08 turns 3–4 not run live since their fix; the
+  highlight rule and the one-ask prompt line not yet exercised by the real model beyond the checks so
+  far; slice 7 (full live walkthrough) not run.
 
 **M4 — Robotics Lab 1 (servo torque) end to end**
 - [ ] Concept graph seed (~40 concepts, 3 labelled "lab")

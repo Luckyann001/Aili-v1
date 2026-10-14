@@ -1,7 +1,43 @@
 # M3 report: the live professor (engine)
 
-**Date:** 13 Oct 2026. **Branch:** `m1/learn-stage-shell` (local commits only; nothing pushed or merged).
-**Scope:** the engine and its command-line tools. The web app does **not** call the live model yet.
+**Date:** 13 Oct 2026; closing note 14 Oct 2026. **Branch:** `m1/learn-stage-shell` (local commits only; nothing pushed or merged).
+**Scope:** the engine and its command-line tools. (When this report was written the web app did not call
+the live model; since then it does, on Lucky's laptop only: see `docs/m3-live-browser-plan.md`, slices 1–6.)
+
+## Status: M3 closed on the numbers (14 Oct 2026)
+
+M3 is closed administratively on the results below (100% after repair, 76% first attempt, over all 28
+scenarios at their latest runs) and the fixes listed under "Changed since this report". It is not a
+claim that every item was checked by a person. **Open items, not done:**
+
+- Lucky has not yet read the transcripts of **s13** (LiPo charging), **s11** (drone PID), **x1** (mains)
+  and **s05**.
+- Lucky has not yet tried **pushback** or **"teach me guitar"** in the browser.
+- **s08 turns 3–4** have not run live since their fix (the cost cap stopped the runs).
+- The **highlight rule** and the **"a prompt asks exactly one thing"** prompt line have not been exercised
+  by the real model beyond the checks so far (unit tests and the recorded e2e only).
+- **Slice 7** (one full live walkthrough in the browser) has not been run.
+
+## Changed since this report (14 Oct 2026; commits a4c06dd..a1a869a)
+
+- **Stray action fields** (a field from another action type, such as "scene" on a highlight) are dropped
+  before the checks when the rest of the action is valid; counted warning. (a4c06dd)
+- **Every check runs** even when the format check fails, so one repair lists every problem. (e5aeb3d)
+- **Learner level starts "unknown"**, marked as not stated by the learner; the prompt forbids claiming the
+  learner said what they did not; a first-turn "you said …" warning. (bfe449c)
+- **Live logs** name the concepts and the selected scene for each attempt. (b6d7896)
+- **Prompt:** a probe's question goes in the prompt field, not only in narration. (72e5dbf)
+- **Starting scene:** when an answer names no concept and nothing is on stage, the engine puts the
+  topic's starting scene on stage; counted warning. (c7f21ad)
+- **Highlight rule:** narration that says "highlighted", "highlight" or "the marked part" with no highlight
+  on stage is rejected for repair. (0910862)
+- **Prompt:** a prompt asks exactly one thing, never two joined with "and" or "or". (384d16d)
+- **Slice 6:** browser e2e of the live path with a hand-written recording (no key, no spend). (a1a869a)
+
+Live checks after these fixes (laptop, own port): "robotics" ×3 passed on the first attempt (0.053 USD);
+"robotics" put the lever on stage through the starting-scene rule and "teach me guitar" put nothing on
+stage (0.036 USD). Ledger total since the first live call: about **4.76 USD**, plus one turn on Lucky's own
+dev server whose cost was shown only in that terminal.
 Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (the rule table).
 
 ## What was built
@@ -58,7 +94,8 @@ Read with `docs/m3-plan.md` (decisions 1–29) and `packages/engine/README.md` (
 - **Only one provider:** no second provider or model pairing was compared.
 - **No robotics-expert review** of the transcripts, the physics or the safety wording. Results come
   from automatic checks and Claude reading transcripts, not from a domain reviewer.
-- **The web app does not call the live model yet**; no live turn has run in a browser.
+- **The web app did not call the live model yet** when this was written (it now does on the laptop;
+  see the status section above).
 - **No load testing and no mobile testing** of live turns; latency was measured from a laptop only.
 - **Test fixtures only:** two concepts, two readings, two analogies; no published content exists yet.
 - **Not every fix was re-run in full:** s08 turns 3–4 have not run since its fix (the cost cap stopped
