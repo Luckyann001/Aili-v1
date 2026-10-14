@@ -97,11 +97,17 @@ test.describe("live path with the recorded provider (slice 6)", () => {
     });
   }
 
-  test("interrupt during the first segment: queued actions never run, the server is told, the panel says where it stopped", async ({ page }) => {
-    const interrupts: Array<{ shown_through?: string | null }> = [];
+  // Every request body the page sends to the turn routes, in order.
+  const recordTurnRequests = (page: Page) => {
+    const sent: Array<{ url: string; body: { previous_shown?: { state_rev: number; shown_through: string | null }; shown_through?: unknown; input?: { text: string } } }> = [];
     page.on("request", (r) => {
-      if (r.url().endsWith("/api/turn/interrupt")) interrupts.push(r.postDataJSON() as { shown_through?: string | null });
+      if (/\/api\/turn(\/interrupt)?$/.test(r.url())) sent.push({ url: r.url(), body: r.postDataJSON() });
     });
+    return sent;
+  };
+
+  test("interrupt during the first segment: queued actions never run, the panel says where it stopped, the next message carries the note", async ({ page }) => {
+    const sent = recordTurnRequests(page);
     await installVoiceFakes(page, { speakMs: 4000 });
     await page.goto("/learn");
     await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
@@ -113,7 +119,8 @@ test.describe("live path with the recorded provider (slice 6)", () => {
     await page.waitForTimeout(4500); // past where the second segment would have started
     await expect(stage(page)).toHaveAttribute("data-dimmed", "");
     await expect(page.getByRole("button", { name: /^Parts/ })).toHaveCount(0);
-    await expect.poll(() => interrupts.map((b) => b.shown_through)).toEqual(["n1"]);
+    // No separate "how far" message: the note waits for the next turn's request.
+    expect(sent.filter((r) => r.body.shown_through !== undefined)).toEqual([]);
     await page.getByRole("button", { name: "Explanation" }).click();
     const panel = page.locator("#learn-tabpanel");
     await expect(panel.getByText(FIRST)).toBeVisible();
@@ -121,5 +128,65 @@ test.describe("live path with the recorded provider (slice 6)", () => {
     await expect(panel.getByText("Stopped here.")).toBeVisible();
     await expect(panel.getByText(QUESTION)).toHaveCount(0);
     expect(await axe(page)).toEqual([]);
+    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("It gets harder");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect.poll(() => sent.filter((r) => r.url.endsWith("/api/turn")).at(-1)?.body.previous_shown?.shown_through).toBe("n1");
   });
+
+  test("a new message during the first segment (no Escape): its own request carries the note, and the stage never shows the unseen scene", async ({ page }) => {
+    const sent = recordTurnRequests(page);
+    await installVoiceFakes(page, { speakMs: 4000 });
+    await page.goto("/learn");
+    await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
+    await welcomeBox(page).fill("teach me robotics");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(caption(page)).toHaveText(FIRST, { timeout: 20_000 });
+    await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("It gets harder");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect.poll(() => sent.filter((r) => r.url.endsWith("/api/turn")).length).toBe(2);
+    const second = sent.filter((r) => r.url.endsWith("/api/turn"))[1]!.body;
+    expect(second.previous_shown).toMatchObject({ shown_through: "n1" });
+    expect(second.input?.text).toBe("It gets harder");
+    expect(sent.filter((r) => r.body.shown_through !== undefined)).toEqual([]);
+    // The second turn was checked against the stage the learner saw (no scene), so it is turned down
+    // plainly, and the lever, bound to the unseen segment, never appeared.
+    await expect(page.locator('p[role="alert"]')).toBeVisible({ timeout: 20_000 });
+    await expect(stage(page)).toHaveAttribute("data-dimmed", "");
+    await expect(page.getByRole("button", { name: /^Parts/ })).toHaveCount(0);
+  });
+
+  // M4 slice 1: the weight slide plays in a live-path turn, with its segment ("Watch the weight slide
+  // out…"). The selected weight's label follows the 3D weight on screen, so it must move.
+  const SLIDE = /^Watch the weight slide out to the end/;
+  for (const mode of ["voice on", "captions only"] as const) {
+    test(`${mode}: the weight-slide animation moves the weight as its segment plays`, async ({ page }) => {
+      await installVoiceFakes(page, { speakMs: 2500 });
+      await page.goto("/learn");
+      await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
+      if (mode === "captions only") await page.getByRole("button", { name: "Mute" }).click();
+      await welcomeBox(page).fill("teach me robotics");
+      await page.getByRole("button", { name: "Send" }).click();
+      await expect(replies(page).getByRole("button")).toHaveCount(4, { timeout: 30_000 });
+      const label = page.locator('[data-part-id="weight"]');
+      await expect(label).toHaveText(/Selected: Weight/);
+      await replies(page).getByRole("button", { name: "It gets harder" }).click();
+      // During turn 2's first segment (no actions) the weight stays put: the slide waits for its own
+      // segment. (Measured here, not before the tap: removing the choice row re-frames the stage.)
+      await expect(caption(page)).toHaveText(/^Yes, farther out is harder/, { timeout: 30_000 });
+      await page.waitForTimeout(600); // let the re-framing settle
+      const before = (await label.boundingBox())!;
+      await page.waitForTimeout(800);
+      const still = (await label.boundingBox())!;
+      if (await caption(page).textContent().then((t) => /^Yes, farther out/.test(t ?? ""))) expect(Math.hypot(still.x - before.x, still.y - before.y)).toBeLessThan(5);
+      await expect(caption(page)).toHaveText(SLIDE, { timeout: 30_000 });
+      // The slide takes about two and a half spatial durations; the label must travel well away.
+      await expect
+        .poll(async () => {
+          const b = await label.boundingBox();
+          return b ? Math.hypot(b.x - before.x, b.y - before.y) : 0;
+        }, { timeout: 6_000 })
+        .toBeGreaterThan(30);
+    });
+  }
 });
