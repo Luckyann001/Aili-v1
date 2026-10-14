@@ -9,6 +9,8 @@ export interface SessionStore {
   get(sessionId: string): SessionState | undefined;
   /** Save the state a COMPLETED turn produced. Ignored if a newer revision was already saved. */
   commit(sessionId: string, rev: number, state: SessionState): boolean;
+  /** Change the state saved by turn `rev` (an interrupt mid-speech; M4 slice 1). Ignored unless `rev` is the latest saved. */
+  amend(sessionId: string, rev: number, change: (s: SessionState) => SessionState): boolean;
 }
 
 export class InMemorySessionStore implements SessionStore {
@@ -30,6 +32,14 @@ export class InMemorySessionStore implements SessionStore {
     this.map.delete(sessionId); // move to the end: most recently used
     this.map.set(sessionId, e);
     return e.state;
+  }
+
+  amend(sessionId: string, rev: number, change: (s: SessionState) => SessionState): boolean {
+    const e = this.map.get(sessionId);
+    if (!e || e.rev !== rev) return false;
+    e.state = change(e.state);
+    e.at = this.now();
+    return true;
   }
 
   commit(sessionId: string, rev: number, state: SessionState): boolean {

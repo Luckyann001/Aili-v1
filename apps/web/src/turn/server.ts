@@ -1,4 +1,4 @@
-import { createFakeDirector, createFakeRouter, encodeEvent, InMemoryLedger, InMemorySessionStore, killSwitchFromEnv, TurnSession, type SessionState, type TurnEvent } from "@aili/engine";
+import { createFakeDirector, createFakeRouter, encodeEvent, reconcileShown, InMemoryLedger, InMemorySessionStore, killSwitchFromEnv, TurnSession, type SessionState, type TurnEvent } from "@aili/engine";
 import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
@@ -176,7 +176,13 @@ export async function handleInterrupt(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest(parsed.error.issues.map((i) => `${i.path.join(".") || "(body)"}: ${i.message}`));
   const key = `${parsed.data.session_id}/${parsed.data.request_id}`;
   const s = running.get(key);
-  if (!s || s.revision !== parsed.data.state_rev) return Response.json({ stopped: false }); // finished, unknown, another session or instance
+  if (!s || s.revision !== parsed.data.state_rev) {
+    // The turn had already arrived and was being played (M4 slice 1): keep only the stage changes
+    // of the segments the learner saw. Ignored unless this is the session's latest turn.
+    const shown = parsed.data.shown_through;
+    const reconciled = shown !== undefined && sessions.amend(parsed.data.session_id, parsed.data.state_rev, (st) => reconcileShown(st, shown));
+    return Response.json({ stopped: false, ...(reconciled ? { reconciled: true } : {}) });
+  }
   s.interrupt();
   running.delete(key);
   return Response.json({ stopped: true });

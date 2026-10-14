@@ -55,6 +55,19 @@ describe("recorded live path (test builds only)", () => {
     expect(sessions.get("recorded-test-0001")!.teaching!.predictions[0]).toMatchObject({ guess: "It gets harder", status: "revealed" });
   });
 
+  it("an interrupt after the turn arrived, with no segment shown yet, puts the server's stage back (M4 slice 1)", async () => {
+    const { handleTurn, handleInterrupt, sessions } = await load();
+    await readAll(await handleTurn(post(body(5, "teach me robotics", "recorded-test-0003"))));
+    expect(sessions.get("recorded-test-0003")!.activeScene).toBe("fx-lever");
+    const res = await handleInterrupt(post({ session_id: "recorded-test-0003", request_id: "turn_5", state_rev: 5, shown_through: null }));
+    expect(await res.json()).toEqual({ stopped: false, reconciled: true });
+    expect(sessions.get("recorded-test-0003")!.activeScene).toBeUndefined();
+    // Shown through the first segment: its scene and highlight stay.
+    await readAll(await handleTurn(post(body(6, "teach me robotics", "recorded-test-0004"))));
+    await handleInterrupt(post({ session_id: "recorded-test-0004", request_id: "turn_6", state_rev: 6, shown_through: "n1" }));
+    expect(sessions.get("recorded-test-0004")).toMatchObject({ activeScene: "fx-lever", highlightedPart: "weight" });
+  });
+
   it("off without the test's cookie, without the run-time flag, and refused from another device; never logged", async () => {
     let s = await load({ fake: "" });
     expect((await s.handleTurn(post(body(1, "hi"), { cookie: "" }))).status).toBe(404); // no cookie: neither live nor fake

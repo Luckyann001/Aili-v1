@@ -23,5 +23,16 @@ export const TurnRequest = z
   .strict();
 export type TurnRequest = z.infer<typeof TurnRequest>;
 
-export const InterruptRequest = z.object({ session_id: ClientSessionId, request_id: z.string().min(1).max(64), state_rev: z.number().int().min(1) }).strict();
+export const InterruptRequest = z
+  .object({
+    session_id: ClientSessionId,
+    request_id: z.string().min(1).max(64),
+    state_rev: z.number().int().min(1),
+    /**
+     * Sent when the turn had already arrived and its narration was being played (M4 slice 1): the
+     * last narration segment the learner saw (null: none yet), so the server's stage matches the page.
+     */
+    shown_through: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).nullable().optional(),
+  })
+  .strict();
 export type InterruptRequest = z.infer<typeof InterruptRequest>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, matchOpenChoice, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
@@ -779,5 +779,43 @@ describe("bound actions in a turn (M4 slice 1)", () => {
     expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
     expect(events.filter((e) => e.type === "narration").length).toBeGreaterThan(1);
     expect(events.filter((e) => e.type === "action").map((e) => (e as { action: { at: string } }).action.at)).toEqual(["n1", "n1"]);
+  });
+});
+
+describe("an interrupt mid-speech keeps only the stage the learner saw (M4 slice 1)", () => {
+  const state: SessionState = {
+    history: { posture: "learning", learner_level: "unknown", entries: [] },
+    activeScene: "fx-lever",
+    highlightedPart: "weight",
+    lastTurn: {
+      startScene: "base-joint-arm",
+      segments: ["n1", "n2", "n3"],
+      actions: [
+        { type: "select_scene", scene: "fx-lever", at: "n1" },
+        { type: "highlight_part", part: "weight", at: "n2" },
+      ],
+    },
+  };
+  it("shown through n1: the new scene, no highlight; through n2: both; none shown: the stage before the turn", () => {
+    expect(reconcileShown(state, "n1")).toMatchObject({ activeScene: "fx-lever" });
+    expect(reconcileShown(state, "n1").highlightedPart).toBeUndefined();
+    expect(reconcileShown(state, "n2")).toMatchObject({ activeScene: "fx-lever", highlightedPart: "weight" });
+    const none = reconcileShown(state, null);
+    expect(none.activeScene).toBe("base-joint-arm");
+    expect(none.highlightedPart).toBeUndefined();
+    expect(none.lastTurn!.actions).toEqual([]);
+  });
+  it("an unknown segment or no last turn changes nothing; the history stays", () => {
+    expect(reconcileShown(state, "n9")).toBe(state);
+    const { lastTurn: _t, ...noTurn } = state;
+    expect(reconcileShown(noTurn, null)).toBe(noTurn);
+    expect(reconcileShown(state, null).history).toBe(state.history);
+  });
+  it("the store amends only the latest turn's state", () => {
+    const store = new InMemorySessionStore();
+    store.commit("page-amend-0001", 3, state);
+    expect(store.amend("page-amend-0001", 2, (s) => reconcileShown(s, null))).toBe(false);
+    expect(store.amend("page-amend-0001", 3, (s) => reconcileShown(s, null))).toBe(true);
+    expect(store.get("page-amend-0001")!.activeScene).toBe("base-joint-arm");
   });
 });
