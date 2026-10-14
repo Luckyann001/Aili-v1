@@ -61,6 +61,8 @@ describe("assembly", () => {
     expect(sl.simulations[0].inputs.arm_length_m).toEqual({ unit: "m", min: 0.05, max: 0.5 });
     expect(Object.keys(sl.solvers[0].outputs)).toContain("torque_nm");
     expect(sl.readings[0].guide.key_claims[0]).toBe("Moment is force times distance");
+    // Each analogy says whether a picture of it exists (docs/m4-plan.md addendum A). The block groups items by kind + "s".
+    expect(Object.fromEntries(sl.analogys.map((x: { id: string; visual: string }) => [x.id, x.visual]))).toEqual({ "analogy.fx-long-wrench": "none", "analogy.fx-ruler-held-out": "fx-lever", "analogy.fx-shopping-bag": "none" });
     const state = JSON.parse(unescape(blockOf(a.input, "session_state")));
     expect(state).toMatchObject({ request_id: "turn_7", state_rev: 7, posture: "learning", open_prompt: { from_turn: 1 }, last_moves: [{ move: "explain", asked: true }] });
     expect(unescape(blockOf(a.input, "learner_input")).trim()).toBe("Why is it harder to hold far out?");

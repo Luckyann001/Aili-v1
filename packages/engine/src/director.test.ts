@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, dropStrayActionFields, highlightErrors, refersToPart, segmentWarnings, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { analogyObjects, analogyWarnings, checkNarration, dropStrayActionFields, highlightErrors, refersToPart, segmentWarnings, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -39,7 +39,7 @@ const errs = (o: object, ctx = CTX) => run(o, ctx).errors;
 describe("director response: setup", () => {
   it("the fixture registry loads, and its shortlist holds the fixtures only (real content is draft)", () => {
     expect(loaded.errors).toEqual([]);
-    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-shopping-bag", "fx-lever", "fx-servo-arm", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
+    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-ruler-held-out", "analogy.fx-shopping-bag", "fx-lever", "fx-servo-arm", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
   });
 
   it("a valid response passes", () => {
@@ -690,5 +690,45 @@ describe("visuals follow the explanation: actions bound to narration segments (M
     expect(names([{ id: "n1", text: "The output horn turns with the motor." }], [])).toContain('action and narration out of step: narration[0] names "Output horn" (scene "fx-servo-arm") before that scene is on stage');
     expect(["this servo holds it", "look at the load", "the load here is light", "that load's distance"].map((t) => refersToPart(t, t.includes("servo") ? "servo" : "load"))).toEqual([true, true, true, true]);
     expect(["a servo holding an arm", "as well as the load's", "the load gets heavier", "servos are motors"].map((t) => refersToPart(t, t.includes("servo") ? "servo" : "load"))).toEqual([false, false, false, false]);
+  });
+});
+
+describe("analogy honesty rule: a picture only when one exists (docs/m4-plan.md addendum A; Lucky's decision 2026-10-15)", () => {
+  const seg = (id: string, text: string) => ({ id, text });
+  const warn = (r: object, active = "fx-lever") => analogyWarnings(r as never, SL, active);
+  it("the objects of an analogy come from its mapping's source side", () => {
+    expect(analogyObjects(SL.analogies.find((a) => a.id === "analogy.fx-shopping-bag")!)).toEqual(["bag", "shoulder", "arm"]);
+  });
+  it("the founder's turn of 14 Oct, verbatim: the bag told while the ruler's weight slides gives the 'different object' warning", () => {
+    const w = warn({
+      analogy: "analogy.fx-shopping-bag",
+      narration: [
+        seg("n1", "Picture holding a shopping bag out at arm's length. The bag is the payload, your shoulder is the joint, and your hand's distance from it is the moment arm."),
+        seg("n2", "Hold the bag close to your body and it feels light. Stretch your arm out and the same bag feels much heavier, because the distance grew."),
+        seg("n3", "Your own arm's weight also loads the shoulder. That maps to the arm's own mass, which counts toward the torque as well as the bag."),
+      ],
+      actions: [{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "weight", at: "n2" }, { type: "play_animation", animation: "slide-weight-out", at: "n3" }],
+    });
+    expect(w).toEqual(['analogy not pictured: narration[2] plays "slide-weight-out" on "fx-lever" while telling "analogy.fx-shopping-bag", which is not pictured: a different object moves']);
+  });
+  it("pointing at an analogy object with no picture on stage is a warning; 'Picture …' in words is not", () => {
+    expect(warn({ analogy: "analogy.fx-shopping-bag", narration: [seg("n1", "Watch the bag as your arm stretches out.")], actions: [] })).toEqual([
+      'analogy not pictured: narration[0] points at "bag" from "analogy.fx-shopping-bag", but no picture of it is on stage (it has none: words only)',
+    ]);
+    expect(warn({ analogy: "analogy.fx-shopping-bag", narration: [seg("n1", "Picture holding a bag at arm's length.")], actions: [] })).toEqual([]);
+  });
+  it("an analogy whose picture is on stage raises nothing; off stage, pointing at it does", () => {
+    const ruler = { analogy: "analogy.fx-ruler-held-out", narration: [seg("n1", "Look at the ruler: your hand holds it out.")], actions: [{ type: "play_animation", animation: "slide-weight-out", at: "n1" }] };
+    expect(warn(ruler)).toEqual([]);
+    expect(warn({ ...ruler, actions: [] }, "fx-servo-arm")).toEqual(['analogy not pictured: narration[0] points at "ruler" from "analogy.fx-ruler-held-out", but no picture of it is on stage']);
+  });
+  it("a word that names a part on stage is about that part ('watch the arm' on the servo + arm); no analogy, no warning", () => {
+    expect(warn({ analogy: "analogy.fx-shopping-bag", narration: [seg("n1", "Watch the arm swing out.")], actions: [] }, "fx-servo-arm")).toEqual([]);
+    expect(warn({ narration: [seg("n1", "Watch the bag.")], actions: [{ type: "play_animation", animation: "slide-weight-out", at: "n1" }] })).toEqual([]);
+  });
+  it("the validator reports them as warnings, never rejections", () => {
+    const r = run({ ...good(), actions: undefined, analogy: "analogy.fx-shopping-bag", narration: [{ id: "n1", text: "Watch the bag: the bag is the payload and your shoulder the joint; a shoulder tires gradually, a servo has a fixed rated torque.", actions: [] }] });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.some((w) => w.startsWith("analogy not pictured"))).toBe(true);
   });
 });

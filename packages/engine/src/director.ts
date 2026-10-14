@@ -154,6 +154,42 @@ export function segmentWarnings(r: Pick<DirectorResponse, "narration" | "actions
   return [...new Set(out)];
 }
 
+/** Warnings when narration treats an analogy as pictured though no picture of it is on stage (Lucky's decision 2026-10-15). */
+export const ANALOGY_NOT_PICTURED = "analogy not pictured";
+
+/** The things an analogy is about, from its mapping's source side: the last word of each ("the bag" → "bag"). */
+export function analogyObjects(an: { mapping: ReadonlyArray<{ source: string }> }): string[] {
+  const heads = an.mapping.map((m) => m.source.toLowerCase().replace(/\(.*?\)/g, "").match(/[a-z]{3,}/g)?.at(-1)).filter((w): w is string => !!w);
+  return [...new Set(heads)];
+}
+
+/**
+ * The honesty rule for analogies (docs/m4-plan.md addendum A). Per segment, with the stage as the
+ * segment's actions leave it, for the analogy this answer uses when its picture is not on stage:
+ * - narration that points at one of its objects ("watch the bag", "look at the bag", "this bag");
+ * - a stage animation played on a different object while the analogy is being told.
+ * Warnings only; the page labels a words-only analogy itself, whatever the narration says.
+ */
+export function analogyWarnings(r: Pick<DirectorResponse, "narration" | "actions" | "analogy">, sl: Pick<Shortlist, "analogies" | "scenes">, activeScene: string | undefined): string[] {
+  const analogies = sl.analogies;
+  const an = r.analogy ? analogies.find((a) => a.id === r.analogy) : undefined;
+  if (!an) return [];
+  const objects = analogyObjects(an);
+  const out: string[] = [];
+  let stage = activeScene;
+  r.narration.forEach((n, i) => {
+    for (const a of r.actions.filter((x) => x.at === n.id)) if (a.type === "select_scene") stage = a.scene;
+    if (an.scene && stage === an.scene) return; // its picture is on stage
+    // A word that also names a part of the scene on stage ("arm" on the servo + arm) is about that part.
+    const onStage = new Set((sl.scenes.find((x) => x.id === stage)?.parts ?? []).flatMap((p) => p.name.toLowerCase().match(/[a-z]{3,}/g) ?? []));
+    const pointed = objects.find((o) => !onStage.has(o) && refersToPart(n.text, o));
+    if (pointed) out.push(`${ANALOGY_NOT_PICTURED}: narration[${i}] points at "${pointed}" from "${an.id}", but no picture of it is on stage${an.scene ? "" : " (it has none: words only)"}`);
+    for (const a of r.actions.filter((x) => x.at === n.id && x.type === "play_animation"))
+      out.push(`${ANALOGY_NOT_PICTURED}: narration[${i}] plays "${(a as { animation: string }).animation}" on "${stage ?? "the stage"}" while telling "${an.id}", which is not pictured: a different object moves`);
+  });
+  return [...new Set(out)];
+}
+
 export const STRAY_ACTION_FIELD_DROPPED = "stray action field dropped";
 
 /** Only these words count as referring to a highlight (Lucky's decision 2026-10-14: keep it narrow). */
@@ -348,7 +384,7 @@ function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResp
   // Narration that refers to a highlight needs one on stage by then (Lucky's decisions 2026-10-14).
   errors.push(...highlightErrors(r, ctx.activeHighlight));
   // Softer: an action whose segment does not mention it; a part named before its scene is on stage.
-  if (!ctx.legacyBinding) warnings.push(...segmentWarnings(r, sl.scenes, ctx.activeScene));
+  if (!ctx.legacyBinding) warnings.push(...segmentWarnings(r, sl.scenes, ctx.activeScene), ...analogyWarnings(r, sl, ctx.activeScene));
 
   // Actions, in order: the scene on stage changes with select_scene.
   const scenes = new Map(sl.scenes.map((s) => [s.id, s]));

@@ -1018,3 +1018,20 @@ describe("the level question is supplied by the engine when a first probe asks n
     expect(checks.map((c) => c.outcome)).toEqual(["validation", "validation"]);
   });
 });
+
+describe("turn.done names the analogy and whether it is words only (docs/m4-plan.md addendum A)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const done = async (analogy?: string) => {
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(analogy ? { analogy } : {}) } }; } };
+    const s = new TurnSession({ registry, director, router: createFakeRouter(), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run(input, (e) => events.push(e));
+    const last = events.at(-1)!;
+    return last.type === "turn.done" ? last.analogy : last.type;
+  };
+  it("a words-only analogy, one with a picture, and none", async () => {
+    expect(await done("analogy.fx-shopping-bag")).toEqual({ id: "analogy.fx-shopping-bag", title: "Holding a shopping bag at arm's length (test fixture)", words_only: true });
+    expect(await done("analogy.fx-ruler-held-out")).toEqual({ id: "analogy.fx-ruler-held-out", title: "A ruler held out (test fixture)", words_only: false });
+    expect(await done()).toBeUndefined();
+  });
+});

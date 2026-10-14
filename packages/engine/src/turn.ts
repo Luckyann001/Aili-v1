@@ -29,7 +29,13 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
   | { type: "calc.result"; calc_id: string; outputs: Record<string, number> }
   | { type: "prompt"; text: string; parts: TextPart[]; chips: string[] }
   /** The move, and what the text panel shows for this turn (labelled values and titles; no IDs). */
-  | { type: "turn.done"; move: DirectorResponse["move"]; explanation: TurnExplanation }
+  | {
+      type: "turn.done";
+      move: DirectorResponse["move"];
+      explanation: TurnExplanation;
+      /** The analogy this turn used; `words_only` when the registry has no picture of it (the page says so). */
+      analogy?: { id: string; title: string; words_only: boolean };
+    }
   | { type: "turn.error"; reason: TurnFailure; message: string; details: string[] }
 );
 
@@ -525,7 +531,8 @@ export class TurnSession {
     };
     if (rev !== this.rev) return;
     this.state = next;
-    send({ type: "turn.done", move: r.move, explanation });
+    const an = r.analogy ? sl.analogies.find((a) => a.id === r.analogy) : undefined;
+    send({ type: "turn.done", move: r.move, explanation, ...(an ? { analogy: { id: an.id, title: an.title, words_only: !an.scene } } : {}) });
   }
 }
 

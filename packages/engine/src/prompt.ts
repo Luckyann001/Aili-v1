@@ -60,7 +60,7 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
   for (const s of sl.solvers)
     items.push({ id: s.id, kind: "solver", rank: usedSolvers.has(s.id) ? 60 : 40, keep: hasSafety(s), data: { id: s.id, inputs: s.inputs, outputs: s.outputs, assumptions: s.assumptions, excludes: s.excludes } });
   for (const a of sl.analogies)
-    items.push({ id: a.id, kind: "analogy", rank: 20, keep: hasSafety(a), data: { id: a.id, title: a.title, levels: a.levels, mapping: a.mapping, breaks_down: a.breaks_down, scene: a.scene } });
+    items.push({ id: a.id, kind: "analogy", rank: 20, keep: hasSafety(a), data: { id: a.id, title: a.title, levels: a.levels, mapping: a.mapping, breaks_down: a.breaks_down, visual: a.scene ?? "none" } });
   for (const r of sl.readings) {
     const src = sl.sources.find((s) => s.id === r.source);
     items.push({
