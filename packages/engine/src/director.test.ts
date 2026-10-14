@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, dropStrayActionFields, lenientCandidate, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, dropStrayActionFields, highlightErrors, lenientCandidate, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -578,5 +578,21 @@ describe("every check runs even when the format check fails (Lucky's decision 20
     expect(lenientCandidate({ ...good(), actions: [{ type: "highlight_part", part: "weight", colour: "red" }, { type: "fly" }] })?.actions).toEqual([{ type: "highlight_part", part: "weight" }]);
     expect(lenientCandidate("nonsense")).toBeNull();
     expect(lenientCandidate({ move: "dance" })).toBeNull();
+  });
+});
+
+describe("narration about a highlight needs one on stage (Lucky's decision 2026-10-14)", () => {
+  const say = (text: string) => [{ id: "n1", text }];
+  it("only 'highlighted', 'highlight' and 'the marked part' count", () => {
+    for (const t of ["See the highlighted weight.", "I'll highlight the weight.", "Look at the marked part."]) expect(highlightErrors({ narration: say(t), actions: [] }, undefined), t).toHaveLength(1);
+    for (const t of ["Look at the weight.", "Notice the marked difference.", "Highlights of robotics."]) expect(highlightErrors({ narration: say(t), actions: [] }, undefined), t).toEqual([]);
+  });
+  it("passes with a highlight_part action, or one still active; a new scene clears the active one", () => {
+    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [{ type: "highlight_part", part: "weight" }] }, undefined)).toEqual([]);
+    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [] }, "weight")).toEqual([]);
+    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [{ type: "select_scene", scene: "fx-lever" }] }, "weight")).toHaveLength(1);
+  });
+  it("the validator reports it", () => {
+    expect(errs({ narration: say("See the highlighted weight."), actions: [] })).toContain('narration[0]: says "highlighted", but nothing is highlighted on stage; add a highlight_part action for the part you mean, or do not mention a highlight');
   });
 });

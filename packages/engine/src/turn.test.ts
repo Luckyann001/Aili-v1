@@ -732,14 +732,21 @@ describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
     expect(actions).toEqual([]);
   });
 
-  // KNOWN GAP (reported to Lucky 2026-10-14): narration that refers to a highlight or a part the answer
-  // never put on stage is not flagged by any check today. The turn below passes with no warning about
-  // it. This test pins today's behaviour so a future check changes it on purpose.
-  it("known gap: narration about a highlighted part that is not highlighted passes unflagged today", async () => {
+  // Narration about a highlight needs one on stage (Lucky's decision 2026-10-14; this replaced the
+  // test that pinned the old, unflagged behaviour).
+  it("narration about a highlighted part that is not highlighted is rejected for repair, with a plain message", async () => {
     const claims = { ...levelQuestion, narration: [{ id: "n1", text: "Look at the highlighted weight at the end of the ruler." }] };
-    const { events, warnings, actions } = await run(claims, ["mech.torque.static"]);
-    expect(events.at(-1)!.type).toBe("turn.done");
-    expect(actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]); // the scene, but no highlight_part
-    expect(warnings.filter((w) => /highlight|part/i.test(w) && !w.startsWith("scene selected by engine"))).toEqual([]);
+    const { events } = await run(claims, ["mech.torque.static"]);
+    const err = events.at(-1) as { type: string; details?: string[] };
+    expect(err.type).toBe("turn.error");
+    expect(err.details).toContain('narration[0]: says "highlighted", but nothing is highlighted on stage; add a highlight_part action for the part you mean, or do not mention a highlight');
+  });
+  it("a highlight in the answer, or one still on stage from an earlier turn, lets the narration mention it", async () => {
+    const claims = { ...levelQuestion, narration: [{ id: "n1", text: "Look at the highlighted weight at the end of the ruler." }] };
+    const withAction = await run({ ...claims, actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight" }] }, ["mech.torque.static"]);
+    expect(withAction.events.at(-1)!.type, JSON.stringify(withAction.events.at(-1))).toBe("turn.done");
+    expect(withAction.s.state.highlightedPart).toBe("weight");
+    const stillOn = await run(claims, ["mech.torque.static"], { history: { posture: "learning", learner_level: "unknown", entries: [] }, activeScene: "fx-lever", highlightedPart: "weight" });
+    expect(stillOn.events.at(-1)!.type, JSON.stringify(stillOn.events.at(-1))).toBe("turn.done");
   });
 });

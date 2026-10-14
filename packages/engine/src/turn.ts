@@ -158,6 +158,8 @@ export const SOLVERS: Record<string, SolverFn> = {
 export interface SessionState {
   history: SessionHistory;
   activeScene?: string;
+  /** The part an earlier turn highlighted on the scene still on stage (a new scene clears it). */
+  highlightedPart?: string;
   /** Predictions, open items, waivers and analogies used (slice 5a). Absent means all empty. */
   teaching?: TeachingState;
 }
@@ -387,6 +389,7 @@ export class TurnSession {
       const v = validateDirectorResponse(stray.raw, {
         shortlist: sl,
         activeScene: before.activeScene,
+        activeHighlight: before.highlightedPart,
         expected: { request_id: turn_id, state_rev: rev },
         safetyCritical,
         // An answer the engine split may have up to five segments (the split checks the 700-character total).
@@ -485,11 +488,16 @@ export class TurnSession {
 
     // Commit the new state only now, then say the turn is done.
     let activeScene = before.activeScene;
-    for (const a of r.actions) if (a.type === "select_scene") activeScene = a.scene;
+    let highlightedPart = before.highlightedPart;
+    for (const a of r.actions) {
+      if (a.type === "select_scene") (activeScene = a.scene), (highlightedPart = undefined);
+      if (a.type === "highlight_part") highlightedPart = a.part;
+    }
     const ailiTurnNumber = history.entries.filter((e) => e.kind === "aili").length + 1;
     const next: SessionState = {
       history: { ...history, entries: [...history.entries, { kind: "aili", move: r.move, asked: !!r.prompt, gave_back: givesBack(r), concepts: r.concepts, safety: r.safety }] },
       activeScene,
+      ...(highlightedPart ? { highlightedPart } : {}),
       teaching: applyResponse(teaching, r, ailiTurnNumber, today, safetyCritical, sl.readings.find((x) => x.id === r.reading)?.teaches ?? []),
     };
     if (rev !== this.rev) return;

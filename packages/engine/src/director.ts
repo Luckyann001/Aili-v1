@@ -48,11 +48,31 @@ export interface TurnContext {
   expected?: { request_id: string; state_rev: number };
   /** IDs of safety-critical concepts and items (from the registry), whatever the director declares. */
   safetyCritical?: ReadonlySet<string>;
+  /** The part already highlighted on stage from an earlier turn, if any. */
+  activeHighlight?: string;
   /** The segment limit for this answer: NARRATION_SPLIT_MAX_SEGMENTS when the engine split it, else the default. */
   maxSegments?: number;
 }
 
 export const STRAY_ACTION_FIELD_DROPPED = "stray action field dropped";
+
+/** Only these words count as referring to a highlight (Lucky's decision 2026-10-14: keep it narrow). */
+const HIGHLIGHT_WORDS = /\b(?:highlighted|highlight|the marked part)\b/i;
+
+/**
+ * Narration that refers to a highlight needs one on stage: a highlight_part action in this answer,
+ * or one still active from an earlier turn (a scene change clears it). Otherwise it is rejected for
+ * repair, with a plain message.
+ */
+export function highlightErrors(r: Pick<DirectorResponse, "narration" | "actions">, activeHighlight: string | undefined): string[] {
+  const highlights = r.actions.some((a) => a.type === "highlight_part");
+  const stillActive = !!activeHighlight && !r.actions.some((a) => a.type === "select_scene");
+  if (highlights || stillActive) return [];
+  return r.narration.flatMap((n, i) => {
+    const m = n.text.match(HIGHLIGHT_WORDS);
+    return m ? [`narration[${i}]: says "${m[0]}", but nothing is highlighted on stage; add a highlight_part action for the part you mean, or do not mention a highlight`] : [];
+  });
+}
 
 /**
  * The provider's reduced schema flattens the actions union, so a model sometimes adds a field that
@@ -203,6 +223,9 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
   r.narration.forEach((n, i) => {
     if (r.narration.findIndex((o) => o.id === n.id) !== i) errors.push(`narration[${i}].id: duplicate "${n.id}"`);
   });
+
+  // Narration that refers to a highlight needs one on stage (Lucky's decision 2026-10-14).
+  errors.push(...highlightErrors(r, ctx.activeHighlight));
 
   // Actions, in order: the scene on stage changes with select_scene.
   const scenes = new Map(sl.scenes.map((s) => [s.id, s]));
