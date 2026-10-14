@@ -63,7 +63,7 @@ export const SceneManifest = z
     params: z.array(SceneParam).default([]),
     animations: z.array(SceneAnimation).default([]),
     /** Fixed inputs for the scene's solver (SI, unit in the name). Never shown as results. */
-    solver: z.object({ id: z.string().min(1), constants: z.record(z.string().regex(/_(m|kg|deg)$/), z.number()) }).strict().optional(),
+    solver: z.object({ id: z.string().min(1), constants: z.record(z.string().regex(/_(m|kg|deg|m_per_s2)$/), z.number()) }).strict().optional(),
   })
   .strict()
   .superRefine((s, ctx) => {

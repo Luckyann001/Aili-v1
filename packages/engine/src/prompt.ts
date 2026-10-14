@@ -57,8 +57,23 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
   const usedSolvers = new Set(sl.simulations.map((s) => s.solver.id));
   for (const s of sl.simulations)
     items.push({ id: s.id, kind: "simulation", rank: 60, keep: hasSafety(s), data: { id: s.id, title: s.title, solver: s.solver.id, inputs: s.inputs, outputs: s.outputs, assumptions: s.assumptions, excludes: s.excludes, fidelity: s.fidelity } });
-  for (const s of sl.solvers)
-    items.push({ id: s.id, kind: "solver", rank: usedSolvers.has(s.id) ? 60 : 40, keep: hasSafety(s), data: { id: s.id, inputs: s.inputs, outputs: s.outputs, assumptions: s.assumptions, excludes: s.excludes } });
+  // A solver run by a shortlisted simulation repeats its inputs and most of its assumptions: say
+  // "as in <simulation>" and list only what the simulation does not already state (prompt budget).
+  for (const s of sl.solvers) {
+    const sim = sl.simulations.find((x) => x.solver.id === s.id);
+    const extra = (own: readonly string[], shared: readonly string[] | undefined) => (sim ? own.filter((x) => !shared?.includes(x)) : own);
+    const assumptions = extra(s.assumptions, sim?.assumptions);
+    const excludes = extra(s.excludes, sim?.excludes);
+    const data = {
+      id: s.id,
+      inputs: sim && JSON.stringify(sim.inputs) === JSON.stringify(s.inputs) ? `as in ${sim.id}` : s.inputs,
+      outputs: s.outputs,
+      ...(sim ? { also_states: `the assumptions and exclusions of ${sim.id}` } : {}),
+      ...(assumptions.length || !sim ? { assumptions } : {}),
+      ...(excludes.length || !sim ? { excludes } : {}),
+    };
+    items.push({ id: s.id, kind: "solver", rank: usedSolvers.has(s.id) ? 60 : 40, keep: hasSafety(s), data });
+  }
   for (const a of sl.analogies)
     items.push({ id: a.id, kind: "analogy", rank: 20, keep: hasSafety(a), data: { id: a.id, title: a.title, levels: a.levels, mapping: a.mapping, breaks_down: a.breaks_down, visual: a.scene ?? "none" } });
   for (const r of sl.readings) {

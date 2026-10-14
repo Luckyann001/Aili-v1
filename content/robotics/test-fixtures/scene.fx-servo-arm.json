@@ -91,12 +91,33 @@
     {
       "id": "slide-load-out",
       "description": "The load slides along the arm to its end."
+    },
+    {
+      "id": "eq-force",
+      "description": "Equation step 1: the load's weight, a force F, as a downward arrow at the load."
+    },
+    {
+      "id": "eq-distance",
+      "description": "Equation step 2: the distance d from the joint to the load, as a line along the arm."
+    },
+    {
+      "id": "eq-torque",
+      "description": "Equation step 3: F times d becomes the load's torque, the curved arrow at the joint."
+    },
+    {
+      "id": "eq-arm-share",
+      "description": "Equation step 4: the arm's own weight, at the middle of the arm, adds its share of torque."
+    },
+    {
+      "id": "eq-margin",
+      "description": "Equation step 5: the total torque against the servo's rated torque, the margin gauge."
     }
   ],
   "solver": {
     "id": "solver.static-torque-single-link",
     "constants": {
-      "angle_deg": 0
+      "angle_deg": 0,
+      "g_m_per_s2": 9.81
     }
   },
   "test_fixture": true
