@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ContentBadge } from "@/components/ContentBadge";
 import { Button } from "@/components/Button";
 import { MODELS } from "@/scene/models";
@@ -101,6 +101,11 @@ export function LearnStage() {
   const [welcomeGone, setWelcomeGone] = useState(false);
   const scenePicked = useStageContent((s) => s.scenePicked);
   const showWelcome = live === true && !welcomeGone;
+  // The bottom input takes over once the welcome has gone. Both boxes share inputRef, so this runs
+  // after React has committed the swap (a frame callback could still find the welcome's input).
+  useLayoutEffect(() => {
+    if (welcomeGone) inputRef.current?.focus();
+  }, [welcomeGone]);
   // Live mode: the stage is dimmed, with no badge or scene tools, until a turn picks a scene.
   const dimmed = live === true && !scenePicked;
   const sceneUi = shown && !dimmed;
@@ -229,10 +234,7 @@ export function LearnStage() {
             onText={setText}
             inputRef={inputRef}
             onSubmit={(t) => void demoTurn.start("valid", t)}
-            onGone={() => {
-              setWelcomeGone(true);
-              requestAnimationFrame(focusInput); // the bottom input takes over
-            }}
+            onGone={() => setWelcomeGone(true)}
           />
         )}
 
