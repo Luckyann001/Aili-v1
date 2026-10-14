@@ -347,3 +347,73 @@ accounts and the database stage, deployment, any downloaded asset.
 3. Readings 3–5: which sections or new sources to verify.
 4. Approve the demo script, or change the steps.
 5. Approve section 8 as the first slice (it changes the professor's output schema).
+
+---
+
+## Addendum (15 Oct 2026): analogy visuals, docking, and the equation built on the servo
+
+**Why.** In the founder's live test on 14 Oct (live session `7de301e6`, turn 10, "can you explain with another
+anology"), the professor described a shopping bag at arm's length in words, while the stage showed the ruler and
+played its weight slide on "Stretch your arm out". No picture of the bag existed, and nothing said so. The founder
+also wants the equation animated on the object.
+
+**The sequence.** Bag analogy (turn A) → in turn A's last segment the professor selects the servo + arm, and the
+bag docks into a small still recap thumbnail → the servo + arm takes the stage with its torque arrow and panel → the
+professor teaches with the servo (sliders, torque arrow, margin gauge, τ = F × d built step by step), each
+explaining turn ending with a check. Narration allows at most four segments per answer, so this takes two turns.
+
+### Decisions (Lucky, 15 Oct 2026)
+1. **Layout-doc wording approved.** It goes into `docs/aili-stage-layout.md` §1 only when the docking slice starts:
+   > **Stage:** large rounded canvas, **one active scene at a time**. When an analogy hands over to a real-part scene, the analogy may stay as a **docked recap**: a small still picture in a corner, with its own badge (for example *Illustrative (AI-composed)*), never animating and never a second 3D view. Tapping it makes it the active scene again. A new scene that is not the analogy's partner clears it. Reduced motion: the handover is a cut. Phones: the recap is a small thumbnail with a tap target of at least 44 px, or a "Recap" chip when the stage is too small, and it hides while the inspector or a panel is open.
+2. **Equation narration is words only for now.** Overlays show solver numbers; narration names the quantities in
+   words ("the force shown at the load"). Spoken numbers (stage placeholders such as `{{stage.torque_nm}}`, which
+   would need the page to send its scene settings) are deferred.
+3. **Cut from the demo scope:** the long-wrench analogy and the optional analogy↔system pairing beat. The wrench
+   can still be used in words, labelled by the honesty rule.
+4. **Build order:** A honesty rule → B equation steps → C bag scene + docking → D demo rehearsal (a recorded browser test). Each slice stops for approval.
+
+### A. Honesty rule: a visual analogy only when its picture exists (0.5 session)
+The registry already limits the professor to shortlisted items, but an analogy is a text record (mapping and
+breakdown) with no link to a picture, so nothing tells "with a picture" from "in words only".
+- **Registry:** an optional `scene` field on analogy records names the scene that illustrates it.
+- **Shortlist:** each analogy shows `visual: "<scene id>"` or `visual: none` (model input only; the output schema
+  does not change).
+- **Page (the guarantee):** a turn that uses an analogy whose picture is not on stage shows the label
+  "Analogy in words only. No picture of this yet." beside the caption, whatever the narration says.
+- **Prompt:** "If an analogy's visual is none, describe it in words only; do not tell the learner to look at it or watch it."
+- **Validator warnings** (never rejections, until bake-off data says otherwise): narration that points at an
+  analogy object ("watch the bag") with no picture of that analogy on stage; and a turn using an analogy with no
+  picture that plays a stage animation on a different object (the bag-versus-ruler case).
+
+### B. Equation steps on the servo + arm (1.5–2 sessions)
+No new action types: five scene animations declared in the servo + arm manifest, played with `play_animation`
+and bound to their segments (output schema unchanged; about five new action types would add roughly 800–950
+characters and pass the provider's ~3,177 limit).
+
+| Step | What appears | Numbers from |
+|---|---|---|
+| `eq-force` | a downward arrow at the load, F (N) | solver (new force outputs, with worked-example tests) |
+| `eq-distance` | a dimension line from joint to load, d (m) | the scene's setting |
+| `eq-torque` | "F × d" becomes the curved torque arrow at the joint, τ (N·m) | solver |
+| `eq-arm-share` | the arm's own weight at mid-arm, added as a second contribution | solver (arm's own mass always included) |
+| `eq-margin` | the margin gauge; "Enter your servo's rated torque" until the learner has | solver and config |
+
+Overlay labels come from the page's solver readout for the settings on stage, so they always match the picture.
+
+### C. Bag scene and docking (about 3 sessions)
+- A stylised figure from primitives (shared figure module with joint pivots), poses `hold-close` and `arm-out`,
+  labelled "Illustrative (AI-composed)" and "Illustrative animation, not a simulation", no numbers; its
+  breakdown line written fresh and reviewed by Lucky.
+- Docking: when the servo + arm is selected after the analogy, the analogy becomes a still SVG recap thumbnail
+  (not a second 3D view); tap to restore. Session state still holds one active scene.
+- Reduced motion: cuts, and the analogy steps through still poses. Phones: as in the approved wording.
+
+### D. Demo rehearsal (0.5–1 session)
+The 20-second moment as a recorded browser test: turn A (bag close, bag out with its breakdown, hand over to the
+servo + arm), then turn B (force, distance, torque with the arm's share, margin; ending with a check). The rating
+is typed in first, from a datasheet. At the current caption pace, turn B runs closer to 20–25 seconds unless the
+segments stay short.
+
+**Effort in scope:** about 6–7 sessions (A 0.5, B 1.5–2, C 3, D 0.5–1, live checks 0.5–1). If it must shrink:
+keep two poses and drop the tremble (−0.5), merge `eq-arm-share` into `eq-torque` (−0.25), make the recap
+still-only with no tap to restore (−0.25).
