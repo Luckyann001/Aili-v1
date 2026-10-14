@@ -595,6 +595,50 @@ export function splitLongNarration(raw: unknown): { raw: unknown; warnings: stri
   return { raw: { ...(raw as object), narration: out }, warnings };
 }
 
+/** An explanation in learning time with no check question (spec A1a): a warning only (Lucky's decision 2026-10-14). */
+export const EXPLAIN_WITHOUT_CHECK = "explanation ends without a check";
+
+/** The warning when the engine moves a probe's question from narration to the prompt (Lucky's decision 2026-10-14). */
+export const QUESTION_MOVED_TO_PROMPT = "question moved from narration to prompt";
+
+/**
+ * A probe with no prompt whose question was written into the narration instead: when the last
+ * segment holds exactly one question mark, at the end of its last sentence, that sentence becomes
+ * the prompt ({ kind: "question", no chips }) and leaves the narration. A segment left empty is
+ * dropped, and its actions move to the previous segment; with no previous segment to take them,
+ * nothing is moved. Only for move "probe"; anything else is left for the checks (rejected for
+ * repair, as before). Runs on the engine's form (actions bound with `at`), with a warning.
+ */
+export function salvageProbeQuestion(raw: unknown): { raw: unknown; warning?: string } {
+  const none = { raw };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return none;
+  const r = raw as { move?: unknown; prompt?: unknown; narration?: unknown; actions?: unknown };
+  if (r.move !== "probe" || (r.prompt !== undefined && r.prompt !== null) || !Array.isArray(r.narration) || r.narration.length === 0) return none;
+  const items = r.narration as Array<{ id?: unknown; text?: unknown }>;
+  const last = items.at(-1)!;
+  if (typeof last.text !== "string" || typeof last.id !== "string" || (last.text.match(/\?/g) ?? []).length !== 1) return none;
+  const parts = sentences(last.text);
+  const question = parts.at(-1)!;
+  if (!question.endsWith("?")) return none; // the question is not the segment's last sentence
+  const rest = parts.slice(0, -1).join(" ");
+  const actions = Array.isArray(r.actions) ? (r.actions as Array<{ at?: unknown }>) : [];
+  const prev = items.at(-2);
+  const hasActions = actions.some((a) => a?.at === last.id);
+  let narration: unknown[] = items;
+  let moved = actions;
+  if (rest) narration = [...items.slice(0, -1), { ...last, text: rest }];
+  else {
+    if (hasActions && typeof prev?.id !== "string") return none; // nowhere for its actions to go
+    narration = items.slice(0, -1);
+    if (hasActions) moved = actions.map((a) => (a?.at === last.id ? { ...a, at: prev!.id } : a));
+  }
+  const i = items.length - 1;
+  return {
+    raw: { ...(raw as object), narration, ...(Array.isArray(r.actions) ? { actions: moved } : {}), prompt: { kind: "question", text: question } },
+    warning: `${QUESTION_MOVED_TO_PROMPT}: narration[${i}] "${question}"${rest ? "" : ` (segment dropped${hasActions ? `; its actions moved to narration[${i - 1}]` : ""})`}`,
+  };
+}
+
 /** The warning when the engine puts the guide's exact application question in the prompt (Lucky's decision 2026-10-13). */
 export const GUIDE_QUESTION_SUBSTITUTED = "guide question substituted";
 

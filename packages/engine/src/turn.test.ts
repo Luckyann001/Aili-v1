@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, EXPLAIN_WITHOUT_CHECK, QUESTION_MOVED_TO_PROMPT, salvageProbeQuestion, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
@@ -822,5 +822,104 @@ describe("an interrupt mid-speech keeps only the stage the learner saw (M4 slice
     expect(store.amend("page-amend-0001", 2, (s) => reconcileShown(s, null))).toBe(false);
     expect(store.amend("page-amend-0001", 3, (s) => reconcileShown(s, null))).toBe(true);
     expect(store.get("page-amend-0001")!.activeScene).toBe("base-joint-arm");
+  });
+});
+
+describe("a probe's question written into the narration moves to the prompt (Lucky's decision 2026-10-14)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const probe = (narration: Array<{ id: string; text: string }>, actions: object[] = []) => ({ move: "probe", calc_requests: [], evidence: [], prompt: undefined, narration, actions });
+  /** Runs one turn whose director gives `first`, then `second` on the repair; returns what happened. */
+  const runTurn = async (first: object, second: object = first) => {
+    const repairs: string[][] = [];
+    const checks: Array<{ attempt: number; outcome: string; warnings: string[] }> = [];
+    const director: Director = {
+      async respond(req) {
+        if (req.repair) repairs.push(req.repair.errors);
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.repair ? second : first) } };
+      },
+    };
+    const s = new TurnSession({ registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "unknown", entries: [] } }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "teach me robotics" }, (e) => events.push(e));
+    return { events, repairs, checks };
+  };
+
+  it("the logged 14 Oct case (probe, no prompt, one 111-character segment) has no question to move, so both attempts are still rejected", async () => {
+    // The 23:16 log (session bcfa4a9e) records only the shape. The same failure at 11:53 (live-session
+    // log 2026-10-14T08-53-23-698Z, also probe, prompt=none, 111 characters) shows its text: it asks nothing.
+    const text = "Robotics covers a lot of ground. I can start with how a robot arm holds a load still, and why distance matters.";
+    expect(text).toHaveLength(111);
+    const { events, checks } = await runTurn(probe([{ id: "n1", text }]));
+    expect(events.at(-1)!.type).toBe("turn.error");
+    expect(checks.map((c) => c.outcome)).toEqual(["validation", "validation"]);
+    expect(checks.flatMap((c) => c.warnings).some((w) => w.startsWith(QUESTION_MOVED_TO_PROMPT))).toBe(false);
+  });
+
+  it("the same opener ending with its question passes on the first attempt, with the question as the prompt and a warning", async () => {
+    const { events, repairs, checks } = await runTurn(probe([{ id: "n1", text: "Robotics covers a lot of ground. What have you built or read so far, even if it is very little?" }]));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(repairs).toEqual([]);
+    expect(events.find((e) => e.type === "prompt")).toMatchObject({ text: "What have you built or read so far, even if it is very little?", chips: [] });
+    expect(events.filter((e) => e.type === "narration").map((e) => (e as { parts: Array<{ text?: string }> }).parts.map((p) => p.text).join(""))).toEqual(["Robotics covers a lot of ground."]);
+    expect(checks[0]!.warnings).toContain(`${QUESTION_MOVED_TO_PROMPT}: narration[0] "What have you built or read so far, even if it is very little?"`);
+  });
+
+  it("both attempts: a first answer it cannot salvage (two questions) is repaired, and the repair is salvaged", async () => {
+    const { events, repairs, checks } = await runTurn(
+      probe([{ id: "n1", text: "Robotics covers a lot. What do you know? What have you built?" }]),
+      probe([{ id: "n1", text: "Robotics covers a lot of ground." }, { id: "n2", text: "What have you built so far?" }]),
+    );
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(repairs).toHaveLength(1);
+    expect(repairs[0]!.some((e) => /^prompt: missing; move "probe"/.test(e))).toBe(true);
+    expect(checks.map((c) => c.outcome)).toEqual(["validation", "pass"]);
+    expect(checks[1]!.warnings, JSON.stringify(checks[1]!.warnings)).toContain(`${QUESTION_MOVED_TO_PROMPT}: narration[1] "What have you built so far?" (segment dropped)`);
+  });
+
+  it("a question-only last segment is dropped and its actions move to the previous segment", () => {
+    const out = salvageProbeQuestion(
+      probe([{ id: "n1", text: "Here is a ruler held out from a hand." }, { id: "n2", text: "Which way will it tip?" }], [{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "weight", at: "n2" }]),
+    );
+    expect(out.raw).toMatchObject({
+      narration: [{ id: "n1", text: "Here is a ruler held out from a hand." }],
+      actions: [{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "weight", at: "n1" }],
+      prompt: { kind: "question", text: "Which way will it tip?" },
+    });
+    expect(out.warning).toBe(`${QUESTION_MOVED_TO_PROMPT}: narration[1] "Which way will it tip?" (segment dropped; its actions moved to narration[0])`);
+  });
+
+  it("no change: not a probe, a prompt already given, two question marks, a question not at the end, or a lone segment whose actions would have nowhere to go", () => {
+    const q = [{ id: "n1", text: "Robotics is broad. What have you built?" }];
+    const cases = [
+      { ...probe(q), move: "explain" },
+      { ...probe(q), move: "answer" },
+      { ...probe(q), prompt: { kind: "question", text: "What do you know?" } },
+      probe([{ id: "n1", text: "What do you know? What have you built?" }]),
+      probe([{ id: "n1", text: "What do you know? Let's start with one idea." }]),
+      probe([{ id: "n1", text: "What have you built?" }], [{ type: "select_scene", scene: "fx-lever", at: "n1" }]),
+      probe([{ id: "n1", text: "What have you built?" }, { id: "n2", text: "Let's see." }]),
+    ];
+    for (const c of cases) expect(salvageProbeQuestion(c)).toEqual({ raw: c });
+  });
+});
+
+describe("an explanation with no check is a warning, never a rejection (spec A1a; Lucky's decision 2026-10-14)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const run = async (o: { answer?: object; posture?: "learning" | "answer"; text?: string }) => {
+    const checks: Array<{ outcome: string; warnings: string[] }> = [];
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...o.answer } }; } };
+    const s = new TurnSession({ registry, director, router: createFakeRouter(), state: { ...start(), history: { posture: o.posture ?? "learning", learner_level: "some_knowledge", entries: [] } }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: o.text ?? "Why is it hard to hold?" }, (e) => events.push(e));
+    return { done: events.at(-1)!.type, warned: checks.flatMap((c) => c.warnings).filter((w) => w.startsWith(EXPLAIN_WITHOUT_CHECK)) };
+  };
+  it("learning time, explain, no prompt: passes with the warning", async () => {
+    expect(await run({ answer: { prompt: undefined } })).toEqual({ done: "turn.done", warned: [`${EXPLAIN_WITHOUT_CHECK}: move "explain" has no prompt (spec A1a: an explanation ends with a check)`] });
+  });
+  it("no warning with a check, in the Answer posture, for a direct answer, or on an unsupported topic", async () => {
+    expect((await run({})).warned).toEqual([]);
+    expect((await run({ answer: { prompt: undefined }, posture: "answer" })).warned).toEqual([]);
+    expect((await run({ answer: { prompt: undefined }, text: "just tell me why it is hard to hold" })).warned).toEqual([]);
+    expect((await run({ answer: { prompt: undefined, coverage: "unsupported" } })).warned).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@ import type { DirectorResponse, SessionHistory } from "@aili/schemas";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
-import { dropStrayActionFields, NARRATION_SPLIT_MAX_SEGMENTS, normalizeActionBinding, splitLongNarration, substituteGuideQuestion, toWirePaths, validateDirectorResponse } from "./director";
+import { dropStrayActionFields, EXPLAIN_WITHOUT_CHECK, NARRATION_SPLIT_MAX_SEGMENTS, normalizeActionBinding, salvageProbeQuestion, splitLongNarration, substituteGuideQuestion, toWirePaths, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept, unsupportedAttributions } from "./teaching";
@@ -392,8 +392,10 @@ export class TurnSession {
       const bound = normalizeActionBinding(answer);
       const filled = fillTeachBackReading(bound.raw, teaching);
       const split = splitLongNarration(filled.raw);
+      // A probe whose question sits at the end of its narration gets it moved to the prompt (a warning).
+      const salvaged = salvageProbeQuestion(split.raw);
       // A field from another action type, on an otherwise valid action, is dropped (a warning).
-      const stray = dropStrayActionFields(split.raw);
+      const stray = dropStrayActionFields(salvaged.raw);
       const v = validateDirectorResponse(stray.raw, {
         shortlist: sl,
         activeScene: before.activeScene,
@@ -404,7 +406,7 @@ export class TurnSession {
         // An answer the engine split may have up to five segments (the split checks the 700-character total).
         maxSegments: split.warnings.length ? NARRATION_SPLIT_MAX_SEGMENTS : undefined,
       });
-      const warnings = toWirePaths([...(filled.warning ? [filled.warning] : []), ...split.warnings, ...stray.warnings, ...v.warnings], bound.paths);
+      const warnings = toWirePaths([...(filled.warning ? [filled.warning] : []), ...split.warnings, ...(salvaged.warning ? [salvaged.warning] : []), ...stray.warnings, ...v.warnings], bound.paths);
       if (!v.response) {
         // The teaching rules too, on the validator's lenient copy, so one repair lists every problem.
         const errors = toWirePaths(v.errors, bound.paths);
@@ -415,6 +417,10 @@ export class TurnSession {
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
       if (reoffersOpenQuestion(v.response, history, teaching)) warnings.push(`${OPEN_QUESTION_REOFFERED} (${v.response.prompt!.kind}): "${v.response.prompt!.text}"`);
       if (p.length) return { reason: "pedagogy", errors: toWirePaths(p, bound.paths), warnings };
+      // An explanation in learning time ends with a check (spec A1a): its absence is a warning, never a
+      // rejection. Not in the Answer posture, for a direct answer, or on an unsupported topic.
+      if (v.response.move === "explain" && !v.response.prompt && history.posture !== "answer" && !c.wants_direct_answer && v.response.coverage !== "unsupported")
+        warnings.push(`${EXPLAIN_WITHOUT_CHECK}: move "explain" has no prompt (spec A1a: an explanation ends with a check)`);
       // "You said …" about words the learner did not write (first turn only; a warning).
       warnings.push(...unsupportedAttributions(v.response.narration, input.text, !before.history.entries.some((e) => e.kind === "learner")));
       // A passing answer about a concept with a scene, but no scene on stage: the engine selects it.
