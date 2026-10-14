@@ -135,8 +135,10 @@ export function selectSceneForConcept(
   const named = r.concepts[0];
   const concept = named ?? (activeScene ? undefined : topicConcepts[0]);
   if (!concept) return null;
+  // The scene on stage stays when it teaches the concept too (the servo + arm after the lever).
+  if (scenes.some((s) => s.id === activeScene && s.teaches.includes(concept))) return null;
   const scene = scenes.find((s) => s.teaches.includes(concept));
-  if (!scene || scene.id === activeScene) return null;
+  if (!scene) return null;
   const why = named ? "the answer put no scene on stage" : "starting scene for the topic; the answer named no concept";
   // Bound to the first segment, so the scene is there as the explanation starts (M4 slice 1).
   return { r: { ...r, actions: [{ type: "select_scene", scene: scene.id, at: r.narration[0]?.id ?? "prompt" }, ...r.actions] }, warning: `${SCENE_SELECTED_BY_ENGINE}: "${scene.id}" for ${concept} (${why})` };

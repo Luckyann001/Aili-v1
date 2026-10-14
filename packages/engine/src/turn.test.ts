@@ -620,6 +620,12 @@ describe("scene on stage: the engine selects the concept's scene when the answer
     expect(selectSceneForConcept({ ...r, actions: [{ type: "select_scene", scene: "other" }] } as typeof r, scenes, undefined)).toBeNull();
     expect(selectSceneForConcept(r, scenes, "fx-lever")).toBeNull();
   });
+  it("a scene on stage that teaches the concept too stays: the servo + arm is not swapped back to the lever (found 2026-10-15)", () => {
+    const scenes = [{ id: "fx-lever", teaches: ["mech.torque.static"] }, { id: "fx-servo-arm", teaches: ["mech.torque.static"] }, { id: "fx-other", teaches: ["mech.gears"] }];
+    const r = { ...noScene, concepts: ["mech.torque.static"] } as unknown as import("@aili/schemas").DirectorResponse;
+    expect(selectSceneForConcept(r, scenes, "fx-servo-arm")).toBeNull();
+    expect(selectSceneForConcept(r, scenes, "fx-other")?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }]); // a scene about something else is still replaced
+  });
 });
 
 describe("a stray action field no longer costs a repair (Lucky's decision 2026-10-13)", () => {
