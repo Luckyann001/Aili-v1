@@ -80,3 +80,17 @@ export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<
       return { ...s, ...cleared(), gate: nextRevision(s.gate), status: "dropped", restoreTo: s.snapshot, snapshot: null, message: DROPPED_MESSAGE };
   }
 }
+
+/**
+ * A turn's actions, grouped by the line that shows them (M4 slice 1: visuals follow the explanation).
+ * Line k is narration segment k; an action whose segment is not among them (an engine-chosen scene
+ * on an answer with no narration) goes with the first line. Order within a line is kept.
+ */
+export function actionsByLine<A extends { at?: string }>(narrationIds: readonly string[], lineCount: number, actions: readonly A[]): A[][] {
+  const out: A[][] = Array.from({ length: Math.max(lineCount, 1) }, () => []);
+  for (const a of actions) {
+    const k = a.at === undefined ? -1 : narrationIds.indexOf(a.at);
+    out[k >= 0 && k < out.length ? k : 0]!.push(a);
+  }
+  return out;
+}

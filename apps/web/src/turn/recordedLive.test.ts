@@ -43,7 +43,7 @@ describe("recorded live path (test builds only)", () => {
     const { handleTurn, sessions } = await load();
     const t1 = await readAll(await handleTurn(post(body(3, "teach me robotics"))));
     expect(t1.at(-1)!.type, JSON.stringify(t1.at(-1))).toBe("turn.done");
-    expect(t1.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "weight", at: "n1" }]);
+    expect(t1.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n2" }, { type: "highlight_part", part: "weight", at: "n2" }]);
     expect((t1.find((e) => e.type === "prompt") as { chips: string[] }).chips).toEqual(["It gets harder", "It gets easier", "No different", "Not sure"]);
 
     const t2 = await readAll(await handleTurn(post(body(4, "It gets harder"))));
@@ -62,10 +62,13 @@ describe("recorded live path (test builds only)", () => {
     const res = await handleInterrupt(post({ session_id: "recorded-test-0003", request_id: "turn_5", state_rev: 5, shown_through: null }));
     expect(await res.json()).toEqual({ stopped: false, reconciled: true });
     expect(sessions.get("recorded-test-0003")!.activeScene).toBeUndefined();
-    // Shown through the first segment: its scene and highlight stay.
+    // Shown through n1 only: the scene (bound to n2) never appeared. Through n2: scene and highlight stay.
     await readAll(await handleTurn(post(body(6, "teach me robotics", "recorded-test-0004"))));
     await handleInterrupt(post({ session_id: "recorded-test-0004", request_id: "turn_6", state_rev: 6, shown_through: "n1" }));
-    expect(sessions.get("recorded-test-0004")).toMatchObject({ activeScene: "fx-lever", highlightedPart: "weight" });
+    expect(sessions.get("recorded-test-0004")!.activeScene).toBeUndefined();
+    await readAll(await handleTurn(post(body(7, "teach me robotics", "recorded-test-0005"))));
+    await handleInterrupt(post({ session_id: "recorded-test-0005", request_id: "turn_7", state_rev: 7, shown_through: "n2" }));
+    expect(sessions.get("recorded-test-0005")).toMatchObject({ activeScene: "fx-lever", highlightedPart: "weight" });
   });
 
   it("off without the test's cookie, without the run-time flag, and refused from another device; never logged", async () => {

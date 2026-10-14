@@ -61,7 +61,13 @@ export function useVoiceController(opts: {
 
   /** Speaks lines as caption segments under revision `rev`; stops scheduling once `rev` is stale. */
   const playLines = useCallback(
-    (rev: number, lines: readonly string[], chips: string[] | undefined, onDone?: () => void, meta?: { source: Caption["source"]; parts?: Array<CaptionPart[] | undefined> }) => {
+    (
+      rev: number,
+      lines: readonly string[],
+      chips: string[] | undefined,
+      onDone?: () => void,
+      meta?: { source: Caption["source"]; parts?: Array<CaptionPart[] | undefined>; onLine?: (seq: number) => void },
+    ) => {
     const lang = recognitionLang();
     const step = (seq: number) => {
       const s = useVoice.getState();
@@ -71,6 +77,10 @@ export function useVoiceController(opts: {
         onDone?.();
         return;
       }
+      // The line's stage actions go first, so the visual is there as its caption and speech start
+      // (M4 slice 1). Voice on or captions only: the same step, so both behave the same.
+      meta?.onLine?.(seq);
+      if (useVoice.getState().rev !== rev) return;
       s.dispatch({ type: "speak", rev, seq, text: lines[seq]!, source: meta?.source, parts: meta?.parts?.[seq] });
       cancelSegment.current = speakSegment(lines[seq]!, { muted: getMuted(), lang, onDone: () => step(seq + 1) });
     };
@@ -108,10 +118,19 @@ export function useVoiceController(opts: {
     return useVoice.getState().rev;
   }, [stopEverything]);
 
-  /** Speaks a completed turn under `rev` (badged "Test fixture", or "Live AI" for a live one), then offers its chips. */
+  /**
+   * Speaks a completed turn under `rev` (badged "Test fixture", or "Live AI" for a live one), then
+   * offers its chips. `onLine(seq)` runs as each line starts (its stage actions); `onDone` when all
+   * lines have played (not after an interrupt).
+   */
   const playTurn = useCallback(
-    (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[], source: "fixture" | "live" = "fixture") =>
-      playLines(rev, lines.map((l) => l.text), chips, undefined, { source, parts: lines.map((l) => l.parts) }),
+    (
+      rev: number,
+      lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>,
+      chips?: string[],
+      source: "fixture" | "live" = "fixture",
+      hooks: { onLine?: (seq: number) => void; onDone?: () => void } = {},
+    ) => playLines(rev, lines.map((l) => l.text), chips, hooks.onDone, { source, parts: lines.map((l) => l.parts), onLine: hooks.onLine }),
     [playLines],
   );
 

@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { relativeEffort } from "@aili/solvers";
-import { cssDurationMs } from "@/design/duration";
 import { LEVER_LENGTH_M } from "@/scene/layout";
 import { LEVER_SOLVER } from "@/scene/manifests";
 import type { SceneId } from "@/scene/models";
+import { slideWeightOut } from "@/scene/animations";
 import { useScene } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import { feedbackText, fill, type BeatDef } from "./runner";
@@ -28,7 +28,6 @@ function placeholderValues(): Record<string, string> {
 /** After an animation finishes, the result stays on screen at least this long before the next beat. */
 export const RESULT_HOLD_MS = 2500;
 
-const spatialMs = () => cssDurationMs(getComputedStyle(document.documentElement).getPropertyValue("--aili-duration-spatial"));
 
 interface Voice {
   say: (lines: readonly string[], onDone: () => void) => number;
@@ -61,42 +60,8 @@ export function useLessonPlayer(voice: Voice) {
 
   const current = useCallback((r: number) => useLesson.getState().rev === r, []);
 
-  // Slide the weight to the far end: a tween over twice the spatial duration, or, under reduced
-  // motion, a few still steps with no animation. Resolves when done or when the lesson moved on.
-  const slideWeight = useCallback(
-    (r: number) =>
-      new Promise<void>((resolve) => {
-        const scene = useScene.getState();
-        const from = scene.leverDistance_m;
-        const to = LEVER_LENGTH_M;
-        const ms = spatialMs();
-        if (ms <= 0) {
-          const steps = [0.12, 0.2, to];
-          let i = 0;
-          const next = () => {
-            if (!current(r)) return resolve();
-            useScene.getState().setLeverDistance(steps[i]!);
-            i += 1;
-            if (i < steps.length) setTimeout(next, 450);
-            else resolve();
-          };
-          next();
-          return;
-        }
-        const total = ms * 2.5;
-        const t0 = performance.now();
-        const frame = () => {
-          if (!current(r)) return resolve();
-          const k = Math.min(1, (performance.now() - t0) / total);
-          const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // ease in-out
-          useScene.getState().setLeverDistance(from + (to - from) * e);
-          if (k < 1) requestAnimationFrame(frame);
-          else resolve();
-        };
-        requestAnimationFrame(frame);
-      }),
-    [current],
-  );
+  // Slide the weight to the far end (shared with live turns: scene/animations.ts).
+  const slideWeight = useCallback((r: number) => slideWeightOut(() => current(r)), [current]);
 
   const applyActions = useCallback(
     (beat: BeatDef, r: number): Promise<void> => {

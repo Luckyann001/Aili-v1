@@ -20,10 +20,10 @@ test.describe("live path with the recorded provider (slice 6)", () => {
 
   test.beforeEach(async ({ page, baseURL }) => {
     await page.context().addCookies([{ name: "aili-e2e-live", value: "1", url: baseURL! }]);
-    await installVoiceFakes(page, { speakMs: 150 });
   });
 
   test("type → question with chips → tap a chip → calculated value → stage action → explanation panel", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 150 });
     await page.goto("/learn");
     await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
     await expect(stage(page)).toHaveAttribute("data-dimmed", "");
@@ -64,10 +64,62 @@ test.describe("live path with the recorded provider (slice 6)", () => {
   });
 
   test("without the test's cookie the page is the normal prepared page", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 150 });
     await page.context().clearCookies();
     await page.goto("/learn");
     await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/^Start: why reach makes holding harder/)).toBeVisible();
     await expect(welcomeBox(page)).toHaveCount(0);
+  });
+
+  // M4 slice 1: visuals follow the explanation. The recording binds the scene and the highlight to
+  // the SECOND segment ("Here is a ruler…"), so during the first segment the stage must still be
+  // dimmed, and the scene must appear as the second segment starts: with voice on and captions only.
+  const FIRST = /^Robotics is broad/;
+  const SECOND = /^Here is a ruler held out from a hand/;
+  const caption = (p: Page) => p.locator("main [aria-live]").last();
+
+  for (const mode of ["voice on", "captions only"] as const) {
+    test(`${mode}: the scene appears with the segment that names it, not before`, async ({ page }) => {
+      await installVoiceFakes(page, { speakMs: 3000 });
+      await page.goto("/learn");
+      await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
+      if (mode === "captions only") await page.getByRole("button", { name: "Mute" }).click();
+      await welcomeBox(page).fill("teach me robotics");
+      await page.getByRole("button", { name: "Send" }).click();
+      await expect(caption(page)).toHaveText(FIRST, { timeout: 20_000 });
+      // The whole turn has arrived, but its actions wait for their segment.
+      await expect(stage(page)).toHaveAttribute("data-dimmed", "");
+      await expect(page.getByRole("button", { name: /^Parts/ })).toHaveCount(0);
+      await expect(caption(page)).toHaveText(SECOND, { timeout: 10_000 });
+      await expect(stage(page)).not.toHaveAttribute("data-dimmed", "");
+      await expect(page.getByRole("button", { name: /^Parts/ })).toHaveText("Parts: Weight");
+    });
+  }
+
+  test("interrupt during the first segment: queued actions never run, the server is told, the panel says where it stopped", async ({ page }) => {
+    const interrupts: Array<{ shown_through?: string | null }> = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/turn/interrupt")) interrupts.push(r.postDataJSON() as { shown_through?: string | null });
+    });
+    await installVoiceFakes(page, { speakMs: 4000 });
+    await page.goto("/learn");
+    await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
+    await welcomeBox(page).fill("teach me robotics");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(caption(page)).toHaveText(FIRST, { timeout: 20_000 });
+    await page.keyboard.press("Escape");
+    await expect(page.locator('p[role="status"][data-state]')).toHaveText(/Stopped\./);
+    await page.waitForTimeout(4500); // past where the second segment would have started
+    await expect(stage(page)).toHaveAttribute("data-dimmed", "");
+    await expect(page.getByRole("button", { name: /^Parts/ })).toHaveCount(0);
+    await expect.poll(() => interrupts.map((b) => b.shown_through)).toEqual(["n1"]);
+    await page.getByRole("button", { name: "Explanation" }).click();
+    const panel = page.locator("#learn-tabpanel");
+    await expect(panel.getByText(FIRST)).toBeVisible();
+    await expect(panel.getByText(SECOND)).toHaveCount(0);
+    await expect(panel.getByText("Stopped here.")).toBeVisible();
+    await expect(panel.getByText(QUESTION)).toHaveCount(0);
+    expect(await axe(page)).toEqual([]);
   });
 });

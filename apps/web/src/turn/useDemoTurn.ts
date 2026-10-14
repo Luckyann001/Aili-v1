@@ -8,7 +8,8 @@ import { MODELS, type SceneId } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
-import { DROPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
+import { ANIMATIONS } from "@/scene/animations";
+import { actionsByLine, DROPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 import { useStageContent } from "./stageContent";
 import { useTurnLog } from "./turnLog";
 
@@ -63,7 +64,8 @@ function restoreStage(snap: StageSnapshot) {
   useStageContent.getState().setScenePicked(snap.scenePicked);
 }
 
-function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: boolean) {
+/** Applies one stage action as its line starts; an animation runs while the voice is still at `rev`. */
+function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: boolean, rev: number) {
   const s = useScene.getState();
   switch (a.type) {
     case "select_scene": {
@@ -80,14 +82,27 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
     case "set_parameter":
       if (a.param === "weight_distance_m") s.setLeverDistance(a.value);
       break;
-    // play_animation and show_choices are not used by the fake director.
+    case "play_animation": {
+      const play = ANIMATIONS[a.animation];
+      // Never a silent no-op: an animation the page cannot play is said in the console.
+      if (play) void play(() => useVoice.getState().rev === rev);
+      else console.warn(`[turn] the page has no animation "${a.animation}"`);
+      break;
+    }
+    // show_choices is for prepared lessons; the validator rejects it from the director.
   }
   useStageContent.getState().setFixture(true, live);
 }
 
 interface Voice {
   beginTurn: () => number;
-  playTurn: (rev: number, lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>, chips?: string[], source?: "fixture" | "live") => void;
+  playTurn: (
+    rev: number,
+    lines: ReadonlyArray<{ text: string; parts?: CaptionPart[] }>,
+    chips?: string[],
+    source?: "fixture" | "live",
+    hooks?: { onLine?: (seq: number) => void; onDone?: () => void },
+  ) => void;
   settle: (rev: number) => void;
 }
 
@@ -99,6 +114,8 @@ const toCaptionParts = (parts: ReadonlyArray<{ text: string } | { value: string 
  */
 export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string) => void) {
   const current = useRef<{ rev: number; abort: AbortController } | null>(null);
+  /** A completed turn whose lines are still playing: the last narration segment shown so far. */
+  const playing = useRef<{ rev: number; segments: string[]; shown: number } | null>(null);
 
   /** Stop the turn in flight (interrupt): cancel the stream, tell the server, put the stage back. */
   const stop = useCallback(() => {
@@ -118,10 +135,24 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
 
   // The voice controller's interrupt (Stop, Escape, the voice button) bumps the voice revision:
   // that is the signal to stop a turn still streaming. Speech and captions stop there already.
+  // A completed turn still playing its lines stops too (M4 slice 1): its queued actions never run,
+  // and the server is told which segment the learner reached, so its stage matches the page.
   useEffect(
     () =>
       useVoice.subscribe((s, prev) => {
-        if (s.rev !== prev.rev && current.current && current.current.rev !== s.rev && useTurnClient.getState().state.status === "streaming") stop();
+        if (s.rev === prev.rev) return;
+        if (current.current && current.current.rev !== s.rev && useTurnClient.getState().state.status === "streaming") stop();
+        const p = playing.current;
+        if (p && p.rev !== s.rev) {
+          playing.current = null;
+          useTurnLog.getState().markShown(p.rev, p.shown);
+          void fetch("/api/turn/interrupt", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ session_id: SESSION_ID, request_id: `turn_${p.rev}`, state_rev: p.rev, shown_through: p.shown > 0 ? (p.segments[Math.min(p.shown, p.segments.length) - 1] ?? null) : null }),
+            keepalive: true,
+          }).catch(() => {});
+        }
       }),
     [stop],
   );
@@ -158,16 +189,28 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
         const before = useTurnClient.getState().state;
         const after = useTurnClient.getState().dispatch({ type: "event", event: e });
         if (after === before) return; // dropped by the gate
-        if (e.type === "action") applyAction(e.action, live);
+        // Actions are NOT applied as they arrive (M4 slice 1): each waits for its narration segment.
         if (after.status === "done") {
           current.current = null;
-          if (after.narration.length) useStageContent.getState().setFixture(true, live);
           // The question is spoken and captioned last, so it stays on screen with its chips.
           const lines = after.narration.map((n) => ({ text: n.text, parts: toCaptionParts(n.parts) }));
           const question = after.prompt?.text ? { text: after.prompt.text, parts: toCaptionParts(after.prompt.parts) } : null;
           if (after.explanation) useTurnLog.getState().add({ rev, source: live ? "live" : "fixture", lines: [...lines], question, explanation: after.explanation });
           if (question) lines.push(question);
-          voice.playTurn(rev, lines, after.prompt?.chips, live ? "live" : "fixture");
+          const segments = after.narration.map((n) => n.id);
+          const byLine = actionsByLine(segments, lines.length, after.actions);
+          playing.current = { rev, segments, shown: 0 };
+          voice.playTurn(rev, lines, after.prompt?.chips, live ? "live" : "fixture", {
+            // As line `seq` starts: its actions, then its caption and speech.
+            onLine: (seq) => {
+              if (playing.current?.rev === rev) playing.current.shown = Math.min(seq + 1, segments.length);
+              if (seq === 0) useStageContent.getState().setFixture(true, live);
+              for (const a of byLine[seq] ?? []) applyAction(a, live, rev);
+            },
+            onDone: () => {
+              if (playing.current?.rev === rev) playing.current = null;
+            },
+          });
         }
         if (after.status === "error") fail(after.message ?? "Something went wrong. Nothing on the stage changed.");
       };

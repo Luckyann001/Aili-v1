@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSseParser, type TurnEvent } from "@aili/engine";
-import { DROPPED_MESSAGE, STOPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
+import { actionsByLine, DROPPED_MESSAGE, STOPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 
 // The client reducer, fed with real events from the route handler through the SSE parser.
 
@@ -109,5 +109,16 @@ describe("failures restore the stage and say so plainly", () => {
     const first = play([{ type: "begin", rev: 4, snapshot: SNAP }, { type: "interrupt" }]);
     const second = turnClientReducer(first, { type: "begin", rev: 6, snapshot: SNAP });
     expect(second).toMatchObject({ status: "streaming", turnId: "turn_6", message: null, restoreTo: null, gate: { rev: 6, lastSeq: -1 } });
+  });
+});
+
+describe("actions grouped by the line that shows them (M4 slice 1)", () => {
+  it("each action goes with its narration segment's line, in order; one with no matching segment goes with the first line", () => {
+    const a = (type: string, at?: string) => ({ type, at });
+    const lines = actionsByLine(["n1", "n2"], 3, [a("select_scene", "n1"), a("highlight_part", "n2"), a("set_parameter", "n2"), a("select_scene", "prompt"), a("play_animation")]);
+    expect(lines.map((l) => l.map((x) => x.type))).toEqual([["select_scene", "select_scene", "play_animation"], ["highlight_part", "set_parameter"], []]);
+  });
+  it("an answer with only a question still has one line for its actions", () => {
+    expect(actionsByLine([], 1, [{ type: "select_scene", at: "prompt" }])).toEqual([[{ type: "select_scene", at: "prompt" }]]);
   });
 });

@@ -165,6 +165,9 @@ const fidelityText = (f: string) => {
 
 function TurnView({ turn, heading }: { turn: LoggedTurn; heading: string }) {
   const x = turn.explanation;
+  // Interrupted (M4 slice 1): only the segments the learner saw, then "Stopped here."
+  const stopped = turn.shown !== undefined && turn.shown < turn.lines.length;
+  const lines = stopped ? turn.lines.slice(0, turn.shown) : turn.lines;
   return (
     <div className={styles.turnStep}>
       <p className={styles.captionBadges}>
@@ -178,10 +181,11 @@ function TurnView({ turn, heading }: { turn: LoggedTurn; heading: string }) {
         )}
       </p>
       <h3 className={styles.stepTitle}>{heading}</h3>
-      {turn.lines.map((l, i) => (
+      {lines.map((l, i) => (
         <p key={i}>{l.parts ? <CaptionText parts={l.parts} /> : l.text}</p>
       ))}
-      {turn.question && (
+      {stopped && <p className={styles.sampleNote}>Stopped here.</p>}
+      {turn.question && !stopped && (
         <>
           <h4 className={styles.listTitle}>Question</h4>
           <p>{turn.question.parts ? <CaptionText parts={turn.question.parts} /> : turn.question.text}</p>

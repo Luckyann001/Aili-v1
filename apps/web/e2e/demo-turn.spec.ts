@@ -101,7 +101,7 @@ test.describe("fake-director turn under ?demo=1", () => {
 
   });
 
-  test("a dropped connection after actions arrived: the stage goes back and says so", async ({ page, request }) => {
+  test("a dropped connection after actions arrived: the stage never changed, and it says so", async ({ page, request }) => {
     // Cut a real turn's stream just after its actions: no prompt, no turn.done.
     await openDemo(page);
     const before = await partsButton(page).innerText();
@@ -111,7 +111,8 @@ test.describe("fake-director turn under ?demo=1", () => {
       const cut = text.slice(0, text.indexOf("event: calc.result"));
       await route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: cut });
     });
-    // Record whether the turn's actions reached the stage before the drop (so "undone" is real).
+    // Record whether the turn's actions ever reached the stage. Since M4 slice 1 they wait for their
+    // narration segment, which only plays once the whole turn has arrived: so never.
     await page.evaluate(() => {
       const w = window as unknown as { __sawWeight: boolean };
       w.__sawWeight = false;
@@ -121,7 +122,7 @@ test.describe("fake-director turn under ?demo=1", () => {
     });
     await typeAndSend(page);
     await expect(alert(page)).toHaveText("The connection dropped. Nothing on the stage changed.", { timeout: 15000 });
-    expect(await page.evaluate(() => (window as unknown as { __sawWeight: boolean }).__sawWeight)).toBe(true); // applied, then undone
+    expect(await page.evaluate(() => (window as unknown as { __sawWeight: boolean }).__sawWeight)).toBe(false); // never applied
     await expect(partsButton(page)).toHaveText(before);
     await expect(stageBadge(page)).toHaveCount(0);
     expect(await spoken(page)).not.toContain(LINE1);
