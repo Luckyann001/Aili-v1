@@ -1,6 +1,6 @@
 import { LEVER_LENGTH_M, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
-import { layoutServoArm, servoFraming, type ServoParams } from "./servoArm";
+import { eqAnchors, layoutServoArm, servoFraming, type ServoParams } from "./servoArm";
 
 // The scenes the Learn stage can show (manifests: content/robotics/scenes/*.json). Each model lays
 // out its parts from the scene state; the 3D view, labels, framing and fallback all use this.
@@ -26,6 +26,8 @@ export interface SceneModel {
    * parts move during a lesson frames their whole range, so the camera never chases them.
    */
   framing: (s: ModelState, explode: number) => Array<Record<string, PartLayout>>;
+  /** Labels that are not parts (the servo + arm's equation steps): where each points, metres. */
+  extraAnchors?: (s: ModelState) => Record<string, [number, number, number]>;
 }
 
 export const MODELS: Record<SceneId, SceneModel> = {
@@ -66,6 +68,7 @@ export const MODELS: Record<SceneId, SceneModel> = {
     explodable: false,
     layout: (s) => layoutServoArm(s.servo),
     framing: () => servoFraming(),
+    extraAnchors: (s) => eqAnchors(s.servo),
   },
 };
 

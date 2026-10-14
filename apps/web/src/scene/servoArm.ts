@@ -94,7 +94,13 @@ export function marginStatus(margin: number, t: { fail_below: number; pass_at_or
   return margin >= t.pass_at_or_above ? "pass" : "warn";
 }
 
+/** Gravity the scene states (its manifest's solver constant), m/s²: shown with the numbers. */
+export const SCENE_G_M_PER_S2 = scene.solver.constants.g_m_per_s2;
+
 export interface ServoReadout {
+  /** The forces behind the torque, N: the load's weight and the arm's own weight (at L/2). */
+  load_force_n: number;
+  arm_weight_n: number;
   /** Torque needed to hold the arm level, N·m and kgf·cm. */
   torque_nm: number;
   torque_kgf_cm: number;
@@ -117,11 +123,14 @@ export function servoReadout(p: ServoParams, rating_nm: number | null): ServoRea
     payload_kg: 0,
     arm_kg_per_m: p.arm_mass_kg / p.arm_length_m,
     angle_deg: scene.solver.constants.angle_deg,
+    g_m_per_s2: SCENE_G_M_PER_S2,
     extra_masses: [{ mass_kg: p.load_mass_kg, distance_m: Math.min(p.arm_length_m, p.load_distance_m) }],
     ...(rating_nm !== null ? { rated_continuous_torque_nm: rating_nm } : {}),
   });
   const margin = r.share_of_rating !== undefined ? 1 / r.share_of_rating : null;
   return {
+    load_force_n: r.extra_force_n,
+    arm_weight_n: r.arm_weight_n,
     torque_nm: r.torque_nm,
     torque_kgf_cm: r.torque_kgf_cm,
     load_torque_nm: r.extra_torque_nm,
@@ -137,3 +146,43 @@ export function servoReadout(p: ServoParams, rating_nm: number | null): ServoRea
  */
 export const ARROW_SCALE_NM = 0.3;
 export const arrowSweep = (torque_nm: number) => 1.5 * Math.PI * (1 - Math.exp(-Math.max(0, torque_nm) / ARROW_SCALE_NM));
+
+// ── The equation built on the scene (M4 slice B): τ = F × d, step by step ─────────────────────
+
+export const EQ_STEPS = ["eq-force", "eq-distance", "eq-torque", "eq-arm-share", "eq-margin"] as const;
+export type EqStep = (typeof EQ_STEPS)[number];
+export const isEqStep = (id: string): id is EqStep => (EQ_STEPS as readonly string[]).includes(id);
+
+/** Where each step's label points, metres: the load, the middle of the distance line, the joint, mid-arm, the servo. */
+export function eqAnchors(p: ServoParams): Record<EqStep, [number, number, number]> {
+  const [, jy, jz] = JOINT;
+  const d = Math.min(p.arm_length_m, p.load_distance_m);
+  return {
+    "eq-force": [d + 0.02, jy - 0.02, jz + 0.01],
+    "eq-distance": [d / 2, jy - 0.026, jz + 0.01],
+    "eq-torque": [-0.03, jy + 0.035, jz + 0.01],
+    "eq-arm-share": [p.arm_length_m / 2, jy - 0.035, jz + 0.01],
+    "eq-margin": [-0.02, 0.012, 0.01],
+  };
+}
+
+const sig3 = (x: number) => x.toPrecision(3);
+const WORD = { pass: "Pass", warn: "Warn", fail: "Fail" } as const;
+
+/** The full text of a step, from the solver readout (and, for d, the setting itself). */
+export function eqText(step: EqStep, r: ServoReadout, d_m: number): string {
+  switch (step) {
+    case "eq-force":
+      return `F = m × g = ${sig3(r.load_force_n)} N, the load's weight`;
+    case "eq-distance":
+      return `d = ${d_m.toFixed(2)} m from the joint`;
+    case "eq-torque":
+      return `τ = F × d = ${sig3(r.load_torque_nm)} N·m`;
+    case "eq-arm-share":
+      return `+ the arm's own weight (${sig3(r.arm_weight_n)} N at mid-arm): ${sig3(r.arm_torque_nm)} N·m`;
+    case "eq-margin":
+      return r.margin === null || r.status === null
+        ? `Total ${sig3(r.torque_nm)} N·m. Enter your servo's rated torque`
+        : `Total ${sig3(r.torque_nm)} N·m, margin ${r.margin.toFixed(2)}×: ${WORD[r.status]}`;
+  }
+}

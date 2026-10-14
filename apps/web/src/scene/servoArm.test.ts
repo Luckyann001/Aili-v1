@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import { createSceneSlice, type SceneState } from "./sceneStore";
-import { DEFAULT_SERVO_PARAMS, MARGIN, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
+import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqText, MARGIN, SCENE_G_M_PER_S2, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
 
 // Servo + arm scene (M4 slice 2a): every number from the solver, bounds enforced, bands from config.
 
@@ -10,7 +10,7 @@ describe("servo + arm: numbers come from the solver", () => {
   it("the readout is the solver's answer, the arm's own mass included, units declared by the solver", () => {
     const p = { arm_length_m: 0.2, arm_mass_kg: 0.05, load_mass_kg: 0.1, load_distance_m: 0.15 };
     const r = servoReadout(p, 1.2);
-    const s = staticTorqueSingleLink({ arm_length_m: 0.2, payload_kg: 0, arm_kg_per_m: 0.25, angle_deg: 0, extra_masses: [{ mass_kg: 0.1, distance_m: 0.15 }], rated_continuous_torque_nm: 1.2 });
+    const s = staticTorqueSingleLink({ arm_length_m: 0.2, payload_kg: 0, arm_kg_per_m: 0.25, angle_deg: 0, extra_masses: [{ mass_kg: 0.1, distance_m: 0.15 }], rated_continuous_torque_nm: 1.2, g_m_per_s2: 9.81 });
     expect(r.torque_nm).toBe(s.torque_nm);
     expect(r.torque_kgf_cm).toBe(s.torque_kgf_cm);
     expect(r.load_torque_nm).toBe(s.extra_torque_nm);
@@ -75,5 +75,42 @@ describe("servo + arm: settings and bounds", () => {
     expect(l["arm-link"]!.position[0]).toBeCloseTo(0.1, 12);
     expect(l.load!.position[0]).toBe(0.12);
     expect(Object.keys(l)).toEqual(["base", "servo-case", "horn", "arm-link", "load"]);
+  });
+});
+
+describe("τ = F × d on the servo + arm (M4 slice B)", () => {
+  const lucky = { arm_length_m: 0.3, arm_mass_kg: 0.2, load_mass_kg: 0.5, load_distance_m: 0.25 };
+  it("the scene states g = 9.81 m/s², and its readout gives Lucky's worked example (all inside the sliders' bounds)", () => {
+    expect(SCENE_G_M_PER_S2).toBe(9.81);
+    const r = servoReadout(lucky, null);
+    expect(r.load_force_n).toBeCloseTo(4.905, 12);
+    expect(r.load_torque_nm).toBeCloseTo(1.22625, 12);
+    expect(r.arm_weight_n).toBeCloseTo(1.962, 12);
+    expect(r.arm_torque_nm).toBeCloseTo(0.2943, 12);
+    expect(r.torque_nm).toBeCloseTo(1.52055, 12);
+  });
+  it("each step's label text, numbers from the readout with units; the margin asks for a rating until one is entered", () => {
+    const r = servoReadout(lucky, null);
+    expect(EQ_STEPS.map((s) => eqText(s, r, 0.25))).toEqual([
+      "F = m × g = 4.91 N, the load's weight",
+      "d = 0.25 m from the joint",
+      "τ = F × d = 1.23 N·m",
+      "+ the arm's own weight (1.96 N at mid-arm): 0.294 N·m",
+      "Total 1.52 N·m. Enter your servo's rated torque",
+    ]);
+    expect(eqText("eq-margin", servoReadout(lucky, 2), 0.25)).toBe("Total 1.52 N·m, margin 1.32×: Warn");
+  });
+  it("the store keeps the steps in order, a repeat moves to the end, a new scene clears them, a snapshot puts them back", () => {
+    const store = createStore<SceneState>()((set) => createSceneSlice(set));
+    store.getState().setScene("servo-arm");
+    store.getState().showEqStep("eq-force");
+    expect(store.getState().eqGrow).toBe(0); // grows in from nothing
+    store.getState().showEqStep("eq-distance");
+    store.getState().showEqStep("eq-force");
+    expect(store.getState().equation).toEqual(["eq-distance", "eq-force"]);
+    store.getState().setScene("lever-analogy");
+    expect(store.getState().equation).toEqual([]);
+    store.getState().setEquation(["eq-force", "eq-distance"]);
+    expect(store.getState()).toMatchObject({ equation: ["eq-force", "eq-distance"], eqGrow: 1 });
   });
 });

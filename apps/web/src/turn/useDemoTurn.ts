@@ -9,7 +9,7 @@ import { useScene } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
 import { ANIMATIONS } from "@/scene/animations";
-import { isServoParam, type ServoParams } from "@/scene/servoArm";
+import { isServoParam, type EqStep, type ServoParams } from "@/scene/servoArm";
 import { actionsByLine, DROPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 import { useStageContent } from "./stageContent";
 import { useTurnLog } from "./turnLog";
@@ -26,6 +26,8 @@ export interface StageSnapshot {
   selectedId: string | null;
   leverDistance_m: number;
   servo: ServoParams;
+  /** The equation steps on stage (servo + arm). */
+  equation: EqStep[];
   /** Whether fixture content (from an earlier, completed turn) was already on stage. */
   fixture: boolean;
   /** Whether that earlier turn was a live one. */
@@ -54,7 +56,7 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, equation: s.equation, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
 };
 
 function restoreStage(snap: StageSnapshot) {
@@ -62,6 +64,7 @@ function restoreStage(snap: StageSnapshot) {
   s.setScene(snap.activeScene);
   s.setLeverDistance(snap.leverDistance_m);
   useScene.setState({ servo: snap.servo });
+  s.setEquation(snap.equation);
   s.highlight(snap.selectedId);
   useStageContent.getState().setFixture(snap.fixture, snap.live);
   useStageContent.getState().setScenePicked(snap.scenePicked);

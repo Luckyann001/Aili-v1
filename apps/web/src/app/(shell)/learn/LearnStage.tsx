@@ -34,6 +34,7 @@ import { SceneFallback } from "./scene/SceneFallback";
 import { SceneLabels } from "./scene/SceneLabels";
 import { SceneViewport } from "./scene/SceneViewport";
 import { TorqueMargin } from "./scene/TorqueMargin";
+import { EquationLabels, EquationList } from "./scene/EquationLabels";
 import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
 import styles from "./learn.module.css";
@@ -223,6 +224,8 @@ export function LearnStage() {
               {viewer === "loading" && <SceneFallback loading />}
               {viewer === "fallback" && <SceneFallback />}
               {viewer === "ready" && <SceneLabels labels={labelEls} />}
+              {viewer === "ready" && <EquationLabels labels={labelEls} />}
+              {viewer === "fallback" && <EquationList />}
               <Inspector onClosed={focusParts} />
               <EffortGauge />
               <TorqueMargin />

@@ -1,6 +1,7 @@
 import { cssDurationMs } from "@/design/duration";
 import { LEVER_LENGTH_M } from "./layout";
 import { useScene } from "./sceneStore";
+import { EQ_STEPS, type EqStep } from "./servoArm";
 
 // Scene animations shared by the prepared lesson and live turns (M4 slice 1: one implementation, so
 // an animation the professor names is never silently dropped). Each takes `isCurrent`: it stops at
@@ -30,8 +31,19 @@ export function slideLoadOut(isCurrent: () => boolean): Promise<void> {
   return tween(isCurrent, (k) => at(k)(), [at(0.4), at(0.7), at(1)]);
 }
 
-/** Eases `apply` from 0 to 1 over 2.5 spatial durations, or, under reduced motion, runs the `still` steps 450 ms apart. */
-function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Array<() => void>): Promise<void> {
+/**
+ * One step of the equation on the servo + arm (M4 slice B): its marks and label appear and grow over
+ * one spatial duration; under reduced motion they appear at once, with no motion.
+ */
+export const showEqStep = (step: EqStep) => (isCurrent: () => boolean) => {
+  if (useScene.getState().activeScene !== "servo-arm") return Promise.resolve();
+  useScene.getState().showEqStep(step);
+  // Its segment has started, so an interrupt leaves the step fully drawn rather than half grown.
+  return tween(isCurrent, (k) => useScene.getState().setEqGrow(k), [() => useScene.getState().setEqGrow(1)], 1).then(() => useScene.getState().setEqGrow(1));
+};
+
+/** Eases `apply` from 0 to 1 over `spans` spatial durations, or, under reduced motion, runs the `still` steps 450 ms apart. */
+function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Array<() => void>, spans = 2.5): Promise<void> {
   return new Promise<void>((resolve) => {
     const ms = spatialMs();
     if (ms <= 0) {
@@ -46,7 +58,7 @@ function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Arra
       next();
       return;
     }
-    const total = ms * 2.5;
+    const total = ms * spans;
     const t0 = performance.now();
     const frame = () => {
       if (!isCurrent()) return resolve();
@@ -63,4 +75,5 @@ function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Arra
 export const ANIMATIONS: Record<string, (isCurrent: () => boolean) => Promise<void>> = {
   "slide-weight-out": slideWeightOut,
   "slide-load-out": slideLoadOut,
+  ...Object.fromEntries(EQ_STEPS.map((step) => [step, showEqStep(step)])),
 };

@@ -52,9 +52,9 @@ async function openDetails(page: Page) {
   await expect(panel(page).getByRole("button", { name: "Fewer details" })).toBeVisible();
 }
 
-/** The solver's answer for the values the page shows (arm level; arm mass as a uniform bar). */
+/** The solver's answer for the values the page shows (arm level; arm mass as a uniform bar; g = 9.81 m/s², as the scene states). */
 const solve = (p: { L: number; armKg: number; loadKg: number; d: number }, rating?: number) =>
-  staticTorqueSingleLink({ arm_length_m: p.L, payload_kg: 0, arm_kg_per_m: p.armKg / p.L, angle_deg: 0, extra_masses: [{ mass_kg: p.loadKg, distance_m: p.d }], ...(rating ? { rated_continuous_torque_nm: rating } : {}) });
+  staticTorqueSingleLink({ arm_length_m: p.L, payload_kg: 0, arm_kg_per_m: p.armKg / p.L, angle_deg: 0, extra_masses: [{ mass_kg: p.loadKg, distance_m: p.d }], g_m_per_s2: 9.81, ...(rating ? { rated_continuous_torque_nm: rating } : {}) });
 const shown = async (page: Page, key: string) => (await page.locator(`[data-solver-value="${key}"]`).textContent())!;
 const settingValue = async (page: Page, label: string) => Number((await inspector(page).locator("div", { has: page.getByText(label, { exact: true }) }).locator("output").first().textContent())!.split(" ")[0]);
 
@@ -118,10 +118,10 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     await page.getByRole("button", { name: "Close inspector" }).click();
     await openDetails(page);
     const s = solve({ L, armKg, loadKg, d });
-    expect(await shown(page, "torque_nm")).toBe(`${s.torque_nm.toFixed(2)} N·m`);
-    expect(await shown(page, "torque_kgf_cm")).toBe(`${s.torque_kgf_cm.toFixed(1)} kgf·cm`);
-    expect(await shown(page, "load_torque_nm")).toBe(`${s.extra_torque_nm.toFixed(2)} N·m`);
-    expect(await shown(page, "arm_torque_nm")).toBe(`${s.arm_torque_nm.toFixed(2)} N·m`);
+    expect(await shown(page, "torque_nm")).toBe(`${s.torque_nm.toPrecision(3)} N·m`);
+    expect(await shown(page, "torque_kgf_cm")).toBe(`${s.torque_kgf_cm.toPrecision(3)} kgf·cm`);
+    expect(await shown(page, "load_torque_nm")).toBe(`${s.extra_torque_nm.toPrecision(3)} N·m`);
+    expect(await shown(page, "arm_torque_nm")).toBe(`${s.arm_torque_nm.toPrecision(3)} N·m`);
     await expect(panel(page)).toContainText("Teaching thresholds, not a design standard: Fail below 1.0×, Warn 1.0× up to 2.0×, Pass at 2.0× and above");
     await expect(panel(page)).toContainText("Simulation only; hardware untested");
     await expect(panel(page)).toContainText("Illustrative (AI-composed)");
@@ -160,7 +160,7 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     const s2 = solve({ L: 0.08, armKg, loadKg, d: 0.08 }, 0.25);
     const margin = 0.25 / s2.torque_nm;
     const word = margin < 1 ? "Fail" : margin >= 2 ? "Pass" : "Warn";
-    expect(await shown(page, "torque_nm")).toBe(`${s2.torque_nm.toFixed(2)} N·m`);
+    expect(await shown(page, "torque_nm")).toBe(`${s2.torque_nm.toPrecision(3)} N·m`);
     expect(await shown(page, "margin")).toBe(`${margin.toFixed(2)}×`);
     const status = panel(page).locator("[data-status]");
     await expect(status).toHaveAttribute("data-status", word.toLowerCase());

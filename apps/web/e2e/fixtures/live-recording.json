@@ -1,5 +1,5 @@
 {
-  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Test builds only.",
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Turns 6 and 7 (the equation built on the servo + arm) added for M4 slice B. Test builds only.",
   "router": {
     "source": "hand-written",
     "steps": [
@@ -54,6 +54,42 @@
             "wants_direct_answer": false
           },
           "input_tokens": 1600,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
           "output_tokens": 92
         }
       },
@@ -369,6 +405,136 @@
           },
           "input_tokens": 7900,
           "output_tokens": 340
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_6",
+            "state_rev": 6,
+            "move": "explain",
+            "concepts": [
+              "mech.torque.static",
+              "mech.moment-arm"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, a longer lever. Back to the servo and its arm: let's build the torque one piece at a time.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-servo-arm"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "First the force: the load's weight pulls straight down on the arm.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-force"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Next the distance from the joint out to the load, along the arm.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-distance"
+                  }
+                ]
+              },
+              {
+                "id": "n4",
+                "text": "Force times distance is the torque the servo must hold at the joint.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-torque"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What else pulls down on the joint besides the load?",
+              "chips": [
+                "The arm itself",
+                "Nothing else",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8000,
+          "output_tokens": 360
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_7",
+            "state_rev": 7,
+            "move": "explain",
+            "concepts": [
+              "mech.arm-own-mass",
+              "mech.torque-margin"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes: the arm's own weight, acting at its middle, adds its share of torque.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-arm-share"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Compare that total with your servo's rated torque: the room left over is the margin.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-margin"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What could you change on the arm to get more margin?",
+              "chips": [
+                "A shorter arm",
+                "A lighter load",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8100,
+          "output_tokens": 300
         }
       }
     ]

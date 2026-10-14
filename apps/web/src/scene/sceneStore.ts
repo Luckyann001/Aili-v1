@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
 import { MODELS, type SceneId } from "./models";
-import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type ServoParamId, type ServoParams } from "./servoArm";
+import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type EqStep, type ServoParamId, type ServoParams } from "./servoArm";
 
 /** loading: 3D code still downloading · ready: rendering · fallback: still picture (no WebGL or it failed). */
 export type ViewerStatus = "loading" | "ready" | "fallback";
@@ -20,6 +20,16 @@ export interface SceneState {
   ratedTorque_nm: number | null;
   /** Out-of-bounds values are refused (returns false) and nothing changes. */
   setRatedTorque: (value: number | null) => boolean;
+  /**
+   * The equation built on the servo + arm (M4 slice B): the steps shown so far, in order, and how far
+   * the latest one has grown (0 to 1; 1 at once under reduced motion). A new scene clears it.
+   */
+  equation: EqStep[];
+  eqGrow: number;
+  showEqStep: (step: EqStep) => void;
+  setEqGrow: (k: number) => void;
+  /** Put back as a snapshot had it (a failed or interrupted turn). */
+  setEquation: (steps: EqStep[]) => void;
   viewer: ViewerStatus;
   setViewer: (v: ViewerStatus) => void;
   selectedId: string | null;
@@ -44,7 +54,7 @@ export interface SceneState {
 
 export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState>) => void): SceneState => ({
   activeScene: "base-joint-arm",
-  setScene: (id) => set((s) => (s.activeScene === id ? {} : { activeScene: id, selectedId: null, inspectorOpen: false, exploded: false })),
+  setScene: (id) => set((s) => (s.activeScene === id ? {} : { activeScene: id, selectedId: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1 })),
   leverDistance_m: 0.05,
   setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
   servo: DEFAULT_SERVO_PARAMS,
@@ -56,6 +66,11 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
     set(() => ({ ratedTorque_nm: v }));
     return true;
   },
+  equation: [],
+  eqGrow: 1,
+  showEqStep: (step) => set((s) => ({ equation: [...s.equation.filter((x) => x !== step), step], eqGrow: 0 })),
+  setEqGrow: (k) => set(() => ({ eqGrow: Math.min(1, Math.max(0, k)) })),
+  setEquation: (steps) => set(() => ({ equation: steps, eqGrow: 1 })),
   viewer: "loading",
   setViewer: (viewer) => set(() => ({ viewer })),
   selectedId: null,

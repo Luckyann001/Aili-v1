@@ -14,7 +14,7 @@ import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
 import { useScene } from "@/scene/sceneStore";
-import { JOINT, arrowSweep, servoReadout } from "@/scene/servoArm";
+import { JOINT, arrowSweep, servoReadout, type EqStep } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
 export interface SceneCanvasProps {
@@ -75,6 +75,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         <PartMesh key={`${activeScene}:${p.id}`} id={p.id} fill={p.fill} colors={props.colors} />
       ))}
       {activeScene === "servo-arm" && <TorqueArrow colors={props.colors} />}
+      {activeScene === "servo-arm" && <EquationMarks colors={props.colors} />}
       <OrbitControls
         makeDefault
         target={DEFAULT_VIEW.target}
@@ -162,12 +163,20 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
  */
 function TorqueArrow({ colors }: { colors: SceneColors }) {
   const servo = useScene((s) => s.servo);
+  const equation = useScene((s) => s.equation);
+  const grow = useScene((s) => s.eqGrow);
   const invalidate = useThree((s) => s.invalidate);
   const r = servoReadout(servo, null);
-  useEffect(() => invalidate(), [r.torque_nm, colors, invalidate]);
-  const total = arrowSweep(r.torque_nm);
-  const loadSweep = r.torque_nm > 0 ? total * (r.load_torque_nm / r.torque_nm) : 0;
-  const armSweep = total - loadSweep;
+  useEffect(() => invalidate(), [r.torque_nm, colors, equation, grow, invalidate]);
+  // While the equation is being built, the arrow appears with its steps: the load's share at
+  // eq-torque, the arm's own share at eq-arm-share (each growing in as its step starts).
+  const building = equation.length > 0;
+  const k = (step: EqStep) => (!building ? 1 : !equation.includes(step) ? 0 : equation.at(-1) === step ? grow : 1);
+  const fullSweep = arrowSweep(r.torque_nm);
+  const loadSweep = (r.torque_nm > 0 ? fullSweep * (r.load_torque_nm / r.torque_nm) : 0) * k("eq-torque");
+  const armSweep = (fullSweep - (r.torque_nm > 0 ? fullSweep * (r.load_torque_nm / r.torque_nm) : 0)) * k("eq-arm-share");
+  const total = loadSweep + armSweep;
+  if (total < 0.01) return null;
   const R = 0.032;
   const start = Math.PI / 2; // from the top, clockwise as seen from the front
   const end = start - total;
@@ -190,6 +199,58 @@ function TorqueArrow({ colors }: { colors: SceneColors }) {
         <coneGeometry args={[0.006, 0.012, 12]} />
         <meshBasicMaterial color={colors.outline} toneMapped={false} />
       </mesh>
+    </group>
+  );
+}
+
+/**
+ * The equation's marks on the servo + arm (M4 slice B): the load's weight as a downward arrow, the
+ * distance from the joint as a line along the arm with end ticks, and the arm's own weight as a
+ * thinner arrow at its middle. Each appears with its step and grows in (at once under reduced
+ * motion). Drawing sizes only: the numbers are in the labels, from the solver. Not selectable.
+ */
+function EquationMarks({ colors }: { colors: SceneColors }) {
+  const servo = useScene((s) => s.servo);
+  const equation = useScene((s) => s.equation);
+  const grow = useScene((s) => s.eqGrow);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [servo, equation, grow, colors, invalidate]);
+  const k = (step: EqStep) => (!equation.includes(step) ? 0 : equation.at(-1) === step ? grow : 1);
+  const [, jy, jz] = JOINT;
+  const d = Math.min(servo.arm_length_m, servo.load_distance_m);
+  const z = jz + 0.012;
+  const arrow = (x: number, top: number, len: number, r: number, color: string, name: string) =>
+    len > 0.001 && (
+      <group name={name}>
+        <mesh position={[x, top - len / 2, z]} raycast={() => null}>
+          <cylinderGeometry args={[r, r, len, 8]} />
+          <meshBasicMaterial color={color} toneMapped={false} />
+        </mesh>
+        <mesh position={[x, top - len - 0.004, z]} rotation={[Math.PI, 0, 0]} raycast={() => null}>
+          <coneGeometry args={[r * 2.6, 0.008, 10]} />
+          <meshBasicMaterial color={color} toneMapped={false} />
+        </mesh>
+      </group>
+    );
+  const kd = k("eq-distance");
+  return (
+    <group name="equation-marks">
+      {arrow(d, jy - 0.006, 0.03 * k("eq-force"), 0.0018, colors.outline, "eq-force")}
+      {kd > 0 && (
+        <group name="eq-distance">
+          <mesh position={[(d * kd) / 2, jy - 0.016, z]} raycast={() => null}>
+            <boxGeometry args={[d * kd, 0.0012, 0.0012]} />
+            <meshBasicMaterial color={colors.outline} toneMapped={false} />
+          </mesh>
+          {[0, d * kd].map((x) => (
+            <mesh key={x} position={[x, jy - 0.016, z]} raycast={() => null}>
+              <boxGeometry args={[0.0012, 0.008, 0.0012]} />
+              <meshBasicMaterial color={colors.outline} toneMapped={false} />
+            </mesh>
+          ))}
+        </group>
+      )}
+      {arrow(servo.arm_length_m / 2, jy - 0.006, 0.02 * k("eq-arm-share"), 0.0012, colors.fills.discovery, "eq-arm-share")}
     </group>
   );
 }
@@ -332,7 +393,8 @@ function LabelTracker({
   const servo = useScene((s) => s.servo);
 
   // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, activeScene, invalidate]);
+  const equation = useScene((s) => s.equation);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, activeScene, equation, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
@@ -365,6 +427,30 @@ function LabelTracker({
         w: lw,
         h: lh,
         priority: part.id === selectedId ? 10 : 0,
+      });
+    }
+    // Labels that are not parts (the equation's steps), placed the same way; the latest step wins space.
+    const extra = MODELS[activeScene].extraAnchors?.({ params, leverDistance_m, servo }) ?? {};
+    const latest = useScene.getState().equation.at(-1);
+    for (const [id, anchor] of Object.entries(extra)) {
+      const el = labels.current.get(id);
+      if (!el) continue;
+      v.set(...anchor).project(camera);
+      const sx = ((v.x + 1) / 2) * size.width;
+      const sy = ((1 - v.y) / 2) * size.height;
+      const lw = el.offsetWidth;
+      const lh = el.offsetHeight;
+      if (v.z > 1 || lw === 0) {
+        el.style.visibility = "hidden";
+        continue;
+      }
+      wanted.push({
+        id,
+        x: Math.min(Math.max(sx - area.offsetLeft - lw / 2, PAD), Math.max(PAD, w - lw - PAD)),
+        y: Math.min(Math.max(sy - area.offsetTop - lh / 2, PAD), Math.max(PAD, h - lh - PAD)),
+        w: lw,
+        h: lh,
+        priority: id === latest ? 9 : 1,
       });
     }
     // 2. Resolve collisions: the selected label stays put; others move aside or hide.

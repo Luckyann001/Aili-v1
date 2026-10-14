@@ -3,7 +3,7 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { StatusIcon } from "@/components/StatusIcon";
 import { useScene } from "@/scene/sceneStore";
-import { MARGIN, servoReadout, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
+import { MARGIN, SCENE_G_M_PER_S2, servoReadout, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // Servo + arm (M4 slice 2a): the torque the joint needs, from the solver, split by cause, and the
@@ -17,8 +17,9 @@ const MEANING: Record<MarginStatus, string> = {
   fail: "the load needs more than the rating",
 };
 
-export const nm = (v: number) => `${v.toFixed(2)} N·m`;
-export const kgfcm = (v: number) => `${v.toFixed(1)} kgf·cm`;
+// Three significant figures, as the engine compiles calculated values and as the equation labels show them.
+export const nm = (v: number) => `${v.toPrecision(3)} N·m`;
+export const kgfcm = (v: number) => `${v.toPrecision(3)} kgf·cm`;
 export const times = (v: number) => `${v.toFixed(2)}×`;
 const bands = `Fail below ${MARGIN.fail_below.toFixed(1)}×, Warn ${MARGIN.fail_below.toFixed(1)}× up to ${MARGIN.pass_at_or_above.toFixed(1)}×, Pass at ${MARGIN.pass_at_or_above.toFixed(1)}× and above`;
 
@@ -103,7 +104,7 @@ export function TorqueMargin() {
           </p>
         )}
         <p className={styles.marginNote}>
-          {MARGIN.label}: {bands}. Simulation only; hardware untested. Level arm, holding still: no acceleration, friction or gear play.
+          {MARGIN.label}: {bands}. Simulation only; hardware untested. Level arm, holding still: no acceleration, friction or gear play. g = {SCENE_G_M_PER_S2} m/s².
         </p>
       </div>
     </section>

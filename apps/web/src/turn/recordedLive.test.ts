@@ -82,6 +82,24 @@ describe("recorded live path (test builds only)", () => {
     expect(sessions.get(sid)!.activeScene).toBe("fx-lever");
   });
 
+  it("turns 6 and 7: the equation steps, each bound to the segment that names it (M4 slice B)", async () => {
+    const { handleTurn } = await load();
+    const sid = "recorded-test-0009";
+    for (const [rev, text] of [[1, "teach me robotics"], [2, "It gets harder"], [3, "show me a real servo"], [4, "the rated torque"], [5, "Yes"]] as const) await readAll(await handleTurn(post(body(rev, text, sid))));
+    const acts = (ev: TurnEvent[]) => ev.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action);
+    const t6 = await readAll(await handleTurn(post(body(6, "Longer lever", sid))));
+    expect(t6.at(-1)!.type, JSON.stringify(t6.at(-1))).toBe("turn.done");
+    expect(acts(t6)).toEqual([
+      { type: "select_scene", scene: "fx-servo-arm", at: "n1" },
+      { type: "play_animation", animation: "eq-force", at: "n2" },
+      { type: "play_animation", animation: "eq-distance", at: "n3" },
+      { type: "play_animation", animation: "eq-torque", at: "n4" },
+    ]);
+    const t7 = await readAll(await handleTurn(post(body(7, "The arm itself", sid))));
+    expect(t7.at(-1)!.type, JSON.stringify(t7.at(-1))).toBe("turn.done");
+    expect(acts(t7)).toEqual([{ type: "play_animation", animation: "eq-arm-share", at: "n1" }, { type: "play_animation", animation: "eq-margin", at: "n2" }]);
+  });
+
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
     const { handleTurn, sessions } = await load();
     // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,

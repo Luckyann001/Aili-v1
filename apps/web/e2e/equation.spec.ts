@@ -1,0 +1,121 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { installVoiceFakes } from "./voiceFakes";
+
+// τ = F × d built on the servo + arm (M4 slice B), through the live path with the RECORDED provider
+// (turns 6 and 7 of e2e/fixtures/live-recording.json): each eq-* step appears with the segment that
+// names it, voice on and captions only; labels carry solver numbers with units; phones show only the
+// latest step in full; accessibility; phone width; reduced motion.
+
+const welcomeBox = (p: Page) => p.getByRole("textbox", { name: "What do you want to learn?" });
+const bottomBox = (p: Page) => p.getByRole("textbox", { name: "Ask Aili or answer" });
+const caption = (p: Page) => p.locator("main [aria-live]").last();
+const label = (p: Page, step: string) => p.locator(`span[data-eq-label="${step}"]`);
+const send = async (p: Page, text: string) => {
+  await bottomBox(p).fill(text);
+  await p.getByRole("button", { name: "Send" }).click();
+};
+const axe = async (p: Page) =>
+  (await new AxeBuilder({ page: p }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" | ")}`);
+
+const N2 = /^First the force/;
+const N3 = /^Next the distance/;
+const N4 = /^Force times distance is the torque/;
+
+/**
+ * Turns 1 to 5, each sent as soon as the stage has what the next turn needs (an early send is an
+ * interrupt, as a learner would do it): turn 1 plays to its question (turn 2's slide needs the lever).
+ * Then turn 6 is sent; returns when its first caption shows.
+ */
+async function toTurn6(page: Page, o: { muted?: boolean } = {}) {
+  await installVoiceFakes(page, { speakMs: 3000 });
+  await page.goto("/learn");
+  await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
+  if (o.muted) await page.getByRole("button", { name: "Mute" }).click();
+  await welcomeBox(page).fill("teach me robotics");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(caption(page)).toHaveText(/^If the weight slides farther/, { timeout: 40_000 });
+  await send(page, "It gets harder");
+  await expect(caption(page)).toHaveText(/^Yes, farther out is harder/, { timeout: 30_000 });
+  await send(page, "show me a real servo");
+  await expect(caption(page)).toHaveText(/^Now the same idea on a robot joint/, { timeout: 30_000 });
+  await send(page, "the rated torque");
+  await expect(caption(page)).toHaveText(/^Yes, check its rated torque/, { timeout: 30_000 });
+  await send(page, "Yes");
+  await expect(caption(page)).toHaveText(/^Here is the ruler held out/, { timeout: 30_000 });
+  await send(page, "Longer lever");
+  await expect(caption(page)).toHaveText(/^Yes, a longer lever/, { timeout: 30_000 });
+}
+
+test.describe("τ = F × d on the servo + arm (slice B), recorded live path", () => {
+  test.setTimeout(180_000);
+  test.beforeEach(async ({ page, baseURL }) => {
+    await page.context().addCookies([{ name: "aili-e2e-live", value: "1", url: baseURL! }]);
+  });
+
+  for (const mode of ["voice on", "captions only"] as const) {
+    test(`${mode}: each step appears with its own segment, with solver numbers and units`, async ({ page }, info) => {
+      await toTurn6(page, { muted: mode === "captions only" });
+      await expect(page.locator("[data-viewer]")).toHaveAttribute("data-viewer", "ready", { timeout: 20_000 });
+      // n1 puts the servo + arm on stage; no step yet.
+      await expect(page.getByRole("region", { name: "Torque at the joint" })).toBeVisible();
+      await expect(page.locator("span[data-eq-label]")).toHaveCount(0);
+      await expect(caption(page)).toHaveText(N2, { timeout: 20_000 });
+      await expect(label(page, "eq-force")).toHaveText(/^F = m × g = \d+\.\d+ N, the load's weight$/);
+      await expect(label(page, "eq-distance")).toHaveCount(0);
+      await expect(caption(page)).toHaveText(N3, { timeout: 20_000 });
+      await expect(label(page, "eq-distance")).toHaveText(/^d = 0\.\d\d m from the joint$/);
+      await expect(label(page, "eq-torque")).toHaveCount(0);
+      await expect(caption(page)).toHaveText(N4, { timeout: 20_000 });
+      await expect(label(page, "eq-torque")).toHaveText(/^τ = F × d = \d\.\d+ N·m$/);
+      // Phones: only the latest step in full; the earlier ones are small marks.
+      if (info.project.name === "phone") {
+        await expect(label(page, "eq-force")).toHaveText("F");
+        await expect(label(page, "eq-distance")).toHaveText("d");
+      } else {
+        await expect(label(page, "eq-force")).toHaveText(/^F = /);
+      }
+      expect(await axe(page)).toEqual([]);
+
+      // Turn 7: the arm's own share, then the margin (no rating yet: it asks for one).
+      await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 20_000 });
+      await send(page, "The arm itself");
+      await expect(caption(page)).toHaveText(/^Yes: the arm's own weight/, { timeout: 30_000 });
+      await expect(label(page, "eq-arm-share")).toHaveText(/^\+ the arm's own weight \(\d\.\d+ N at mid-arm\): \d\.\d+ N·m$/);
+      await expect(label(page, "eq-margin")).toHaveCount(0);
+      await expect(caption(page)).toHaveText(/^Compare that total with your servo's rated torque/, { timeout: 20_000 });
+      await expect(label(page, "eq-margin")).toHaveText(/^Total \d\.\d+ N·m\. Enter your servo's rated torque$/);
+      expect(await axe(page)).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    });
+  }
+
+  test("reduced motion: the steps appear at once, with no motion, and the labels are the same", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await toTurn6(page);
+    await expect(caption(page)).toHaveText(N4, { timeout: 30_000 });
+    await expect(label(page, "eq-torque")).toHaveText(/^τ = F × d = /);
+    const anim = await label(page, "eq-torque").evaluate((el) => parseFloat(getComputedStyle(el).animationDuration));
+    expect(anim).toBeLessThan(0.001); // the UI duration token is (near) zero under reduced motion
+  });
+
+  // Screenshots for Lucky (git-ignored apps/web/screenshots/equation): desktop and phone, after turn 7.
+  test("screenshots of the equation on the servo + arm", async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "taken once");
+    const dir = "screenshots/equation";
+    mkdirSync(dir, { recursive: true });
+    for (const [width, height, name] of [[1280, 800, "desktop"], [412, 915, "phone"]] as const) {
+      await page.setViewportSize({ width, height });
+      await toTurn6(page);
+      await expect(caption(page)).toHaveText(N4, { timeout: 30_000 });
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: `${dir}/${name}-1-torque.png` });
+      await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 20_000 });
+      await send(page, "The arm itself");
+      await expect(caption(page)).toHaveText(/^Compare that total/, { timeout: 30_000 });
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: `${dir}/${name}-2-margin.png` });
+    }
+  });
+});

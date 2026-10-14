@@ -1369,3 +1369,61 @@
   font-size: 0.8rem;
   pointer-events: auto;
 }
+
+/* τ = F × d on the servo + arm (M4 slice B): labels on the object, placed like part labels. The
+   latest step is a full label (square corners, heavier border: shape, not colour); earlier steps on
+   phones are small marks. Fades in over the UI duration (none under reduced motion, via the token). */
+.eqLabel,
+.eqMark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  border: 1px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  will-change: transform;
+  animation: eqIn var(--aili-duration-ui) ease-out;
+}
+
+.eqLabel {
+  padding: 2px var(--aili-space-2);
+  border-radius: var(--aili-radius-sm);
+}
+
+.eqLabel[data-latest] {
+  z-index: 1;
+  border: 2px solid var(--aili-text);
+  font-weight: 600;
+}
+
+.eqMark {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+@keyframes eqIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.eqList {
+  margin: 0;
+  padding: var(--aili-space-2) var(--aili-space-3) var(--aili-space-2) calc(var(--aili-space-3) + 1em);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.85rem;
+}
+
+.eqListNote {
+  list-style: none;
+  color: var(--aili-text-muted);
+  font-size: 0.75rem;
+}

@@ -178,6 +178,16 @@ request as if config held those values; config is not changed.
   unused solvers, simulations. Never dropped: the scene on stage and any item with safety notes;
   kept items keep their bounds. The model is told what was left out. `overBudget` is reported if
   even that is not enough.
+  **Typical prompt: 4,881 of 5,000** estimated tokens (15 Oct 2026, after slice B), nothing dropped.
+- **No repetition**: a solver that a shortlisted simulation runs says `inputs: "as in <simulation>"`
+  when they match, and lists only the assumptions and exclusions the simulation does not already
+  state (`also_states` names it). This made room for slice B without raising the budget.
+- **Equation steps (M4 slice B)**: the servo + arm declares five scene animations, `eq-force`,
+  `eq-distance`, `eq-torque`, `eq-arm-share`, `eq-margin`, played with `play_animation` and bound to
+  their segments (no new action types; the output schema is unchanged). The prompt asks for them in
+  order, one per segment, with the quantities named in words: the page labels each step on the object
+  with the solver's numbers and units (three significant figures; g = 9.81 m/s², the scene's stated
+  constant); the margin step asks for the learner's rating until one is entered.
 - **Output schema**: generated from the Zod director-response schema (`z.toJSONSchema`).
 
 ## Metering, cap and kill switch (`src/metering.ts`)
