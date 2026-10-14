@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { readBlock, SELECTORS } from "@/design/contrast";
 import { R3FCheck } from "./R3FCheck";
-import { StatusIcon, type Status } from "./StatusIcon";
+import { StatusIcon, type Status } from "@/components/StatusIcon";
 import styles from "./preview.module.css";
 
 export const metadata: Metadata = { title: "Design preview · AILI" };
