@@ -91,8 +91,8 @@ describe("structured-output schema for Anthropic", () => {
     walk(schema, "$");
   });
 
-  it("flattens the actions union into one shape: type from the list, every other field optional (accepted by the provider, 2026-10-12)", () => {
-    const items = (schema as { properties: { actions: { items: { anyOf?: unknown; properties: Record<string, { enum?: string[] }>; required: string[] } } } }).properties.actions.items;
+  it("flattens the actions union into one shape: type from the list, every other field optional (accepted by the provider, 2026-10-12; nested in narration since 2026-10-14)", () => {
+    const items = (schema as { properties: { narration: { items: { properties: { actions: { items: { anyOf?: unknown; properties: Record<string, { enum?: string[] }>; required: string[] } } } } } } }).properties.narration.items.properties.actions.items;
     expect(items.anyOf).toBeUndefined();
     expect(items.properties.type!.enum).toEqual(["select_scene", "highlight_part", "set_parameter", "play_animation", "show_choices"]);
     expect(items.required).toEqual(["type"]);

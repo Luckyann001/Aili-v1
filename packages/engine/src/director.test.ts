@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, dropStrayActionFields, highlightErrors, lenientCandidate, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, dropStrayActionFields, highlightErrors, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -424,14 +424,15 @@ describe("an answer gives the learner something, and a probe asks (Lucky's decis
   const PROBE_ERR = `prompt: missing; move "probe" asks one short question (behavior spec A1a), so it needs "prompt": { "kind": "question" or "prediction", "text": the question, "chips": the choices if any }`;
   it("the live s04 answer (probe, no narration, no prompt, one highlight) is rejected with both exact messages", () => {
     const e = errs({ move: "probe", concepts: ["mech.moment-arm"], narration: [], actions: [{ type: "highlight_part", part: "weight" }], calc_requests: [], evidence: [], prompt: undefined });
-    expect(e).toEqual([EMPTY_ANSWER, PROBE_ERR]);
+    // M4 slice 1: an action also needs a narration segment to belong to.
+    expect(e).toEqual(["actions[0]: an action belongs to the narration segment that explains it, and this answer has no segment for it", EMPTY_ANSWER, PROBE_ERR]);
   });
   it("an action-only explain is rejected as empty", () => {
     expect(errs({ move: "explain", narration: [], prompt: undefined, actions: [{ type: "highlight_part", part: "weight" }] })).toContain(EMPTY_ANSWER);
   });
   it("narration alone, or a prompt alone, is something", () => {
     expect(errs({ move: "explain", narration: [{ id: "n1", text: "Holding it out is harder." }], prompt: undefined, calc_requests: [] })).toEqual([]);
-    expect(errs({ move: "probe", narration: [], calc_requests: [], prompt: { kind: "question", text: "What have you built?", chips: [] } })).toEqual([]);
+    expect(errs({ move: "probe", narration: [], actions: [], calc_requests: [], prompt: { kind: "question", text: "What have you built?", chips: [] } })).toEqual([]);
   });
   it("a probe with narration but no prompt is still rejected: a probe asks", () => {
     expect(errs({ move: "probe", narration: [{ id: "n1", text: "Let's start." }], prompt: undefined, calc_requests: [] })).toEqual([PROBE_ERR]);
@@ -575,7 +576,7 @@ describe("every check runs even when the format check fails (Lucky's decision 20
     expect(e.filter((x) => x.startsWith("prompt"))).toHaveLength(1);
   });
   it("the lenient copy sets broken parts aside, and gives up on something that is not a response", () => {
-    expect(lenientCandidate({ ...good(), actions: [{ type: "highlight_part", part: "weight", colour: "red" }, { type: "fly" }] })?.actions).toEqual([{ type: "highlight_part", part: "weight" }]);
+    expect(lenientCandidate({ ...good(), actions: [{ type: "highlight_part", part: "weight", colour: "red" }, { type: "fly" }] })?.actions).toEqual([{ type: "highlight_part", part: "weight", at: "n1" }]);
     expect(lenientCandidate("nonsense")).toBeNull();
     expect(lenientCandidate({ move: "dance" })).toBeNull();
   });
@@ -588,11 +589,58 @@ describe("narration about a highlight needs one on stage (Lucky's decision 2026-
     for (const t of ["Look at the weight.", "Notice the marked difference.", "Highlights of robotics."]) expect(highlightErrors({ narration: say(t), actions: [] }, undefined), t).toEqual([]);
   });
   it("passes with a highlight_part action, or one still active; a new scene clears the active one", () => {
-    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [{ type: "highlight_part", part: "weight" }] }, undefined)).toEqual([]);
+    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [{ type: "highlight_part", part: "weight", at: "n1" }] }, undefined)).toEqual([]);
     expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [] }, "weight")).toEqual([]);
-    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [{ type: "select_scene", scene: "fx-lever" }] }, "weight")).toHaveLength(1);
+    expect(highlightErrors({ narration: say("See the highlighted weight."), actions: [{ type: "select_scene", scene: "fx-lever", at: "n1" }] }, "weight")).toHaveLength(1);
   });
   it("the validator reports it", () => {
-    expect(errs({ narration: say("See the highlighted weight."), actions: [] })).toContain('narration[0]: says "highlighted", but nothing is highlighted on stage; add a highlight_part action for the part you mean, or do not mention a highlight');
+    expect(errs({ narration: say("See the highlighted weight."), actions: [] })).toContain('narration[0]: says "highlighted", but nothing is highlighted on stage by then; put a highlight_part action in this segment (or an earlier one) for the part you mean, or do not mention a highlight');
+  });
+});
+
+describe("visuals follow the explanation: actions bound to narration segments (M4 slice 1, Lucky's decision 2026-10-14)", () => {
+  const nested = (o: object = {}) => ({
+    ...good(),
+    actions: undefined,
+    narration: [
+      { id: "n1", text: "Holding the arm level takes {{c1.torque_nm}} newton-metres.", actions: [] },
+      { id: "n2", text: "Watch the weight: most of that comes from it, {{c1.payload_torque_nm}}.", actions: [{ type: "highlight_part", part: "weight" }] },
+    ],
+    ...o,
+  });
+  it("the model's nested form becomes one list where each action names its segment", () => {
+    const b = normalizeActionBinding(nested());
+    expect((b.raw as { actions: unknown[] }).actions).toEqual([{ type: "highlight_part", part: "weight", at: "n2" }]);
+    expect((b.raw as { narration: object[] }).narration.every((n) => !("actions" in n))).toBe(true);
+    expect(b.paths).toEqual(["narration[1].actions[0]"]);
+    expect(b.legacy).toBe(false);
+    expect(run(nested()).response?.actions).toEqual([{ type: "highlight_part", part: "weight", at: "n2" }]);
+  });
+  it("top-level actions (fake director, old recordings) bind to the first segment and are marked legacy", () => {
+    const b = normalizeActionBinding(good());
+    expect((b.raw as { actions: Array<{ at: string }> }).actions.every((a) => a.at === "n1")).toBe(true);
+    expect(b.legacy).toBe(true);
+  });
+  it("errors name the model's own path", () => {
+    const e = errs(nested({ narration: [{ id: "n1", text: "Look.", actions: [{ type: "highlight_part", part: "nose" }] }] }));
+    expect(e.some((x) => x.startsWith("narration[0].actions[0].part:"))).toBe(true);
+  });
+  it("an action naming a segment that is not in the answer is rejected", () => {
+    expect(errs({ narration: [{ id: "n1", text: "Look at this." }], actions: [{ type: "highlight_part", part: "weight", at: "n9" }] })).toContain(
+      'actions[0]: an action belongs to the narration segment that explains it; "n9" is not a segment of this answer',
+    );
+  });
+  it("per segment: 'highlighted' before the highlight's segment is rejected; in or after it passes; a new scene clears it", () => {
+    const say2 = (t1: string, t2: string, a2: object[]) => ({ ...good(), actions: undefined, calc_requests: [], narration: [{ id: "n1", text: t1, actions: [] }, { id: "n2", text: t2, actions: a2 }] });
+    const hl = [{ type: "highlight_part", part: "weight" }];
+    expect(errs(say2("See the highlighted weight.", "Here it is.", hl)).some((x) => x.startsWith('narration[0]: says "highlighted"'))).toBe(true);
+    expect(errs(say2("Look at the ruler.", "See the highlighted weight.", hl))).toEqual([]);
+    expect(highlightErrors({ narration: [{ id: "n1", text: "A new scene." }, { id: "n2", text: "The highlighted weight." }], actions: [{ type: "select_scene", scene: "fx-lever", at: "n1" }] }, "weight")).toHaveLength(1);
+  });
+  it("softer mismatches are warnings: a highlight its segment does not mention; a part named before its scene is on stage", () => {
+    const w = run(nested({ narration: [{ id: "n1", text: "Holding the arm level takes {{c1.torque_nm}} newton-metres.", actions: [{ type: "highlight_part", part: "weight" }] }] })).warnings;
+    expect(w).toContain('action and narration out of step: narration[0] highlights "Weight" but does not mention it');
+    expect(run(nested()).warnings.filter((x) => x.startsWith("action and narration out of step"))).toEqual([]);
+    expect(run(good()).warnings.filter((x) => x.startsWith("action and narration out of step"))).toEqual([]); // legacy: no mismatch warnings
   });
 });

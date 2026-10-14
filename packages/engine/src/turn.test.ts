@@ -604,14 +604,14 @@ describe("scene on stage: the engine selects the concept's scene when the answer
     const events: TurnEvent[] = [];
     await s.run({ text: "teach me robotics" }, (e) => events.push(e));
     expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
-    expect(events.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(events.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }]);
     expect(s.state.activeScene).toBe("fx-lever");
     expect(warnings.some((w) => w.startsWith("scene selected by engine"))).toBe(true);
   });
   it("never for a concept without a scene, an unsupported topic, a scene already chosen or already on stage", () => {
     const scenes = [{ id: "fx-lever", teaches: ["mech.torque.static"] }];
     const r = { ...noScene, concepts: ["mech.torque.static"] } as unknown as import("@aili/schemas").DirectorResponse;
-    expect(selectSceneForConcept(r, scenes, undefined)?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(selectSceneForConcept(r, scenes, undefined)?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }]);
     expect(selectSceneForConcept({ ...r, concepts: ["mech.gears"] }, scenes, undefined)).toBeNull();
     expect(selectSceneForConcept({ ...r, concepts: [] }, scenes, undefined)).toBeNull();
     expect(selectSceneForConcept({ ...r, coverage: "unsupported" }, scenes, undefined)).toBeNull();
@@ -692,7 +692,7 @@ describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
 
   it("an answer naming no concept, nothing on stage: the topic's top concept's scene, marked 'starting scene for the topic'", () => {
     const p = selectSceneForConcept(levelQuestion, scenes, undefined, ["mech.torque.static", "mech.moment-arm"]);
-    expect(p?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(p?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }]);
     expect(p?.warning).toBe('scene selected by engine: "fx-lever" for mech.torque.static (starting scene for the topic; the answer named no concept)');
   });
   it("never: a scene already on stage, an empty shortlist, a top concept with no scene, an unsupported topic, a scene the answer chose", () => {
@@ -701,7 +701,7 @@ describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
     expect(selectSceneForConcept(levelQuestion, scenes, undefined, [])).toBeNull();
     expect(selectSceneForConcept(levelQuestion, scenes, undefined, ["mech.gears", "mech.torque.static"])).toBeNull(); // only the TOP concept counts
     expect(selectSceneForConcept({ ...levelQuestion, coverage: "unsupported" }, scenes, undefined, ["mech.torque.static"])).toBeNull();
-    expect(selectSceneForConcept({ ...levelQuestion, actions: [{ type: "select_scene", scene: "fx-lever" }] }, scenes, undefined, ["mech.torque.static"])).toBeNull();
+    expect(selectSceneForConcept({ ...levelQuestion, actions: [{ type: "select_scene", scene: "fx-lever", at: "n1" }] }, scenes, undefined, ["mech.torque.static"])).toBeNull();
   });
 
   const run = async (answer: object, concepts: string[], state: SessionState = { history: { posture: "learning", learner_level: "unknown", entries: [] } }) => {
@@ -716,7 +716,7 @@ describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
   it("in a turn: 'robotics' answered with a level question puts the lever on stage, visibly", async () => {
     const { s, events, warnings, actions } = await run(levelQuestion, ["mech.torque.static", "mech.moment-arm"]);
     expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
-    expect(actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(actions).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }]);
     expect(s.state.activeScene).toBe("fx-lever");
     expect(warnings.some((w) => /^scene selected by engine: .*starting scene for the topic/.test(w))).toBe(true);
   });
@@ -739,7 +739,7 @@ describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
     const { events } = await run(claims, ["mech.torque.static"]);
     const err = events.at(-1) as { type: string; details?: string[] };
     expect(err.type).toBe("turn.error");
-    expect(err.details).toContain('narration[0]: says "highlighted", but nothing is highlighted on stage; add a highlight_part action for the part you mean, or do not mention a highlight');
+    expect(err.details).toContain('narration[0]: says "highlighted", but nothing is highlighted on stage by then; put a highlight_part action in this segment (or an earlier one) for the part you mean, or do not mention a highlight');
   });
   it("a highlight in the answer, or one still on stage from an earlier turn, lets the narration mention it", async () => {
     const claims = { ...levelQuestion, narration: [{ id: "n1", text: "Look at the highlighted weight at the end of the ruler." }] };
@@ -748,5 +748,36 @@ describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
     expect(withAction.s.state.highlightedPart).toBe("weight");
     const stillOn = await run(claims, ["mech.torque.static"], { history: { posture: "learning", learner_level: "unknown", entries: [] }, activeScene: "fx-lever", highlightedPart: "weight" });
     expect(stillOn.events.at(-1)!.type, JSON.stringify(stillOn.events.at(-1))).toBe("turn.done");
+  });
+});
+
+describe("bound actions in a turn (M4 slice 1)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const answer = {
+    ...VALID,
+    actions: undefined,
+    narration: [
+      { id: "n1", text: "Holding this arm level takes {{c1.torque_nm}} newton-metres.", actions: [{ type: "select_scene", scene: "fx-lever" }] },
+      { id: "n2", text: "Watch the weight slide out to the end.", actions: [{ type: "highlight_part", part: "weight" }, { type: "set_parameter", param: "weight_distance_m", value: 0.2 }] },
+    ],
+  };
+  it("each action event carries its segment, in segment order; the session keeps the stage they leave", async () => {
+    const director: Director = { async respond(req) { return { response: { ...answer, request_id: req.request_id, state_rev: req.state_rev } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "unknown", entries: [] } }, concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "Why is it hard to hold?" }, (e) => events.push(e));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(events.filter((e) => e.type === "action").map((e) => (e as { action: { type: string; at: string } }).action).map((a) => `${a.type}@${a.at}`)).toEqual(["select_scene@n1", "highlight_part@n2", "set_parameter@n2"]);
+    expect(s.state).toMatchObject({ activeScene: "fx-lever", highlightedPart: "weight" });
+  });
+  it("a long segment that the engine splits keeps its actions on its first part", async () => {
+    const long = "Holding this arm level takes {{c1.torque_nm}} newton-metres. " + "The weight far out pulls hardest on the joint. ".repeat(4);
+    const director: Director = { async respond(req) { return { response: { ...answer, request_id: req.request_id, state_rev: req.state_rev, narration: [{ id: "n1", text: long.trim(), actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight" }] }] } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "unknown", entries: [] } }, concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "Why?" }, (e) => events.push(e));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(events.filter((e) => e.type === "narration").length).toBeGreaterThan(1);
+    expect(events.filter((e) => e.type === "action").map((e) => (e as { action: { at: string } }).action.at)).toEqual(["n1", "n1"]);
   });
 });

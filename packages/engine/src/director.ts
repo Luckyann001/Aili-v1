@@ -48,10 +48,90 @@ export interface TurnContext {
   expected?: { request_id: string; state_rev: number };
   /** IDs of safety-critical concepts and items (from the registry), whatever the director declares. */
   safetyCritical?: ReadonlySet<string>;
+  /** Top-level actions bound by the engine to the first segment (fake director, old recordings): no mismatch warnings. */
+  legacyBinding?: boolean;
   /** The part already highlighted on stage from an earlier turn, if any. */
   activeHighlight?: string;
   /** The segment limit for this answer: NARRATION_SPLIT_MAX_SEGMENTS when the engine split it, else the default. */
   maxSegments?: number;
+}
+
+/**
+ * The model writes each action inside the narration segment that explains it (DirectorResponseWire);
+ * the engine holds one flat list where every action names its segment (`at`). This turns the first
+ * into the second before any check, and records where each action came from, so error messages name
+ * the model's own path ("narration[1].actions[0]"). Top-level actions without `at` (the fake
+ * director and hand-written recordings only; the provider's grammar has no top-level actions) are
+ * bound to the first segment. Anything else is left for the checks.
+ */
+export function normalizeActionBinding(raw: unknown): { raw: unknown; paths: string[]; legacy: boolean } {
+  const r = raw as { narration?: unknown; actions?: unknown } | null;
+  if (!r || typeof r !== "object" || Array.isArray(r)) return { raw, paths: [], legacy: false };
+  const narration = Array.isArray(r.narration) ? r.narration : null;
+  const nested = narration?.some((n) => n && typeof n === "object" && "actions" in n) ?? false;
+  const legacy = Array.isArray(r.actions) ? r.actions : [];
+  if (!nested && legacy.every((a) => a && typeof a === "object" && "at" in a)) return { raw, paths: legacy.map((_, k) => `actions[${k}]`), legacy: false };
+  const actions: unknown[] = [];
+  const paths: string[] = [];
+  const firstId = (narration?.[0] as { id?: unknown } | undefined)?.id;
+  legacy.forEach((a, k) => {
+    actions.push(a && typeof a === "object" && !("at" in a) && typeof firstId === "string" ? { ...a, at: firstId } : a);
+    paths.push(`actions[${k}]`);
+  });
+  const segments = narration?.map((n, i) => {
+    if (!n || typeof n !== "object" || !("actions" in n)) return n;
+    const { actions: own, ...rest } = n as { actions?: unknown; id?: unknown };
+    if (Array.isArray(own))
+      own.forEach((a, j) => {
+        actions.push(a && typeof a === "object" && !Array.isArray(a) ? { ...a, at: rest.id } : a);
+        paths.push(`narration[${i}].actions[${j}]`);
+      });
+    return rest;
+  });
+  // "legacy": top-level actions the engine bound to the first segment (never from the model).
+  return { raw: { ...r, ...(segments ? { narration: segments } : {}), actions }, paths, legacy: legacy.some((a) => a && typeof a === "object" && !("at" in a)) };
+}
+
+/** Rewrite "actions[k]" in messages to the model's own path for that action. */
+export const toWirePaths = (messages: string[], paths: readonly string[]): string[] =>
+  messages.map((m) => m.replace(/(?<![.\w])actions\[(\d+)\]/g, (all, k: string) => paths[Number(k)] ?? all));
+
+export const SEGMENT_MISMATCH = "action and narration out of step";
+
+/**
+ * Softer checks (warnings, never rejections): a highlight or animation whose segment does not mention
+ * it, and a segment that names a part of a scene that is not on stage by then.
+ */
+export function segmentWarnings(r: Pick<DirectorResponse, "narration" | "actions">, scenes: readonly SceneManifest[], activeScene: string | undefined): string[] {
+  const out: string[] = [];
+  const words = (t: string) => t.toLowerCase().replace(/\(.*?\)/g, " ").match(/[a-z]{3,}/g) ?? [];
+  const byId = new Map(scenes.map((s) => [s.id, s]));
+  let stage = activeScene ? byId.get(activeScene) : undefined;
+  r.narration.forEach((n, i) => {
+    const said = new Set(words(n.text));
+    for (const a of r.actions.filter((x) => x.at === n.id)) {
+      if (a.type === "select_scene") stage = byId.get(a.scene);
+      if (a.type === "highlight_part") {
+        const part = stage?.parts.find((p) => p.id === a.part);
+        const named = [...words(part?.name ?? ""), ...words(a.part.replace(/-/g, " "))];
+        if (named.length && !named.some((w) => said.has(w))) out.push(`${SEGMENT_MISMATCH}: narration[${i}] highlights "${part?.name ?? a.part}" but does not mention it`);
+      }
+      if (a.type === "play_animation") {
+        const anim = stage?.animations.find((x) => x.id === a.animation);
+        const named = words(a.animation.replace(/-/g, " ")).filter((w) => !["out", "the", "and"].includes(w));
+        if (anim && named.length && !named.some((w) => said.has(w))) out.push(`${SEGMENT_MISMATCH}: narration[${i}] plays "${a.animation}" but does not describe it`);
+      }
+    }
+    for (const other of scenes) {
+      if (other.id === stage?.id) continue;
+      for (const p of other.parts) {
+        const name = p.name.toLowerCase().replace(/\(.*?\)/g, "").trim();
+        if (name.length >= 3 && !stage?.parts.some((q) => q.name.toLowerCase().replace(/\(.*?\)/g, "").trim() === name) && new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(n.text.toLowerCase()))
+          out.push(`${SEGMENT_MISMATCH}: narration[${i}] names "${p.name}" (scene "${other.id}") before that scene is on stage`);
+      }
+    }
+  });
+  return [...new Set(out)];
 }
 
 export const STRAY_ACTION_FIELD_DROPPED = "stray action field dropped";
@@ -65,12 +145,16 @@ const HIGHLIGHT_WORDS = /\b(?:highlighted|highlight|the marked part)\b/i;
  * repair, with a plain message.
  */
 export function highlightErrors(r: Pick<DirectorResponse, "narration" | "actions">, activeHighlight: string | undefined): string[] {
-  const highlights = r.actions.some((a) => a.type === "highlight_part");
-  const stillActive = !!activeHighlight && !r.actions.some((a) => a.type === "select_scene");
-  if (highlights || stillActive) return [];
+  // Per segment (M4 slice 1): a segment's actions apply as it starts, so segment i may mention a
+  // highlight only if one is on stage after the actions bound to segments up to i.
+  let on = activeHighlight;
   return r.narration.flatMap((n, i) => {
+    for (const a of r.actions.filter((x) => x.at === n.id)) {
+      if (a.type === "select_scene") on = undefined;
+      if (a.type === "highlight_part") on = a.part;
+    }
     const m = n.text.match(HIGHLIGHT_WORDS);
-    return m ? [`narration[${i}]: says "${m[0]}", but nothing is highlighted on stage; add a highlight_part action for the part you mean, or do not mention a highlight`] : [];
+    return m && !on ? [`narration[${i}]: says "${m[0]}", but nothing is highlighted on stage by then; put a highlight_part action in this segment (or an earlier one) for the part you mean, or do not mention a highlight`] : [];
   });
 }
 
@@ -90,12 +174,13 @@ export function dropStrayActionFields(raw: unknown): { raw: unknown; warnings: s
     const type = (a as { type?: unknown }).type;
     const own = Action.options.find((o) => o.shape.type.safeParse(type).success);
     if (!own) return a;
-    const allowed = new Set(keysOf(own));
+    const allowed = new Set([...keysOf(own), "at"]); // "at": the segment the engine bound it to
     const others = new Set(Action.options.filter((o) => o !== own).flatMap(keysOf));
     const stray = Object.keys(a).filter((k) => !allowed.has(k));
     if (!stray.length || !stray.every((k) => others.has(k))) return a;
     const kept = Object.fromEntries(Object.entries(a).filter(([k]) => allowed.has(k)));
-    if (!own.safeParse(kept).success) return a;
+    const { at: _at, ...rest } = kept as { at?: unknown };
+    if (!own.safeParse(rest).success) return a;
     warnings.push(`${STRAY_ACTION_FIELD_DROPPED}: actions[${i}] (${String(type)}) ${stray.map((k) => `"${k}"`).join(", ")}`);
     return kept;
   });
@@ -151,7 +236,8 @@ function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> =
  * set aside (unknown keys removed, a broken list item removed, a broken optional field cleared), so
  * the remaining checks can still run on it. Null when it still does not parse. Never shown or used.
  */
-export function lenientCandidate(raw: unknown): DirectorResponse | null {
+export function lenientCandidate(input: unknown): DirectorResponse | null {
+  const raw = normalizeActionBinding(input).raw;
   if (!raw || typeof raw !== "object") return null;
   let cur: unknown = structuredClone(raw);
   for (let round = 0; round < 3; round++) {
@@ -184,7 +270,14 @@ export function lenientCandidate(raw: unknown): DirectorResponse | null {
 /** "actions[1].scene: …" → "actions"; "prompt: …" → "prompt". */
 export const topField = (error: string) => error.split(/[.[:,\s]/, 1)[0]!;
 
-export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[]; warnings: string[]; candidate?: DirectorResponse } {
+export function validateDirectorResponse(input: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[]; warnings: string[]; candidate?: DirectorResponse } {
+  // Actions nested under their segments become one flat list with `at`; messages name the model's paths.
+  const bound = normalizeActionBinding(input);
+  const v = validateBound(bound.raw, { ...ctx, legacyBinding: ctx.legacyBinding || bound.legacy });
+  return { ...v, errors: toWirePaths(v.errors, bound.paths), warnings: toWirePaths(v.warnings, bound.paths) };
+}
+
+function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[]; warnings: string[]; candidate?: DirectorResponse } {
   const sl = ctx.shortlist;
   const parsed = DirectorResponse.safeParse(raw);
   if (!parsed.success) {
@@ -193,6 +286,8 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     const formatErrors = parsed.error.issues.map((i) => {
       const field = fieldPath(i.path);
       flagged.add(field);
+      // An action with no segment to belong to (an answer with no narration).
+      if (i.path[0] === "actions" && i.path[2] === "at") return `actions[${String(i.path[1])}]: an action belongs to the narration segment that explains it, and this answer has no segment for it`;
       const hint = i.path[0] === "concepts" ? ` (${valid(sl.concepts)})` : i.path[0] === "evidence" ? ` (${valid(sl.readings.map((x) => x.id))})` : "";
       return `${field || "(response)"}: ${i.message}${hint}`;
     });
@@ -202,7 +297,7 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     const candidate = lenientCandidate(raw);
     if (candidate) {
       const reported = new Set(errors.map(topField));
-      const rest = validateDirectorResponse(candidate, ctx);
+      const rest = validateBound(candidate, ctx);
       for (const e of rest.errors) if (!reported.has(topField(e)) && !errors.includes(e)) errors.push(e);
     }
     return { response: null, errors, warnings: [], ...(candidate ? { candidate } : {}) };
@@ -224,8 +319,16 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
     if (r.narration.findIndex((o) => o.id === n.id) !== i) errors.push(`narration[${i}].id: duplicate "${n.id}"`);
   });
 
-  // Narration that refers to a highlight needs one on stage (Lucky's decision 2026-10-14).
+  // Every action names a segment of THIS answer (M4 slice 1: visuals follow the explanation).
+  const segmentIds = new Set(r.narration.map((n) => n.id));
+  r.actions.forEach((a, i) => {
+    if (!segmentIds.has(a.at)) errors.push(`actions[${i}]: an action belongs to the narration segment that explains it; "${a.at}" is not a segment of this answer`);
+  });
+
+  // Narration that refers to a highlight needs one on stage by then (Lucky's decisions 2026-10-14).
   errors.push(...highlightErrors(r, ctx.activeHighlight));
+  // Softer: an action whose segment does not mention it; a part named before its scene is on stage.
+  if (!ctx.legacyBinding) warnings.push(...segmentWarnings(r, sl.scenes, ctx.activeScene));
 
   // Actions, in order: the scene on stage changes with select_scene.
   const scenes = new Map(sl.scenes.map((s) => [s.id, s]));

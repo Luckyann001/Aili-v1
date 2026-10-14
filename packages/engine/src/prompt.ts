@@ -1,4 +1,4 @@
-import { DirectorResponse } from "@aili/schemas";
+import { DirectorResponseWire } from "@aili/schemas";
 import { z } from "zod";
 import type { Shortlist } from "./capabilities";
 import { openPrompt } from "./pedagogy";
@@ -159,4 +159,6 @@ export const professorPrompt =
  * The director's output JSON Schema, generated from the Zod schema (our validators still run on
  * every answer). Every field is required in the output, defaults included, so answers are complete.
  */
-export const directorResponseJsonSchema = (): object => z.toJSONSchema(DirectorResponse, { io: "output" });
+// The model writes actions nested under the narration segment that explains them (M4 slice 1); the
+// engine flattens them (normalizeActionBinding) before any check.
+export const directorResponseJsonSchema = (): object => z.toJSONSchema(DirectorResponseWire, { io: "output" });

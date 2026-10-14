@@ -34,6 +34,21 @@ export const DirectorPrompt = z
   })
   .strict();
 
+/**
+ * An action as the engine holds it: the action plus `at`, the narration segment that explains it
+ * (M4 slice 1, Lucky's decision 2026-10-14: visuals follow the explanation). The page applies a
+ * segment's actions as that segment's caption and speech start.
+ */
+const at = { at: KebabId };
+export const BoundAction = z.discriminatedUnion("type", [
+  Action.options[0].extend(at),
+  Action.options[1].extend(at),
+  Action.options[2].extend(at),
+  Action.options[3].extend(at),
+  Action.options[4].extend(at),
+]);
+export type BoundAction = z.infer<typeof BoundAction>;
+
 export const DirectorResponse = z
   .object({
     request_id: z.string().min(1).max(64),
@@ -44,7 +59,8 @@ export const DirectorResponse = z
     /** Safety-relevant turns may exceed the challenge budget (checked in the pedagogy validator). */
     safety: z.boolean().default(false),
     narration: z.array(Narration).default([]),
-    actions: z.array(Action).default([]),
+    /** Engine form: every action names its segment (`at`). The model writes them nested (see DirectorResponseWire). */
+    actions: z.array(BoundAction).default([]),
     calc_requests: z.array(CalcRequest).default([]),
     evidence: z.array(ReadingId).default([]),
     /** The only place a question may appear. */
@@ -82,3 +98,14 @@ export const DirectorResponse = z
   })
   .strict();
 export type DirectorResponse = z.infer<typeof DirectorResponse>;
+
+/** A narration segment as the model writes it: its text and the stage actions that go with it. */
+export const DirectorSegment = Narration.extend({ actions: z.array(Action).default([]) }).strict();
+
+/**
+ * What the MODEL writes (the provider's output schema): actions nested under the narration segment
+ * that explains them, so an action cannot exist without its segment. The engine turns this into
+ * DirectorResponse (a flat list, each action with `at`) before any check; see normalizeActionBinding.
+ */
+export const DirectorResponseWire = DirectorResponse.omit({ actions: true }).extend({ narration: z.array(DirectorSegment).default([]) }).strict();
+export type DirectorResponseWire = z.infer<typeof DirectorResponseWire>;

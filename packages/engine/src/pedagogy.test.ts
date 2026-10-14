@@ -30,7 +30,7 @@ describe("rule 2: never two questions in a row without giving something back", (
     expect(validatePedagogy(bare, h)).toContain(
       "rule give-before-asking-again (turn 2): turn 1 asked a question and this turn asks again without giving anything back (narration, a result or a visual)",
     );
-    expect(validatePedagogy(resp({ ...ask, move: "challenge", narration: [], actions: [{ type: "highlight_part", part: "weight" }] }), h).join()).not.toMatch(/give-before-asking-again/);
+    expect(validatePedagogy(resp({ ...ask, move: "challenge", narration: [], actions: [{ type: "highlight_part", part: "weight", at: "n1" }] }), h).join()).not.toMatch(/give-before-asking-again/);
   });
 });
 

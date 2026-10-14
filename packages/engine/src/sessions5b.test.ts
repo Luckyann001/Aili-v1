@@ -133,7 +133,7 @@ describe("A14 #11 unsupported topic: say so, nothing on stage, state kept", () =
     expect(t.s.state.activeScene).toBe("fx-lever");
     const bad = scriptedSession(registry, [{ move: "explain", narration: say("Drones use propellers.") }], { concepts: ["mech.nothing-covered"] });
     expect(lastError(await bad.reply("Teach me drone flight control"))).toMatch(/coverage: the shortlist is empty for this topic/);
-    const acting = scriptedSession(registry, [{ move: "answer", coverage: "unsupported", actions: [{ type: "select_scene", scene: "fx-lever" }], narration: say("Not supported yet.") }], { concepts: ["mech.nothing-covered"] });
+    const acting = scriptedSession(registry, [{ move: "answer", coverage: "unsupported", actions: [{ type: "select_scene", scene: "fx-lever", at: "n1" }], narration: say("Not supported yet.") }], { concepts: ["mech.nothing-covered"] });
     expect(lastError(await acting.reply("Teach me drone flight control"))).toMatch(/an unsupported topic changes nothing on stage/);
   });
 });

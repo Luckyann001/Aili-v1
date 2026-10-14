@@ -43,7 +43,7 @@ describe("recorded live path (test builds only)", () => {
     const { handleTurn, sessions } = await load();
     const t1 = await readAll(await handleTurn(post(body(3, "teach me robotics"))));
     expect(t1.at(-1)!.type, JSON.stringify(t1.at(-1))).toBe("turn.done");
-    expect(t1.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight" }]);
+    expect(t1.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "weight", at: "n1" }]);
     expect((t1.find((e) => e.type === "prompt") as { chips: string[] }).chips).toEqual(["It gets harder", "It gets easier", "No different", "Not sure"]);
 
     const t2 = await readAll(await handleTurn(post(body(4, "It gets harder"))));

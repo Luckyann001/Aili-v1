@@ -138,7 +138,8 @@ export function selectSceneForConcept(
   const scene = scenes.find((s) => s.teaches.includes(concept));
   if (!scene || scene.id === activeScene) return null;
   const why = named ? "the answer put no scene on stage" : "starting scene for the topic; the answer named no concept";
-  return { r: { ...r, actions: [{ type: "select_scene", scene: scene.id }, ...r.actions] }, warning: `${SCENE_SELECTED_BY_ENGINE}: "${scene.id}" for ${concept} (${why})` };
+  // Bound to the first segment, so the scene is there as the explanation starts (M4 slice 1).
+  return { r: { ...r, actions: [{ type: "select_scene", scene: scene.id, at: r.narration[0]?.id ?? "prompt" }, ...r.actions] }, warning: `${SCENE_SELECTED_BY_ENGINE}: "${scene.id}" for ${concept} (${why})` };
 }
 
 

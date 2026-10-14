@@ -152,8 +152,12 @@ describe("output JSON Schema and response sizes", () => {
     const s = directorResponseJsonSchema() as { type: string; additionalProperties: boolean; required: string[]; properties: Record<string, unknown> };
     expect(s.type).toBe("object");
     expect(s.additionalProperties).toBe(false);
-    for (const f of ["request_id", "state_rev", "move", "concepts", "narration", "actions", "calc_requests", "evidence", "assumptions", "limitations"]) expect(s.required, f).toContain(f);
+    for (const f of ["request_id", "state_rev", "move", "concepts", "narration", "calc_requests", "evidence", "assumptions", "limitations"]) expect(s.required, f).toContain(f);
     expect(Object.keys(s.properties)).toContain("prompt");
+    // M4 slice 1: actions live inside each narration segment, never at the top level.
+    expect(Object.keys(s.properties)).not.toContain("actions");
+    const segment = (s.properties.narration as { items: { required: string[]; properties: Record<string, unknown> } }).items;
+    expect(segment.required).toEqual(expect.arrayContaining(["id", "text", "actions"]));
   });
 
   it("typical and largest-allowed answers, in estimated output tokens, against max_output_tokens", () => {
@@ -214,6 +218,8 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toMatch(/set "coverage": "unsupported" with move "answer" or "explain"/);
     expect(s).toMatch(/A prompt contains exactly one question mark: one question, never two, and no "does that make sense\?" checks/);
     expect(s).toMatch(/A prompt asks exactly one thing: do not join two questions with "and" or "or"/);
+    expect(s).toMatch(/Visuals follow the explanation: put each stage action .* inside the "actions" of the narration segment that explains it/);
+    expect(s).toMatch(/Never refer to a scene, a part or a highlight before the segment that puts it on stage\. Format only, not content to reuse:/);
     expect(s).toMatch(/If a reading is already open and the learner asks for a source that is not in the shortlist: say "I can't verify that", point back to the open reading in narration \(do not set "reading" again\)/);
     expect(s).toMatch(/Never write a calculation ID \(c1, c2\) in anything the learner reads; show a result only through its placeholder\./);
     expect(s).toMatch(/Assumptions and limitations contain no digits: write them in words \("level", "no payload"/);

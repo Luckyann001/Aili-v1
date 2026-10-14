@@ -2,7 +2,7 @@ import type { DirectorResponse, SessionHistory } from "@aili/schemas";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
-import { dropStrayActionFields, NARRATION_SPLIT_MAX_SEGMENTS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
+import { dropStrayActionFields, NARRATION_SPLIT_MAX_SEGMENTS, normalizeActionBinding, splitLongNarration, substituteGuideQuestion, toWirePaths, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept, unsupportedAttributions } from "./teaching";
@@ -382,7 +382,10 @@ export class TurnSession {
     const check = (answer: unknown): ({ r: DirectorResponse } | { reason: "validation" | "pedagogy"; errors: string[] }) & { warnings: string[] } => {
       // A segment over the hard limit is split at sentence ends when it can be (a warning, never silent).
       // A teach-back question with no reading gets the one open reading (a warning, never silent).
-      const filled = fillTeachBackReading(answer, teaching);
+      // First: actions nested under their segments become one list with `at` (M4 slice 1), so the
+      // narration split and the stray-field fallback see the engine's form.
+      const bound = normalizeActionBinding(answer);
+      const filled = fillTeachBackReading(bound.raw, teaching);
       const split = splitLongNarration(filled.raw);
       // A field from another action type, on an otherwise valid action, is dropped (a warning).
       const stray = dropStrayActionFields(split.raw);
@@ -390,22 +393,23 @@ export class TurnSession {
         shortlist: sl,
         activeScene: before.activeScene,
         activeHighlight: before.highlightedPart,
+        legacyBinding: bound.legacy,
         expected: { request_id: turn_id, state_rev: rev },
         safetyCritical,
         // An answer the engine split may have up to five segments (the split checks the 700-character total).
         maxSegments: split.warnings.length ? NARRATION_SPLIT_MAX_SEGMENTS : undefined,
       });
-      const warnings = [...(filled.warning ? [filled.warning] : []), ...split.warnings, ...stray.warnings, ...v.warnings];
+      const warnings = toWirePaths([...(filled.warning ? [filled.warning] : []), ...split.warnings, ...stray.warnings, ...v.warnings], bound.paths);
       if (!v.response) {
         // The teaching rules too, on the validator's lenient copy, so one repair lists every problem.
-        const errors = [...v.errors];
+        const errors = toWirePaths(v.errors, bound.paths);
         if (v.candidate) for (const e of validatePedagogy(v.candidate, history, teaching, pedagogyContext)) if (!errors.includes(e)) errors.push(e);
         return { reason: "validation", errors, warnings };
       }
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
       if (reoffersOpenQuestion(v.response, history, teaching)) warnings.push(`${OPEN_QUESTION_REOFFERED} (${v.response.prompt!.kind}): "${v.response.prompt!.text}"`);
-      if (p.length) return { reason: "pedagogy", errors: p, warnings };
+      if (p.length) return { reason: "pedagogy", errors: toWirePaths(p, bound.paths), warnings };
       // "You said …" about words the learner did not write (first turn only; a warning).
       warnings.push(...unsupportedAttributions(v.response.narration, input.text, !before.history.entries.some((e) => e.kind === "learner")));
       // A passing answer about a concept with a scene, but no scene on stage: the engine selects it.
