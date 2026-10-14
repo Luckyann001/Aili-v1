@@ -102,6 +102,26 @@ export const SEGMENT_MISMATCH = "action and narration out of step";
  * Softer checks (warnings, never rejections): a highlight or animation whose segment does not mention
  * it, and a segment that names a part of a scene that is not on stage by then.
  */
+const plainName = (name: string) => name.toLowerCase().replace(/\(.*?\)/g, "").trim();
+
+/**
+ * Whether narration refers to a scene's own part, not to the word in its general sense (after the
+ * 14 Oct 2026 live run: "A servo holding an arm faces the same thing", "as well as the load's"). A
+ * name of two or more words ("output horn", "arm link") is specific enough on its own. A one-word
+ * name ("servo", "load", "weight") counts only when the narration points at it: "this load", "that
+ * servo", "watch / look at / see the load", "the load here / on stage / on screen".
+ */
+export function refersToPart(text: string, name: string): boolean {
+  const t = text.toLowerCase();
+  const n = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (/\s/.test(name)) return new RegExp(`\\b${n}\\b`).test(t);
+  return (
+    new RegExp(`\\b(?:this|that|these|those)\\s+${n}\\b`).test(t) ||
+    new RegExp(`\\b(?:watch|look at|see)\\s+(?:the|this|that)\\s+${n}\\b`).test(t) ||
+    new RegExp(`\\bthe\\s+${n}\\s+(?:here|on stage|on the stage|on screen)\\b`).test(t)
+  );
+}
+
 export function segmentWarnings(r: Pick<DirectorResponse, "narration" | "actions">, scenes: readonly SceneManifest[], activeScene: string | undefined): string[] {
   const out: string[] = [];
   const words = (t: string) => t.toLowerCase().replace(/\(.*?\)/g, " ").match(/[a-z]{3,}/g) ?? [];
@@ -125,8 +145,8 @@ export function segmentWarnings(r: Pick<DirectorResponse, "narration" | "actions
     for (const other of scenes) {
       if (other.id === stage?.id) continue;
       for (const p of other.parts) {
-        const name = p.name.toLowerCase().replace(/\(.*?\)/g, "").trim();
-        if (name.length >= 3 && !stage?.parts.some((q) => q.name.toLowerCase().replace(/\(.*?\)/g, "").trim() === name) && new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(n.text.toLowerCase()))
+        const name = plainName(p.name);
+        if (name.length >= 3 && !stage?.parts.some((q) => plainName(q.name) === name) && refersToPart(n.text, name))
           out.push(`${SEGMENT_MISMATCH}: narration[${i}] names "${p.name}" (scene "${other.id}") before that scene is on stage`);
       }
     }

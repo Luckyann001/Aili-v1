@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, dropStrayActionFields, highlightErrors, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, dropStrayActionFields, highlightErrors, refersToPart, segmentWarnings, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -655,5 +655,40 @@ describe("visuals follow the explanation: actions bound to narration segments (M
     expect(w).toContain('action and narration out of step: narration[0] highlights "Weight" but does not mention it');
     expect(run(nested()).warnings.filter((x) => x.startsWith("action and narration out of step"))).toEqual([]);
     expect(run(good()).warnings.filter((x) => x.startsWith("action and narration out of step"))).toEqual([]); // legacy: no mismatch warnings
+  });
+
+  it("a part of another scene is named only when the narration points at it, not a word used generally (the 14 Oct 2026 live run)", () => {
+    const scenes = loaded.registry.scenes;
+    const names = (narration: Array<{ id: string; text: string }>, actions: Array<Record<string, unknown> & { at: string }>) =>
+      segmentWarnings({ narration, actions } as never, scenes, "fx-lever").filter((w) => w.includes("before that scene is on stage"));
+    // Turn 3 of the live session, verbatim: "servo" in its general sense.
+    expect(
+      names(
+        [
+          { id: "n1", text: "That's fine, we can start from scratch. Hold a ruler out level with a weight on it: your hand has to resist the twist." },
+          { id: "n2", text: "Your hand is the pivot. It has to hold the ruler against the weight trying to turn it downward." },
+          { id: "n3", text: "That turning effect is torque: force times the distance from the pivot, called the moment arm. Farther out means more torque." },
+          { id: "n4", text: "The ruler's own weight adds to the twist too. A servo holding an arm faces the same thing." },
+        ],
+        [{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "hand", at: "n2" }, { type: "highlight_part", part: "weight", at: "n3" }, { type: "highlight_part", part: "ruler", at: "n4" }],
+      ),
+    ).toEqual([]);
+    // Turn 4 of the live session, verbatim: "the load's" in its general sense.
+    expect(
+      names(
+        [
+          { id: "n1", text: "It runs the other way: a heavier arm needs more torque to hold it, because its own weight pulls down on the joint too." },
+          { id: "n2", text: "Think of the ruler held out in your hand. Its weight acts along its length, and your grip has to resist the twist it causes." },
+          { id: "n3", text: "Static torque is force times the distance from the pivot. More mass means more force, and the same distance means more torque." },
+          { id: "n4", text: "Slide the weight outward and the distance grows, so the twist on your grip grows too. The arm's own weight counts as well as the load's." },
+        ],
+        [{ type: "select_scene", scene: "fx-lever", at: "n1" }, { type: "highlight_part", part: "ruler", at: "n2" }, { type: "play_animation", animation: "slide-weight-out", at: "n4" }],
+      ),
+    ).toEqual([]);
+    // Still raised when the narration points at the other scene's part, or names a specific one.
+    expect(names([{ id: "n1", text: "Watch the load slide out to the end of the arm." }], [])).toContain('action and narration out of step: narration[0] names "Load" (scene "fx-servo-arm") before that scene is on stage');
+    expect(names([{ id: "n1", text: "The output horn turns with the motor." }], [])).toContain('action and narration out of step: narration[0] names "Output horn" (scene "fx-servo-arm") before that scene is on stage');
+    expect(["this servo holds it", "look at the load", "the load here is light", "that load's distance"].map((t) => refersToPart(t, t.includes("servo") ? "servo" : "load"))).toEqual([true, true, true, true]);
+    expect(["a servo holding an arm", "as well as the load's", "the load gets heavier", "servos are motors"].map((t) => refersToPart(t, t.includes("servo") ? "servo" : "load"))).toEqual([false, false, false, false]);
   });
 });
