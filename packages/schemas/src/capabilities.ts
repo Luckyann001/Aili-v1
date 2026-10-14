@@ -29,6 +29,7 @@ export const UNIT_SUFFIX = {
   "kg/m": "_kg_per_m",
   deg: "_deg",
   "N·m": "_nm",
+  N: "_n",
   "kgf·cm": "_kgf_cm",
   ratio: null,
 } as const;

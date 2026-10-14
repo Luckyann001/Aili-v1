@@ -89,6 +89,35 @@ describe("textbook: [CP2] Example 9.4 through the full solver — uniform forear
   });
 });
 
+describe("forces behind the torque (M4 slice B): weights m·g, with the gravity a check states", () => {
+  it("[CP2] Example 9.4 with the book's g = 9.80: forearm and load weigh 63.7 N together, and the moment is exactly 18.816 N·m", () => {
+    const r = staticTorqueSingleLink({ arm_length_m: 0.32, payload_kg: 0, arm_kg_per_m: 7.8125, angle_deg: 0, extra_masses: [{ mass_kg: 4.0, distance_m: 0.38 }], g_m_per_s2: 9.8 });
+    expect(r.arm_weight_n).toBeCloseTo(2.5 * 9.8, 10); // 24.5 N
+    expect(r.extra_force_n).toBeCloseTo(4.0 * 9.8, 10); // 39.2 N
+    expect(Number((r.arm_weight_n + r.extra_force_n).toPrecision(3))).toBe(63.7); // "6.50 kg × 9.80 m/s² = 63.7 N"
+    expect(r.torque_nm).toBeCloseTo(18.816, 10);
+    expect(Number((r.torque_nm / 0.04).toPrecision(3))).toBe(470); // eq 9.38, now exactly the book's g
+  });
+
+  it("hand derivation (Lucky's example, 2026-10-15; g = 9.81 m/s² stated): load 0.5 kg at 0.25 m on a uniform 0.2 kg arm 0.3 m long", () => {
+    // F = 0.5 × 9.81 = 4.905 N; τ_load = 4.905 × 0.25 = 1.22625 N·m;
+    // arm weight 0.2 × 9.81 = 1.962 N at L/2 = 0.15 m → τ_arm = 0.2943 N·m; total 1.52055 N·m.
+    const r = staticTorqueSingleLink({ arm_length_m: 0.3, payload_kg: 0, arm_kg_per_m: 0.2 / 0.3, angle_deg: 0, extra_masses: [{ mass_kg: 0.5, distance_m: 0.25 }], g_m_per_s2: 9.81 });
+    expect(r.extra_force_n).toBeCloseTo(4.905, 12);
+    expect(r.extra_torque_nm).toBeCloseTo(1.22625, 12);
+    expect(r.arm_weight_n).toBeCloseTo(1.962, 12);
+    expect(r.arm_torque_nm).toBeCloseTo(0.2943, 12);
+    expect(r.torque_nm).toBeCloseTo(1.52055, 12);
+    expect(r.payload_force_n).toBe(0);
+  });
+
+  it("standard gravity stays the default, and g outside the sanity range is refused", () => {
+    const base = { arm_length_m: 0.3, payload_kg: 0.1, arm_kg_per_m: 0.5, angle_deg: 0 };
+    expect(staticTorqueSingleLink(base).payload_force_n).toBeCloseTo(0.1 * STANDARD_GRAVITY_M_PER_S2, 12);
+    expect(() => staticTorqueSingleLink({ ...base, g_m_per_s2: 1.62 })).toThrow(/g_m_per_s2/); // the Moon is not this solver's job
+  });
+});
+
 describe("textbook: [UP1] Example 12.4 — a tilted forearm, its own weight neglected", () => {
   // "A weightlifter is holding a 50.0-lb weight (equivalent to 222.4 N) with his forearm, as shown
   //  in Figure 12.11. His forearm is positioned at β=60° with respect to his upper arm."

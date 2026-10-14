@@ -58,6 +58,15 @@
     },
     "share_of_rating": {
       "unit": "ratio"
+    },
+    "payload_force_n": {
+      "unit": "N"
+    },
+    "arm_weight_n": {
+      "unit": "N"
+    },
+    "extra_force_n": {
+      "unit": "N"
     }
   },
   "assumptions": [
@@ -66,7 +75,8 @@
     "payload is a point mass at the tip",
     "extra masses may sit beyond the arm's end",
     "angle measured from horizontal: 0 degrees is level, 90 degrees is straight up",
-    "a torque rating is used only when the learner supplies one from a datasheet, and says whether it is a stall or continuous rating"
+    "a torque rating is used only when the learner supplies one from a datasheet, and says whether it is a stall or continuous rating",
+    "gravity is standard gravity, 9.80665 m/s², unless a scene or check states another value (the servo + arm scene states 9.81 m/s²)"
   ],
   "excludes": [
     "acceleration",

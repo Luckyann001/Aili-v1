@@ -71,6 +71,11 @@ export interface SingleLinkInput {
   angle_deg: number;
   /** Optional extra point masses on the arm (a bracket, a second servo). */
   extra_masses?: readonly PointMass[];
+  /**
+   * Gravity, m/s². Defaults to standard gravity (9.80665); a scene or a check that states another
+   * value (9.81, 9.80) passes it, inside the sanity range. Wherever results are shown, say which.
+   */
+  g_m_per_s2?: number;
   /** A datasheet rating the learner supplies; never invented. Give at most one. */
   rated_stall_torque_nm?: number;
   rated_continuous_torque_nm?: number;
@@ -83,6 +88,10 @@ export interface SingleLinkResult {
   payload_torque_nm: number;
   arm_torque_nm: number;
   extra_torque_nm: number;
+  /** The forces behind those torques, N: the payload's weight, the arm's own weight (acting at L/2), the extra masses' weight. */
+  payload_force_n: number;
+  arm_weight_n: number;
+  extra_force_n: number;
   /** Only when a rating was supplied: torque ÷ rating, and which rating it was. */
   share_of_rating?: number;
   rating_kind?: "stall" | "continuous";
@@ -100,11 +109,22 @@ export function staticTorqueSingleLink(input: SingleLinkInput): SingleLinkResult
   for (const [i, m] of extra_masses.entries())
     cap(`extra_masses[${i}].distance_m`, m.distance_m, SANITY_CAPS.extra_mass_distance_m, "m");
 
-  const payload_torque_nm = gravityMoment_nm([{ mass_kg: payload_kg, distance_m: L }], angle_deg);
-  const arm_torque_nm = gravityMoment_nm([{ mass_kg: arm_kg_per_m * L, distance_m: L / 2 }], angle_deg);
-  const extra_torque_nm = gravityMoment_nm(extra_masses, angle_deg);
+  const g = input.g_m_per_s2 ?? STANDARD_GRAVITY_M_PER_S2;
+  const payload_torque_nm = gravityMoment_nm([{ mass_kg: payload_kg, distance_m: L }], angle_deg, g);
+  const arm_torque_nm = gravityMoment_nm([{ mass_kg: arm_kg_per_m * L, distance_m: L / 2 }], angle_deg, g);
+  const extra_torque_nm = gravityMoment_nm(extra_masses, angle_deg, g);
   const torque_nm = payload_torque_nm + arm_torque_nm + extra_torque_nm;
-  const result: SingleLinkResult = { torque_nm, torque_kgf_cm: kgfCmFromNm(torque_nm), payload_torque_nm, arm_torque_nm, extra_torque_nm };
+  const result: SingleLinkResult = {
+    torque_nm,
+    torque_kgf_cm: kgfCmFromNm(torque_nm),
+    payload_torque_nm,
+    arm_torque_nm,
+    extra_torque_nm,
+    // Weights are m·g whatever the angle (gravityMoment_nm checked g against the sanity range).
+    payload_force_n: payload_kg * g,
+    arm_weight_n: arm_kg_per_m * L * g,
+    extra_force_n: extra_masses.reduce((n, m) => n + m.mass_kg, 0) * g,
+  };
 
   const { rated_stall_torque_nm: stall, rated_continuous_torque_nm: cont } = input;
   if (stall !== undefined && cont !== undefined) throw new RangeError("give one rating: rated_stall_torque_nm or rated_continuous_torque_nm");
