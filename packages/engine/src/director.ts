@@ -1,4 +1,4 @@
-import { Action, DirectorResponse, type BoundedInput, type SceneManifest } from "@aili/schemas";
+import { Action, DirectorResponse, type BoundedInput, type LevelQuestion, type SceneManifest } from "@aili/schemas";
 import type { Shortlist } from "./capabilities";
 import { checkNarration } from "./narration";
 import { findPhrases, WARN_PHRASES } from "./pedagogy";
@@ -637,6 +637,34 @@ export function salvageProbeQuestion(raw: unknown): { raw: unknown; warning?: st
     raw: { ...(raw as object), narration, ...(Array.isArray(r.actions) ? { actions: moved } : {}), prompt: { kind: "question", text: question } },
     warning: `${QUESTION_MOVED_TO_PROMPT}: narration[${i}] "${question}"${rest ? "" : ` (segment dropped${hasActions ? `; its actions moved to narration[${i - 1}]` : ""})`}`,
   };
+}
+
+/** The warning when the engine supplies the content's level question (Lucky's decision 2026-10-14). */
+export const LEVEL_QUESTION_SUPPLIED = "level question supplied by engine";
+
+/**
+ * A probe that asks nothing at all (no prompt, no question mark anywhere in its narration), on a
+ * supported topic, while the learner's level is unknown: the engine supplies the level question from
+ * content (content/level-question.json) as the prompt, with its chips, instead of a repair. Runs
+ * after the question salvage; anything else is left for the checks (rejected for repair, as before).
+ */
+export function supplyLevelQuestion(raw: unknown, q: LevelQuestion | undefined, level: string): { raw: unknown; warning?: string } {
+  const none = { raw };
+  if (!q || level !== "unknown" || !raw || typeof raw !== "object" || Array.isArray(raw)) return none;
+  const r = raw as { move?: unknown; prompt?: unknown; narration?: unknown; coverage?: unknown };
+  if (r.move !== "probe" || (r.prompt !== undefined && r.prompt !== null) || r.coverage === "unsupported" || !Array.isArray(r.narration)) return none;
+  if ((r.narration as Array<{ text?: unknown }>).some((n) => typeof n?.text !== "string" || n.text.includes("?"))) return none;
+  return {
+    raw: { ...(raw as object), prompt: { kind: "question", text: q.text, chips: q.chips.map((c) => c.label) } },
+    warning: `${LEVEL_QUESTION_SUPPLIED}: "${q.text}" (content v${q.version})`,
+  };
+}
+
+/** The level a reply sets: a chip of the level question, tapped (or typed exactly) while it is the open question. */
+export function levelFromReply(q: LevelQuestion | undefined, open: { text: string } | undefined, reply: string): "true_beginner" | "some_knowledge" | null {
+  if (!q || !open || open.text !== q.text) return null;
+  const said = reply.trim().toLowerCase();
+  return q.chips.find((c) => c.label.toLowerCase() === said)?.level ?? null;
 }
 
 /** The warning when the engine puts the guide's exact application question in the prompt (Lucky's decision 2026-10-13). */

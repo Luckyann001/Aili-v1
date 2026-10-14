@@ -1,4 +1,4 @@
-import type { AiConfig, DirectorResponse, RuntimeModel } from "@aili/schemas";
+import type { AiConfig, DirectorResponse, LevelQuestion, RuntimeModel } from "@aili/schemas";
 import { shortlist, type Registry } from "../capabilities";
 import { checkNarration } from "../narration";
 import { InMemoryLedger, worstCaseTurnCost, type LedgerEntry } from "../metering";
@@ -62,6 +62,8 @@ export interface ScenarioRecord {
 
 export interface RunDeps {
   registry: Registry;
+  /** The level question from content (content/level-question.json), as the app uses it. */
+  levelQuestion?: LevelQuestion;
   config: AiConfig;
   /**
    * A fresh director and router per scenario run (recorded providers replay per scenario). `spent`
@@ -175,6 +177,7 @@ export async function runBakeoff(scenarios: Scenario[], runs: number, d: RunDeps
       const routed: { v?: TurnRecord["router"] } = {}; // set by onRoute during the turn
       const s = new TurnSession({
         registry: d.registry,
+        levelQuestion: d.levelQuestion,
         director,
         router,
         state: { history: { posture: scenario.posture, learner_level: scenario.learner_level, entries: [] }, activeScene: scenario.active_scene },

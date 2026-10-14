@@ -1,6 +1,7 @@
 import { createFakeDirector, createFakeRouter, encodeEvent, reconcileShown, InMemoryLedger, InMemorySessionStore, killSwitchFromEnv, TurnSession, type SessionState, type TurnEvent } from "@aili/engine";
-import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
+import { AiConfig, InterruptRequest, LevelQuestion, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
+import levelQuestionJson from "../../../../content/level-question.json";
 import { FAKE_DIRECTOR } from "./flags";
 import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, loadTemplates, logCheck, recordedLiveRequested, summarizeAttempt } from "./live";
 import { recordedLiveParts } from "aili-recorded-live";
@@ -19,6 +20,9 @@ const loadFixtureRegistry = () => import("aili-turn-fixtures");
 
 // Prices and the session cap come only from config/ai.json, validated once at start-up.
 const aiConfig = AiConfig.safeParse(aiConfigJson);
+
+/** The level question the engine asks when a first probe asks nothing (content/level-question.json; human-written). */
+const LEVEL_QUESTION = LevelQuestion.parse(levelQuestionJson);
 
 /**
  * Cost per page session (slice 7). IN MEMORY ONLY: lost on restart and separate on each server
@@ -100,6 +104,7 @@ export async function handleTurn(request: Request): Promise<Response> {
   const terminalLog = logCheck(req.session_id, req.state_rev);
   const session = new TurnSession({
     registry,
+    levelQuestion: LEVEL_QUESTION,
     director: live ? live.director : createFakeDirector(req.case, { slowMs: SLOW_MS }),
     router: live ? live.router : createFakeRouter(),
     state: start,

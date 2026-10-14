@@ -1,8 +1,8 @@
-import type { DirectorResponse, SessionHistory } from "@aili/schemas";
+import type { DirectorResponse, LevelQuestion, SessionHistory } from "@aili/schemas";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
-import { dropStrayActionFields, EXPLAIN_WITHOUT_CHECK, NARRATION_SPLIT_MAX_SEGMENTS, normalizeActionBinding, salvageProbeQuestion, splitLongNarration, substituteGuideQuestion, toWirePaths, validateDirectorResponse } from "./director";
+import { dropStrayActionFields, EXPLAIN_WITHOUT_CHECK, levelFromReply, NARRATION_SPLIT_MAX_SEGMENTS, normalizeActionBinding, salvageProbeQuestion, supplyLevelQuestion, splitLongNarration, substituteGuideQuestion, toWirePaths, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept, unsupportedAttributions } from "./teaching";
@@ -179,6 +179,8 @@ export interface LearnerInput {
 
 export interface TurnSessionOptions {
   registry: Registry;
+  /** The level question from content (content/level-question.json); without it, no question is supplied. */
+  levelQuestion?: LevelQuestion;
   director: Director;
   state: SessionState;
   concepts: readonly string[];
@@ -323,8 +325,11 @@ export class TurnSession {
     if (!classified.success) return fail("router", classified.error.issues.map((i) => `${i.path.join(".") || "(classification)"}: ${i.message}`));
     this.opts.onRoute?.({ classification: classified.data, question_open: openPrompt(before.history) !== null });
     const c = matchOpenChoice(classified.data, input.text, openQuestion(before)?.choices);
+    // A chip of the level question, while it is the open question, sets the learner's level.
+    const level = levelFromReply(this.opts.levelQuestion, openQuestion(before), input.text);
     const history: SessionHistory = {
       ...before.history,
+      ...(level ? { learner_level: level } : {}),
       entries: [
         ...before.history.entries,
         {
@@ -394,8 +399,10 @@ export class TurnSession {
       const split = splitLongNarration(filled.raw);
       // A probe whose question sits at the end of its narration gets it moved to the prompt (a warning).
       const salvaged = salvageProbeQuestion(split.raw);
+      // A probe that asks nothing, while the level is unknown, gets the content's level question (a warning).
+      const supplied = supplyLevelQuestion(salvaged.raw, this.opts.levelQuestion, history.learner_level);
       // A field from another action type, on an otherwise valid action, is dropped (a warning).
-      const stray = dropStrayActionFields(salvaged.raw);
+      const stray = dropStrayActionFields(supplied.raw);
       const v = validateDirectorResponse(stray.raw, {
         shortlist: sl,
         activeScene: before.activeScene,
@@ -406,7 +413,7 @@ export class TurnSession {
         // An answer the engine split may have up to five segments (the split checks the 700-character total).
         maxSegments: split.warnings.length ? NARRATION_SPLIT_MAX_SEGMENTS : undefined,
       });
-      const warnings = toWirePaths([...(filled.warning ? [filled.warning] : []), ...split.warnings, ...(salvaged.warning ? [salvaged.warning] : []), ...stray.warnings, ...v.warnings], bound.paths);
+      const warnings = toWirePaths([...(filled.warning ? [filled.warning] : []), ...split.warnings, ...(salvaged.warning ? [salvaged.warning] : []), ...(supplied.warning ? [supplied.warning] : []), ...stray.warnings, ...v.warnings], bound.paths);
       if (!v.response) {
         // The teaching rules too, on the validator's lenient copy, so one repair lists every problem.
         const errors = toWirePaths(v.errors, bound.paths);

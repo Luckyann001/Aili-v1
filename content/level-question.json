@@ -1,0 +1,11 @@
+{
+  "_about": "The level question the engine asks when a first probe forgets its question and the learner's level is unknown (Lucky's decision 2026-10-14). Human-written content: the founder may edit the wording and chips. Each chip's level is what tapping it records: true_beginner or some_knowledge (the session's levels). Never edited by the AI.",
+  "version": "1.0.0",
+  "text": "What do you already know about this topic?",
+  "chips": [
+    { "label": "Nothing yet", "level": "true_beginner" },
+    { "label": "A little", "level": "some_knowledge" },
+    { "label": "Some", "level": "some_knowledge" },
+    { "label": "A lot", "level": "some_knowledge" }
+  ]
+}

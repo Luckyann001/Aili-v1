@@ -1,4 +1,4 @@
-import { EMPTY_ANSWER, EXPLAIN_WITHOUT_CHECK, GUIDE_QUESTION_SUBSTITUTED, NARRATION_SPLIT, QUESTION_MOVED_TO_PROMPT, STRAY_ACTION_FIELD_DROPPED } from "../director";
+import { EMPTY_ANSWER, EXPLAIN_WITHOUT_CHECK, GUIDE_QUESTION_SUBSTITUTED, LEVEL_QUESTION_SUPPLIED, NARRATION_SPLIT, QUESTION_MOVED_TO_PROMPT, STRAY_ACTION_FIELD_DROPPED } from "../director";
 import { OPEN_QUESTION_REOFFERED, SCENE_SELECTED_BY_ENGINE, READING_FILLED_IN, UNSUPPORTED_ATTRIBUTION } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
@@ -72,6 +72,7 @@ export interface Metrics {
   /** Turns where a field from another action type was dropped before the checks. */
   stray_fields_dropped: number;
   question_moved: number;
+  level_question_supplied: number;
   explain_without_check: number;
   /** Turns where the engine split a long narration segment at sentence boundaries. */
   narration_split: number;
@@ -130,6 +131,8 @@ export function metrics(turns: TurnRecord[]): Metrics {
             ? "stray action field dropped"
             : w.startsWith(QUESTION_MOVED_TO_PROMPT)
             ? "question moved to prompt"
+            : w.startsWith(LEVEL_QUESTION_SUPPLIED)
+            ? "level question supplied"
             : w.startsWith(EXPLAIN_WITHOUT_CHECK)
             ? "explanation without a check"
             : w.startsWith(UNSUPPORTED_ATTRIBUTION)
@@ -160,6 +163,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     scene_selected: turns.filter((t) => t.warnings.some((w) => w.startsWith(SCENE_SELECTED_BY_ENGINE))).length,
     stray_fields_dropped: turns.filter((t) => t.warnings.some((w) => w.startsWith(STRAY_ACTION_FIELD_DROPPED))).length,
     question_moved: turns.filter((t) => t.warnings.some((w) => w.startsWith(QUESTION_MOVED_TO_PROMPT))).length,
+    level_question_supplied: turns.filter((t) => t.warnings.some((w) => w.startsWith(LEVEL_QUESTION_SUPPLIED))).length,
     explain_without_check: turns.filter((t) => t.warnings.some((w) => w.startsWith(EXPLAIN_WITHOUT_CHECK))).length,
   };
 }
@@ -205,6 +209,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Scene selected by the engine (the answer put none on stage) | ${m.scene_selected} |`,
     `| Stray action fields dropped (a field from another action type) | ${m.stray_fields_dropped} |`,
     `| Probe questions moved from narration to prompt | ${m.question_moved} |`,
+    `| Level questions supplied by the engine | ${m.level_question_supplied} |`,
     `| Explanations without a check (warning only) | ${m.explain_without_check} |`,
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
     `| Empty or action-only first answers (no narration, no prompt) | ${m.empty_first} |`,

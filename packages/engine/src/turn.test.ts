@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { admit, EXPLAIN_WITHOUT_CHECK, QUESTION_MOVED_TO_PROMPT, salvageProbeQuestion, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, EXPLAIN_WITHOUT_CHECK, LEVEL_QUESTION_SUPPLIED, levelFromReply, QUESTION_MOVED_TO_PROMPT, supplyLevelQuestion, salvageProbeQuestion, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
+import levelQuestionJson from "../../../content/level-question.json";
+import { LevelQuestion } from "@aili/schemas";
 
 // runTurn pipeline with the scripted fake director (docs/m2-plan.md slice 5). No provider, no key,
 // no network. The registry is the dev-only test-fixture registry.
@@ -844,7 +846,7 @@ describe("a probe's question written into the narration moves to the prompt (Luc
     return { events, repairs, checks };
   };
 
-  it("the logged 14 Oct case (probe, no prompt, one 111-character segment) has no question to move, so both attempts are still rejected", async () => {
+  it("the logged 14 Oct case (probe, no prompt, one 111-character segment) has no question to move: without the level question it is still rejected", async () => {
     // The 23:16 log (session bcfa4a9e) records only the shape. The same failure at 11:53 (live-session
     // log 2026-10-14T08-53-23-698Z, also probe, prompt=none, 111 characters) shows its text: it asks nothing.
     const text = "Robotics covers a lot of ground. I can start with how a robot arm holds a load still, and why distance matters.";
@@ -921,5 +923,92 @@ describe("an explanation with no check is a warning, never a rejection (spec A1a
     expect((await run({ answer: { prompt: undefined }, posture: "answer" })).warned).toEqual([]);
     expect((await run({ answer: { prompt: undefined }, text: "just tell me why it is hard to hold" })).warned).toEqual([]);
     expect((await run({ answer: { prompt: undefined, coverage: "unsupported" } })).warned).toEqual([]);
+  });
+});
+
+describe("the level question is supplied by the engine when a first probe asks nothing (Lucky's decision 2026-10-14)", () => {
+  const LQ = LevelQuestion.parse(levelQuestionJson);
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const probe = (narration: Array<{ id: string; text: string }>, o: object = {}) => ({ move: "probe", calc_requests: [], evidence: [], prompt: undefined, actions: [], narration, ...o });
+  const SUPPLIED = `${LEVEL_QUESTION_SUPPLIED}: "What do you already know about this topic?" (content v1.0.0)`;
+  /** One session; each call is a turn whose director answers with `answer` (and the same on repair). */
+  const sessionWith = (level: "unknown" | "true_beginner" | "some_knowledge" = "unknown") => {
+    let answer: object = {};
+    const checks: Array<{ attempt: number; outcome: string; warnings: string[] }> = [];
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...answer } }; } };
+    const s = new TurnSession({ registry, director, router: createFakeRouter(), levelQuestion: LQ, state: { history: { posture: "learning", learner_level: level, entries: [] } }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    const turn = async (text: string, a: object) => {
+      answer = a;
+      checks.length = 0;
+      const events: TurnEvent[] = [];
+      await s.run({ text }, (e) => events.push(e));
+      return { events, checks: [...checks], state: s.state };
+    };
+    return turn;
+  };
+
+  it("the content file is valid: the question and its four chips, each with the level it records", () => {
+    expect(LQ.text).toBe("What do you already know about this topic?");
+    expect(LQ.chips.map((c) => `${c.label}: ${c.level}`)).toEqual(["Nothing yet: true_beginner", "A little: some_knowledge", "Some: some_knowledge", "A lot: some_knowledge"]);
+  });
+
+  it("the 14 Oct 11:53 narration now passes on attempt 1, with the supplied prompt and its chips", async () => {
+    const text = "Robotics covers a lot of ground. I can start with how a robot arm holds a load still, and why distance matters.";
+    const { events, checks } = await sessionWith()("robotics", probe([{ id: "n1", text }]));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(checks.map((c) => c.outcome)).toEqual(["pass"]);
+    expect(checks[0]!.warnings).toContain(SUPPLIED);
+    expect(events.find((e) => e.type === "prompt")).toMatchObject({ text: "What do you already know about this topic?", chips: ["Nothing yet", "A little", "Some", "A lot"] });
+  });
+
+  it("the 14 Oct 23:xx shapes (one segment of 111 or 127 characters, no question) pass on attempt 1 (their text was not logged; sentences of the same length stand in)", async () => {
+    for (const text of [
+      "Robotics is a wide field. I'll start with one idea each arm depends on: the twist a joint needs to hold a load.",
+      "Robotics is a wide field, so I'll start with one idea every robot arm depends on: the twist a joint needs to hold a load still.",
+    ]) {
+      expect([111, 127]).toContain(text.length);
+      const { events, checks } = await sessionWith()("robotics", probe([{ id: "n1", text }]));
+      expect(events.at(-1)!.type).toBe("turn.done");
+      expect(checks.map((c) => c.outcome)).toEqual(["pass"]);
+      expect(checks[0]!.warnings).toContain(SUPPLIED);
+    }
+  });
+
+  it("a chip sends its full label and sets the level; other replies leave it unknown", async () => {
+    const opener = probe([{ id: "n1", text: "Robotics is a wide field." }]);
+    const explain = { move: "explain", prompt: { kind: "question", text: "Where would you move the weight to make it easier to hold?", chips: ["Closer to my hand", "Not sure"] } };
+    for (const [reply, level] of [["Nothing yet", "true_beginner"], ["A lot", "some_knowledge"], ["a little", "some_knowledge"], ["I know some physics", "unknown"]] as const) {
+      const turn = sessionWith();
+      await turn("robotics", opener);
+      const { state } = await turn(reply, explain);
+      expect(state.history.learner_level, reply).toBe(level);
+    }
+    expect(levelFromReply(LQ, { text: "What did you build?" }, "Nothing yet")).toBeNull(); // only while the level question is open
+  });
+
+  it("order: a narration with exactly one question is salvaged first; supplied only when no question mark is anywhere", () => {
+    const withQ = probe([{ id: "n1", text: "Robotics is broad." }, { id: "n2", text: "What have you built?" }]);
+    expect(salvageProbeQuestion(withQ).warning).toMatch(/^question moved/);
+    expect(supplyLevelQuestion(salvageProbeQuestion(withQ).raw, LQ, "unknown")).toEqual({ raw: salvageProbeQuestion(withQ).raw }); // the prompt now exists
+  });
+
+  it("no-ops: answer, explain or unsupported; a prompt already given; the level known; a question mark in the narration; no content", () => {
+    const n = [{ id: "n1", text: "Robotics is a wide field." }];
+    const cases: Array<[object, string, LevelQuestion | undefined]> = [
+      [{ ...probe(n), move: "answer" }, "unknown", LQ],
+      [{ ...probe(n), move: "explain" }, "unknown", LQ],
+      [probe(n, { coverage: "unsupported" }), "unknown", LQ],
+      [probe(n, { prompt: { kind: "question", text: "What?" } }), "unknown", LQ],
+      [probe(n), "true_beginner", LQ],
+      [probe(n), "some_knowledge", LQ],
+      [probe([{ id: "n1", text: "What do you know? What have you built?" }]), "unknown", LQ],
+      [probe(n), "unknown", undefined],
+    ];
+    for (const [raw, level, q] of cases) expect(supplyLevelQuestion(raw, q, level)).toEqual({ raw });
+  });
+
+  it("a known level: the probe that asks nothing is rejected for repair, as before", async () => {
+    const { checks } = await sessionWith("some_knowledge")("robotics", probe([{ id: "n1", text: "Robotics is a wide field." }]));
+    expect(checks.map((c) => c.outcome)).toEqual(["validation", "validation"]);
   });
 });

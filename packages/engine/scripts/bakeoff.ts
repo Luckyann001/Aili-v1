@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { AiConfig, type RuntimeModel } from "@aili/schemas";
+import { AiConfig, LevelQuestion, type RuntimeModel } from "@aili/schemas";
 import {
   CapGuardProvider,
   createProfessorProvider,
@@ -121,6 +121,7 @@ async function main() {
 
   const result = await runBakeoff(scenarios, runs, {
     registry,
+    levelQuestion: LevelQuestion.parse(readJson(join(root, "content", "level-question.json"))),
     config,
     maxTurns,
     stopOnUnexpected: a["keep-going"] !== true,
