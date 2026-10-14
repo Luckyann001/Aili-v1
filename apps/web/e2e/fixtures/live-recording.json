@@ -1,5 +1,5 @@
 {
-  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Test builds only.",
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Test builds only.",
   "router": {
     "source": "hand-written",
     "steps": [
@@ -54,6 +54,42 @@
             "wants_direct_answer": false
           },
           "input_tokens": 1600,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
           "output_tokens": 92
         }
       }
@@ -229,6 +265,110 @@
           },
           "input_tokens": 7700,
           "output_tokens": 320
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_4",
+            "state_rev": 4,
+            "move": "explain",
+            "concepts": [
+              "mech.moment-arm",
+              "mech.torque.static"
+            ],
+            "analogy": "analogy.fx-shopping-bag",
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, check its rated torque. Here is a way to feel why: picture holding a shopping bag out at arm's length.",
+                "actions": []
+              },
+              {
+                "id": "n2",
+                "text": "The bag is the payload, your shoulder is the joint, and your hand's distance from it is the moment arm.",
+                "actions": []
+              },
+              {
+                "id": "n3",
+                "text": "Where it breaks down: a shoulder tires gradually and can shift its grip; a servo has a fixed rated torque.",
+                "actions": []
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Shall we look at the ruler held out again?",
+              "chips": [
+                "Yes",
+                "Not now"
+              ]
+            },
+            "assumptions": [
+              "a static hold"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7800,
+          "output_tokens": 330
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_5",
+            "state_rev": 5,
+            "move": "explain",
+            "concepts": [
+              "mech.moment-arm",
+              "mech.torque.static"
+            ],
+            "analogy": "analogy.fx-ruler-held-out",
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Here is the ruler held out from a hand: the ruler is the arm link and your hand is the servo's joint.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-lever"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Watch the weight slide out: the hand works harder. Where it breaks down: a hand tires; a servo heats up while it holds.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "slide-weight-out"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Why does the far weight take more effort to hold?",
+              "chips": [
+                "Longer lever",
+                "Heavier weight",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7900,
+          "output_tokens": 340
         }
       }
     ]

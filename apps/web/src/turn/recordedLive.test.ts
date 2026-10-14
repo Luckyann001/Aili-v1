@@ -70,6 +70,18 @@ describe("recorded live path (test builds only)", () => {
     expect(sessions.get(sid)!.activeScene).toBe("fx-servo-arm");
   });
 
+  it("turns 4 and 5: an analogy in words only, then one with its picture on stage (docs/m4-plan.md addendum A)", async () => {
+    const { handleTurn, sessions } = await load();
+    const sid = "recorded-test-0008";
+    for (const [rev, text] of [[1, "teach me robotics"], [2, "It gets harder"], [3, "show me a real servo"]] as const) await readAll(await handleTurn(post(body(rev, text, sid))));
+    const t4 = await readAll(await handleTurn(post(body(4, "the rated torque", sid))));
+    expect(t4.at(-1), JSON.stringify(t4.at(-1))).toMatchObject({ type: "turn.done", analogy: { id: "analogy.fx-shopping-bag", words_only: true } });
+    expect(t4.filter((e) => e.type === "action"), JSON.stringify(t4.filter((e) => e.type === "action"))).toEqual([]); // the stage keeps the servo + arm
+    const t5 = await readAll(await handleTurn(post(body(5, "Yes", sid))));
+    expect(t5.at(-1), JSON.stringify(t5.at(-1))).toMatchObject({ type: "turn.done", analogy: { id: "analogy.fx-ruler-held-out", words_only: false } });
+    expect(sessions.get(sid)!.activeScene).toBe("fx-lever");
+  });
+
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
     const { handleTurn, sessions } = await load();
     // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,

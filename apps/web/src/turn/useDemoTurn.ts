@@ -154,6 +154,7 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
         const p = playing.current;
         if (p && p.rev !== s.rev) {
           playing.current = null;
+          useStageContent.getState().setWordsOnlyAnalogy(null);
           useTurnLog.getState().markShown(p.rev, p.shown);
           // Kept for the next turn's request, which the server reads before this session's stage, so
           // the stage can never include actions the learner did not see.
@@ -168,6 +169,7 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
     async (fakeCase: FakeCase, text: string) => {
       stop(); // a new turn replaces one still in flight (its changes are undone first)
       const rev = voice.beginTurn();
+      useStageContent.getState().setWordsOnlyAnalogy(null); // a new turn: the last turn's note goes
       const abort = new AbortController();
       current.current = { rev, abort };
       const turnClient = useTurnClient.getState();
@@ -210,7 +212,11 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
             // As line `seq` starts: its actions, then its caption and speech.
             onLine: (seq) => {
               if (playing.current?.rev === rev) playing.current.shown = Math.min(seq + 1, segments.length);
-              if (seq === 0) useStageContent.getState().setFixture(true, live);
+              if (seq === 0) {
+                useStageContent.getState().setFixture(true, live);
+                // An analogy with no picture is said to be words only, as its lines start.
+                useStageContent.getState().setWordsOnlyAnalogy(after.analogy?.words_only ? after.analogy.title : null);
+              }
               for (const a of byLine[seq] ?? []) applyAction(a, live, rev);
             },
             onDone: () => {

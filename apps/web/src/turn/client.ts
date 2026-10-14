@@ -25,6 +25,8 @@ export interface TurnClientState<Snapshot> {
   prompt: { text: string; parts: TextPart[]; chips: string[] } | null;
   /** The text panel's content, sent with turn.done. */
   explanation: TurnExplanation | null;
+  /** The analogy the turn used, if any, and whether it is words only (no picture exists). */
+  analogy?: { id: string; title: string; words_only: boolean } | null;
   /** One plain line: the error, "Stopped." or the dropped connection. */
   message: string | null;
 }
@@ -64,7 +66,7 @@ export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<
         case "prompt":
           return { ...t, prompt: { text: e.text, parts: e.parts, chips: e.chips } };
         case "turn.done":
-          return { ...t, status: "done", snapshot: null, explanation: e.explanation };
+          return { ...t, status: "done", snapshot: null, explanation: e.explanation, analogy: e.analogy ?? null };
         case "turn.error":
           return { ...t, ...cleared(), status: "error", restoreTo: t.snapshot, snapshot: null, message: e.message };
       }

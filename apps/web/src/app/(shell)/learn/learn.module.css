@@ -1352,3 +1352,20 @@
   border-width: 2px;
   border-color: var(--aili-status-fail-border);
 }
+
+/* An analogy told in words only (docs/m4-plan.md addendum A): beside the caption, never colour alone. */
+.analogyNote {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin: var(--aili-space-1) auto 0;
+  padding: 2px var(--aili-space-2);
+  width: fit-content;
+  max-width: 100%;
+  border: 1px dashed var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.8rem;
+  pointer-events: auto;
+}

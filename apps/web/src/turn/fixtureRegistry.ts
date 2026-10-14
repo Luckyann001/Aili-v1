@@ -17,6 +17,7 @@ import fxDraft from "../../../../content/robotics/test-fixtures/read.fx-draft.js
 import fxLeverBasics from "../../../../content/robotics/test-fixtures/read.fx-lever-basics.json";
 import fxWrench from "../../../../content/robotics/test-fixtures/analogy.fx-long-wrench.json";
 import fxBag from "../../../../content/robotics/test-fixtures/analogy.fx-shopping-bag.json";
+import fxRuler from "../../../../content/robotics/test-fixtures/analogy.fx-ruler-held-out.json";
 
 // The dev-only registry for the fake director and live dev turns: real content (all draft) plus
 // every test fixture (the same files as the bake-off's registry).
@@ -33,7 +34,7 @@ export function fixtureTurnRegistry() {
         { file: "test-fixtures/scene.fx-lever.json", data: fxScene },
         { file: "test-fixtures/scene.fx-servo-arm.json", data: fxServoArm },
       ],
-      capabilities: [solver, sim, srcUp1, srcCp2, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
+      capabilities: [solver, sim, srcUp1, srcCp2, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
     },
     { allowTestFixtures: true },
   );

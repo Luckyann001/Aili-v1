@@ -101,6 +101,7 @@ export function LearnStage() {
   const live = useLiveMode();
   const [welcomeGone, setWelcomeGone] = useState(false);
   const scenePicked = useStageContent((s) => s.scenePicked);
+  const wordsOnlyAnalogy = useStageContent((s) => s.wordsOnlyAnalogy);
   const showWelcome = live === true && !welcomeGone;
   // The bottom input takes over once the welcome has gone. Both boxes share inputRef, so this runs
   // after React has committed the swap (a frame callback could still find the welcome's input).
@@ -259,6 +260,16 @@ export function LearnStage() {
               )}
               <p aria-live={captionLive}>{caption.parts ? <CaptionText parts={caption.parts} /> : caption.text}</p>
             </div>
+          )}
+          {/* Shown whether or not captions are on: the stage is not a picture of this analogy. */}
+          {wordsOnlyAnalogy && (
+            <p className={styles.analogyNote} data-analogy-note="">
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <path d="M2.5 4h9M2.5 7h9M2.5 10h5.5" />
+              </svg>
+              Analogy in words only. No picture of this yet.
+              <span className={styles.srOnly}> ({wordsOnlyAnalogy.replace(/\s*\(test fixture\)$/, "")})</span>
+            </p>
           )}
         </div>
 
