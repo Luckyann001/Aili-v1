@@ -639,3 +639,25 @@ describe("a stray action field no longer costs a repair (Lucky's decision 2026-1
     expect(warnings).toContain('stray action field dropped: actions[1] (highlight_part) "scene"');
   });
 });
+
+describe("one repair lists every problem (Lucky's decision 2026-10-13)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  it("a format error and a missing question reach the repair together", async () => {
+    const repairs: string[][] = [];
+    const first = { move: "probe", calc_requests: [], prompt: undefined, narration: [{ id: "n1", text: "Robotics is broad, so let's start with one idea." }], actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight", colour: "red" }] };
+    const fixed = { move: "probe", calc_requests: [], narration: [{ id: "n1", text: "Robotics is broad, so let's start with one idea." }], actions: [{ type: "select_scene", scene: "fx-lever" }], prompt: { kind: "question", text: "What would you like to build?", chips: [] } };
+    const director: Director = {
+      async respond(req) {
+        if (req.repair) repairs.push(req.repair.errors);
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.repair ? fixed : first) } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] } }, concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "robotics" }, (e) => events.push(e));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(repairs).toHaveLength(1);
+    expect(repairs[0]!.some((e) => /Unrecognized key: "colour"/.test(e))).toBe(true);
+    expect(repairs[0]!.some((e) => /^prompt: missing; move "probe"/.test(e))).toBe(true);
+  });
+});

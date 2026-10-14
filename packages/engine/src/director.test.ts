@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, dropStrayActionFields, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, dropStrayActionFields, lenientCandidate, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -560,5 +560,23 @@ describe("stray action fields from another action type are dropped before the ch
     expect(dropStrayActionFields(clean)).toEqual({ raw: clean, warnings: [] });
     expect(dropStrayActionFields({ actions: [{ type: "fly", scene: "x" }] }).warnings).toEqual([]);
     expect(dropStrayActionFields(null)).toEqual({ raw: null, warnings: [] });
+  });
+});
+
+describe("every check runs even when the format check fails (Lucky's decision 2026-10-13)", () => {
+  const PROBE_ERR = `prompt: missing; move "probe" asks one short question (behavior spec A1a), so it needs "prompt": { "kind": "question" or "prediction", "text": the question, "chips": the choices if any }`;
+  it("the live 'robotics' shape: a format error AND the missing question, reported together", () => {
+    const e = errs({ move: "probe", narration: [{ id: "n1", text: "Robotics is broad, so let's start with one idea." }], actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight", colour: "red" }], calc_requests: [], prompt: undefined });
+    expect(e.some((x) => /^actions\[1\]: Unrecognized key: "colour"/.test(x))).toBe(true);
+    expect(e).toContain(PROBE_ERR);
+  });
+  it("a field already reported by the format check is not reported again", () => {
+    const e = errs({ move: "probe", narration: [{ id: "n1", text: "Let's start." }], calc_requests: [], prompt: { kind: "riddle", text: "What have you built?", chips: [] } });
+    expect(e.filter((x) => x.startsWith("prompt"))).toHaveLength(1);
+  });
+  it("the lenient copy sets broken parts aside, and gives up on something that is not a response", () => {
+    expect(lenientCandidate({ ...good(), actions: [{ type: "highlight_part", part: "weight", colour: "red" }, { type: "fly" }] })?.actions).toEqual([{ type: "highlight_part", part: "weight" }]);
+    expect(lenientCandidate("nonsense")).toBeNull();
+    expect(lenientCandidate({ move: "dance" })).toBeNull();
   });
 });

@@ -126,7 +126,45 @@ function shapeChecks(raw: unknown, sl: Shortlist, flagged: ReadonlySet<string> =
  * analogy?): never a rejection, reported in the bake-off summary and transcripts for human review
  * (Lucky's decision 2026-10-12).
  */
-export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[]; warnings: string[] } {
+/**
+ * For error-finding only: a copy of a response that failed the format check, with each failing part
+ * set aside (unknown keys removed, a broken list item removed, a broken optional field cleared), so
+ * the remaining checks can still run on it. Null when it still does not parse. Never shown or used.
+ */
+export function lenientCandidate(raw: unknown): DirectorResponse | null {
+  if (!raw || typeof raw !== "object") return null;
+  let cur: unknown = structuredClone(raw);
+  for (let round = 0; round < 3; round++) {
+    const p = DirectorResponse.safeParse(cur);
+    if (p.success) return p.data;
+    const removals = new Map<unknown[], Set<number>>();
+    for (const issue of p.error.issues) {
+      const path = issue.path as Array<string | number>;
+      let node: unknown = cur;
+      for (const k of path) node = (node as Record<string | number, unknown> | undefined)?.[k];
+      if (issue.code === "unrecognized_keys" && node && typeof node === "object") {
+        for (const k of (issue as { keys: string[] }).keys) delete (node as Record<string, unknown>)[k];
+        continue;
+      }
+      const at = path.map((k, i) => (typeof k === "number" ? i : -1)).filter((i) => i >= 0).at(-1);
+      if (at !== undefined) {
+        let arr: unknown = cur;
+        for (const k of path.slice(0, at)) arr = (arr as Record<string | number, unknown>)[k];
+        if (Array.isArray(arr)) removals.set(arr, (removals.get(arr) ?? new Set()).add(path[at] as number));
+      } else if (path.length) delete (cur as Record<string, unknown>)[path[0] as string];
+      else return null;
+    }
+    // Each broken item once, highest index first, so earlier indices stay right.
+    for (const [arr, indices] of removals) for (const i of [...indices].sort((x, y) => y - x)) arr.splice(i, 1);
+  }
+  const last = DirectorResponse.safeParse(cur);
+  return last.success ? last.data : null;
+}
+
+/** "actions[1].scene: …" → "actions"; "prompt: …" → "prompt". */
+export const topField = (error: string) => error.split(/[.[:,\s]/, 1)[0]!;
+
+export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { response: DirectorResponse | null; errors: string[]; warnings: string[]; candidate?: DirectorResponse } {
   const sl = ctx.shortlist;
   const parsed = DirectorResponse.safeParse(raw);
   if (!parsed.success) {
@@ -138,7 +176,16 @@ export function validateDirectorResponse(raw: unknown, ctx: TurnContext): { resp
       const hint = i.path[0] === "concepts" ? ` (${valid(sl.concepts)})` : i.path[0] === "evidence" ? ` (${valid(sl.readings.map((x) => x.id))})` : "";
       return `${field || "(response)"}: ${i.message}${hint}`;
     });
-    return { response: null, errors: [...formatErrors, ...shapeChecks(raw, sl, flagged, undefined, ctx.maxSegments)], warnings: [] };
+    const errors = [...formatErrors, ...shapeChecks(raw, sl, flagged, undefined, ctx.maxSegments)];
+    // Every other check too, on a lenient copy, so one repair hears about every problem together
+    // (Lucky's decision 2026-10-13). Fields already reported are not reported twice.
+    const candidate = lenientCandidate(raw);
+    if (candidate) {
+      const reported = new Set(errors.map(topField));
+      const rest = validateDirectorResponse(candidate, ctx);
+      for (const e of rest.errors) if (!reported.has(topField(e)) && !errors.includes(e)) errors.push(e);
+    }
+    return { response: null, errors, warnings: [], ...(candidate ? { candidate } : {}) };
   }
   const r = parsed.data;
   const errors: string[] = [];

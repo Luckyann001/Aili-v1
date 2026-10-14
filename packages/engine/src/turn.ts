@@ -393,7 +393,12 @@ export class TurnSession {
         maxSegments: split.warnings.length ? NARRATION_SPLIT_MAX_SEGMENTS : undefined,
       });
       const warnings = [...(filled.warning ? [filled.warning] : []), ...split.warnings, ...stray.warnings, ...v.warnings];
-      if (!v.response) return { reason: "validation", errors: v.errors, warnings };
+      if (!v.response) {
+        // The teaching rules too, on the validator's lenient copy, so one repair lists every problem.
+        const errors = [...v.errors];
+        if (v.candidate) for (const e of validatePedagogy(v.candidate, history, teaching, pedagogyContext)) if (!errors.includes(e)) errors.push(e);
+        return { reason: "validation", errors, warnings };
+      }
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
       if (reoffersOpenQuestion(v.response, history, teaching)) warnings.push(`${OPEN_QUESTION_REOFFERED} (${v.response.prompt!.kind}): "${v.response.prompt!.text}"`);
