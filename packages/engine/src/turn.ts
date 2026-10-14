@@ -164,7 +164,7 @@ export interface SessionState {
    * The last completed turn's stage changes, by segment, so an interrupt mid-speech can keep only
    * what the learner saw (M4 slice 1): the stage before the turn, the segment ids in order, the actions.
    */
-  lastTurn?: { startScene?: string; startHighlight?: string; segments: string[]; actions: DirectorResponse["actions"] };
+  lastTurn?: { rev: number; startScene?: string; startHighlight?: string; segments: string[]; actions: DirectorResponse["actions"] };
   /** Predictions, open items, waivers and analogies used (slice 5a). Absent means all empty. */
   teaching?: TeachingState;
 }
@@ -507,7 +507,7 @@ export class TurnSession {
       history: { ...history, entries: [...history.entries, { kind: "aili", move: r.move, asked: !!r.prompt, gave_back: givesBack(r), concepts: r.concepts, safety: r.safety }] },
       activeScene,
       ...(highlightedPart ? { highlightedPart } : {}),
-      lastTurn: { ...(before.activeScene ? { startScene: before.activeScene } : {}), ...(before.highlightedPart ? { startHighlight: before.highlightedPart } : {}), segments: r.narration.map((n) => n.id), actions: r.actions },
+      lastTurn: { rev, ...(before.activeScene ? { startScene: before.activeScene } : {}), ...(before.highlightedPart ? { startHighlight: before.highlightedPart } : {}), segments: r.narration.map((n) => n.id), actions: r.actions },
       teaching: applyResponse(teaching, r, ailiTurnNumber, today, safetyCritical, sl.readings.find((x) => x.id === r.reading)?.teaches ?? []),
     };
     if (rev !== this.rev) return;
@@ -550,9 +550,9 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * the learner saw, up to and including `shownThrough` (null: none were shown). The turn itself still
  * happened (its history and teaching state stay); only the stage is put back to what was shown.
  */
-export function reconcileShown(state: SessionState, shownThrough: string | null): SessionState {
+export function reconcileShown(state: SessionState, shownThrough: string | null, rev?: number): SessionState {
   const t = state.lastTurn;
-  if (!t) return state;
+  if (!t || (rev !== undefined && t.rev !== rev)) return state; // not the turn the note is about
   const upTo = shownThrough === null ? -1 : t.segments.indexOf(shownThrough);
   if (shownThrough !== null && upTo < 0) return state; // unknown segment: leave the state as it is
   let activeScene = t.startScene;

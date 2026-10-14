@@ -18,21 +18,19 @@ export const TurnRequest = z
     /** The client's revision for this turn (its gate's new revision). */
     state_rev: z.number().int().min(1).max(1_000_000_000),
     case: z.enum(FAKE_CASES).default("valid"),
+    /**
+     * The previous turn was interrupted mid-speech (M4 slice 1): its revision and the last narration
+     * segment the learner saw (null: none). Sent INSIDE the next turn's request, so the server applies
+     * it before reading the session's stage for this turn; a separate message could arrive too late.
+     */
+    previous_shown: z
+      .object({ state_rev: z.number().int().min(1), shown_through: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).nullable() })
+      .strict()
+      .optional(),
     input: z.object({ text: z.string().max(500) }).strict(),
   })
   .strict();
 export type TurnRequest = z.infer<typeof TurnRequest>;
 
-export const InterruptRequest = z
-  .object({
-    session_id: ClientSessionId,
-    request_id: z.string().min(1).max(64),
-    state_rev: z.number().int().min(1),
-    /**
-     * Sent when the turn had already arrived and its narration was being played (M4 slice 1): the
-     * last narration segment the learner saw (null: none yet), so the server's stage matches the page.
-     */
-    shown_through: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).nullable().optional(),
-  })
-  .strict();
+export const InterruptRequest = z.object({ session_id: ClientSessionId, request_id: z.string().min(1).max(64), state_rev: z.number().int().min(1) }).strict();
 export type InterruptRequest = z.infer<typeof InterruptRequest>;

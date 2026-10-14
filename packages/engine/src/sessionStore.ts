@@ -9,7 +9,7 @@ export interface SessionStore {
   get(sessionId: string): SessionState | undefined;
   /** Save the state a COMPLETED turn produced. Ignored if a newer revision was already saved. */
   commit(sessionId: string, rev: number, state: SessionState): boolean;
-  /** Change the state saved by turn `rev` (an interrupt mid-speech; M4 slice 1). Ignored unless `rev` is the latest saved. */
+  /** Change the state saved by turn `rev` (the next request's note of what an interrupted turn showed; M4 slice 1). Ignored unless `rev` is the latest saved. */
   amend(sessionId: string, rev: number, change: (s: SessionState) => SessionState): boolean;
 }
 

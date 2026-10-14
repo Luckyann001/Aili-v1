@@ -116,6 +116,8 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
   const current = useRef<{ rev: number; abort: AbortController } | null>(null);
   /** A completed turn whose lines are still playing: the last narration segment shown so far. */
   const playing = useRef<{ rev: number; segments: string[]; shown: number } | null>(null);
+  /** How far an interrupted turn got, sent inside the NEXT turn's request (never as its own message). */
+  const pendingShown = useRef<{ state_rev: number; shown_through: string | null } | null>(null);
 
   /** Stop the turn in flight (interrupt): cancel the stream, tell the server, put the stage back. */
   const stop = useCallback(() => {
@@ -146,12 +148,9 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
         if (p && p.rev !== s.rev) {
           playing.current = null;
           useTurnLog.getState().markShown(p.rev, p.shown);
-          void fetch("/api/turn/interrupt", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ session_id: SESSION_ID, request_id: `turn_${p.rev}`, state_rev: p.rev, shown_through: p.shown > 0 ? (p.segments[Math.min(p.shown, p.segments.length) - 1] ?? null) : null }),
-            keepalive: true,
-          }).catch(() => {});
+          // Kept for the next turn's request, which the server reads before this session's stage, so
+          // the stage can never include actions the learner did not see.
+          pendingShown.current = { state_rev: p.rev, shown_through: p.shown > 0 ? (p.segments[Math.min(p.shown, p.segments.length) - 1] ?? null) : null };
         }
       }),
     [stop],
@@ -215,6 +214,8 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
         if (after.status === "error") fail(after.message ?? "Something went wrong. Nothing on the stage changed.");
       };
 
+      const note = pendingShown.current;
+      pendingShown.current = null;
       try {
         const res = await fetch("/api/turn", {
           method: "POST",
@@ -225,6 +226,7 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
             case: fakeCase,
             // Only the text: the server keeps the history and decides how to read the reply.
             input: { text: text.slice(0, 500) },
+            ...(note ? { previous_shown: note } : {}),
           }),
           signal: abort.signal,
         });

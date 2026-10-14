@@ -80,7 +80,12 @@ export async function handleTurn(request: Request): Promise<Response> {
 
   // A newer turn from the same page stops the older one (its state is never committed).
   inFlight.get(req.session_id)?.interrupt();
-  const start = sessions.get(req.session_id) ?? fresh();
+  // The previous turn was interrupted mid-speech: its stage keeps only what the learner saw, applied
+  // here, before this turn reads it (M4 slice 1; inside the request, so it can never arrive too late).
+  const saved = sessions.get(req.session_id) ?? fresh();
+  const start = req.previous_shown ? reconcileShown(saved, req.previous_shown.shown_through, req.previous_shown.state_rev) : saved;
+  // Saved at once, so it holds even if this turn fails its checks and commits nothing.
+  if (start !== saved) sessions.amend(req.session_id, req.previous_shown!.state_rev, () => start);
   // Live: the case field is ignored; the turn budget comes from config (turn and attempt timeouts).
   // Recorded: the same live path (director, router, concepts, config timeouts), answered from the
   // recording; no key checks, no terminal log and no session log, since no model is called.
@@ -176,13 +181,7 @@ export async function handleInterrupt(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest(parsed.error.issues.map((i) => `${i.path.join(".") || "(body)"}: ${i.message}`));
   const key = `${parsed.data.session_id}/${parsed.data.request_id}`;
   const s = running.get(key);
-  if (!s || s.revision !== parsed.data.state_rev) {
-    // The turn had already arrived and was being played (M4 slice 1): keep only the stage changes
-    // of the segments the learner saw. Ignored unless this is the session's latest turn.
-    const shown = parsed.data.shown_through;
-    const reconciled = shown !== undefined && sessions.amend(parsed.data.session_id, parsed.data.state_rev, (st) => reconcileShown(st, shown));
-    return Response.json({ stopped: false, ...(reconciled ? { reconciled: true } : {}) });
-  }
+  if (!s || s.revision !== parsed.data.state_rev) return Response.json({ stopped: false }); // finished, unknown, another session or instance
   s.interrupt();
   running.delete(key);
   return Response.json({ stopped: true });

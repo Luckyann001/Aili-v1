@@ -788,6 +788,7 @@ describe("an interrupt mid-speech keeps only the stage the learner saw (M4 slice
     activeScene: "fx-lever",
     highlightedPart: "weight",
     lastTurn: {
+      rev: 3,
       startScene: "base-joint-arm",
       segments: ["n1", "n2", "n3"],
       actions: [
@@ -804,6 +805,10 @@ describe("an interrupt mid-speech keeps only the stage the learner saw (M4 slice
     expect(none.activeScene).toBe("base-joint-arm");
     expect(none.highlightedPart).toBeUndefined();
     expect(none.lastTurn!.actions).toEqual([]);
+  });
+  it("a note about a different turn changes nothing", () => {
+    expect(reconcileShown(state, null, 2)).toBe(state);
+    expect(reconcileShown(state, null, 3).activeScene).toBe("base-joint-arm");
   });
   it("an unknown segment or no last turn changes nothing; the history stays", () => {
     expect(reconcileShown(state, "n9")).toBe(state);

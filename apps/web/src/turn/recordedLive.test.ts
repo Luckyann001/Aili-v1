@@ -55,20 +55,36 @@ describe("recorded live path (test builds only)", () => {
     expect(sessions.get("recorded-test-0001")!.teaching!.predictions[0]).toMatchObject({ guess: "It gets harder", status: "revealed" });
   });
 
-  it("an interrupt after the turn arrived, with no segment shown yet, puts the server's stage back (M4 slice 1)", async () => {
-    const { handleTurn, handleInterrupt, sessions } = await load();
+  it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
+    const { handleTurn, sessions } = await load();
+    // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,
+    // then sends a new message at once. The note travels inside that request.
     await readAll(await handleTurn(post(body(5, "teach me robotics", "recorded-test-0003"))));
     expect(sessions.get("recorded-test-0003")!.activeScene).toBe("fx-lever");
-    const res = await handleInterrupt(post({ session_id: "recorded-test-0003", request_id: "turn_5", state_rev: 5, shown_through: null }));
-    expect(await res.json()).toEqual({ stopped: false, reconciled: true });
+    const t6 = await readAll(await handleTurn(post({ ...body(6, "It gets harder", "recorded-test-0003"), previous_shown: { state_rev: 5, shown_through: "n1" } })));
+    // Turn 6 was checked against the stage the learner saw (no scene): its recorded answer plays the
+    // weight slide without selecting the lever, so it is rejected; without the note it would pass.
+    expect(JSON.stringify(t6.at(-1))).toMatch(/"play_animation\\" needs a shortlisted scene on stage/);
     expect(sessions.get("recorded-test-0003")!.activeScene).toBeUndefined();
-    // Shown through n1 only: the scene (bound to n2) never appeared. Through n2: scene and highlight stay.
-    await readAll(await handleTurn(post(body(6, "teach me robotics", "recorded-test-0004"))));
-    await handleInterrupt(post({ session_id: "recorded-test-0004", request_id: "turn_6", state_rev: 6, shown_through: "n1" }));
-    expect(sessions.get("recorded-test-0004")!.activeScene).toBeUndefined();
-    await readAll(await handleTurn(post(body(7, "teach me robotics", "recorded-test-0005"))));
-    await handleInterrupt(post({ session_id: "recorded-test-0005", request_id: "turn_7", state_rev: 7, shown_through: "n2" }));
-    expect(sessions.get("recorded-test-0005")).toMatchObject({ activeScene: "fx-lever", highlightedPart: "weight" });
+
+    // Without the note (the learner saw both segments), the lever stays.
+    await readAll(await handleTurn(post(body(5, "teach me robotics", "recorded-test-0004"))));
+    await readAll(await handleTurn(post(body(6, "It gets harder", "recorded-test-0004"))));
+    expect(sessions.get("recorded-test-0004")!.activeScene).toBe("fx-lever");
+  });
+
+  it("the note is kept even if the next turn fails; a note about another turn changes nothing; the interrupt route takes no note", async () => {
+    const { handleTurn, handleInterrupt, sessions } = await load();
+    await readAll(await handleTurn(post(body(5, "teach me robotics", "recorded-test-0005"))));
+    vi.stubEnv("AILI_AI_KILL_SWITCH", "1"); // the next turn is refused before anything runs
+    const refused = await readAll(await handleTurn(post({ ...body(6, "hi", "recorded-test-0005"), previous_shown: { state_rev: 5, shown_through: null } })));
+    expect(refused.at(-1)!.type).toBe("turn.error");
+    expect(sessions.get("recorded-test-0005")!.activeScene).toBeUndefined();
+    vi.stubEnv("AILI_AI_KILL_SWITCH", "");
+    await readAll(await handleTurn(post(body(5, "teach me robotics", "recorded-test-0006"))));
+    await readAll(await handleTurn(post({ ...body(6, "It gets harder", "recorded-test-0006"), previous_shown: { state_rev: 4, shown_through: null } })));
+    expect(sessions.get("recorded-test-0006")!.activeScene).toBe("fx-lever");
+    expect((await handleInterrupt(post({ session_id: "recorded-test-0006", request_id: "turn_6", state_rev: 6, shown_through: "n1" }))).status).toBe(400);
   });
 
   it("off without the test's cookie, without the run-time flag, and refused from another device; never logged", async () => {
