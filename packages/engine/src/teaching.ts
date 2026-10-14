@@ -119,17 +119,26 @@ export function unsupportedAttributions(narration: ReadonlyArray<{ text: string 
  * When the answer's first concept has a scene in this turn's shortlist (the registry's own `teaches`
  * link) and the model put no scene on stage, the engine selects it (Lucky's decision 2026-10-13).
  * Never for a concept without a scene, an unsupported topic, or when that scene is already on stage.
+ *
+ * Starting scene for the topic (Lucky's decision 2026-10-14): when the answer names NO concept (a
+ * level question, say) and nothing is on stage yet, the scene that teaches the topic's top concept
+ * goes on stage. `topicConcepts` are this turn's concepts that are in its shortlist, in order (never
+ * guessed); if there are none, or the top one has no scene, nothing happens.
  */
 export function selectSceneForConcept(
   r: DirectorResponse,
   scenes: ReadonlyArray<{ id: string; teaches: readonly string[] }>,
   activeScene: string | undefined,
+  topicConcepts: readonly string[] = [],
 ): { r: DirectorResponse; warning: string } | null {
-  const concept = r.concepts[0];
-  if (!concept || r.coverage === "unsupported" || r.actions.some((a) => a.type === "select_scene")) return null;
+  if (r.coverage === "unsupported" || r.actions.some((a) => a.type === "select_scene")) return null;
+  const named = r.concepts[0];
+  const concept = named ?? (activeScene ? undefined : topicConcepts[0]);
+  if (!concept) return null;
   const scene = scenes.find((s) => s.teaches.includes(concept));
   if (!scene || scene.id === activeScene) return null;
-  return { r: { ...r, actions: [{ type: "select_scene", scene: scene.id }, ...r.actions] }, warning: `${SCENE_SELECTED_BY_ENGINE}: "${scene.id}" for ${concept} (the answer put no scene on stage)` };
+  const why = named ? "the answer put no scene on stage" : "starting scene for the topic; the answer named no concept";
+  return { r: { ...r, actions: [{ type: "select_scene", scene: scene.id }, ...r.actions] }, warning: `${SCENE_SELECTED_BY_ENGINE}: "${scene.id}" for ${concept} (${why})` };
 }
 
 

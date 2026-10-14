@@ -406,7 +406,7 @@ export class TurnSession {
       // "You said …" about words the learner did not write (first turn only; a warning).
       warnings.push(...unsupportedAttributions(v.response.narration, input.text, !before.history.entries.some((e) => e.kind === "learner")));
       // A passing answer about a concept with a scene, but no scene on stage: the engine selects it.
-      const picked = selectSceneForConcept(v.response, sl.scenes, before.activeScene);
+      const picked = selectSceneForConcept(v.response, sl.scenes, before.activeScene, this.opts.concepts.filter((c) => sl.concepts.includes(c)));
       return picked ? { r: picked.r, warnings: [...warnings, picked.warning] } : { r: v.response, warnings };
     };
 

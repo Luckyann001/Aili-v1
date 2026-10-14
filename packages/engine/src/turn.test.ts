@@ -684,3 +684,62 @@ describe("the learner's level is never put in their mouth (Lucky's decision 2026
     expect(warnings.some((w) => w.startsWith("unsupported attribution"))).toBe(true);
   });
 });
+
+describe("starting scene for the topic (Lucky's decision 2026-10-14)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const scenes = [{ id: "fx-lever", teaches: ["mech.torque.static", "mech.moment-arm"] }];
+  const levelQuestion = { ...VALID, move: "probe", concepts: [], actions: [], calc_requests: [], evidence: [], narration: [{ id: "n1", text: "Robotics is wide, so let's find a starting point." }], prompt: { kind: "question", text: "What have you already learned or built in robotics?", chips: ["Nothing yet", "Built something small"] } } as unknown as import("@aili/schemas").DirectorResponse;
+
+  it("an answer naming no concept, nothing on stage: the topic's top concept's scene, marked 'starting scene for the topic'", () => {
+    const p = selectSceneForConcept(levelQuestion, scenes, undefined, ["mech.torque.static", "mech.moment-arm"]);
+    expect(p?.r.actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(p?.warning).toBe('scene selected by engine: "fx-lever" for mech.torque.static (starting scene for the topic; the answer named no concept)');
+  });
+  it("never: a scene already on stage, an empty shortlist, a top concept with no scene, an unsupported topic, a scene the answer chose", () => {
+    expect(selectSceneForConcept(levelQuestion, scenes, "fx-lever", ["mech.torque.static"])).toBeNull();
+    expect(selectSceneForConcept(levelQuestion, scenes, "base-joint-arm", ["mech.torque.static"])).toBeNull();
+    expect(selectSceneForConcept(levelQuestion, scenes, undefined, [])).toBeNull();
+    expect(selectSceneForConcept(levelQuestion, scenes, undefined, ["mech.gears", "mech.torque.static"])).toBeNull(); // only the TOP concept counts
+    expect(selectSceneForConcept({ ...levelQuestion, coverage: "unsupported" }, scenes, undefined, ["mech.torque.static"])).toBeNull();
+    expect(selectSceneForConcept({ ...levelQuestion, actions: [{ type: "select_scene", scene: "fx-lever" }] }, scenes, undefined, ["mech.torque.static"])).toBeNull();
+  });
+
+  const run = async (answer: object, concepts: string[], state: SessionState = { history: { posture: "learning", learner_level: "unknown", entries: [] } }) => {
+    const warnings: string[] = [];
+    const director: Director = { async respond(req) { return { response: { ...answer, request_id: req.request_id, state_rev: req.state_rev } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state, concepts, level: "L2", onCheck: (c) => warnings.push(...c.warnings) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "robotics" }, (e) => events.push(e));
+    return { s, events, warnings, actions: events.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action) };
+  };
+
+  it("in a turn: 'robotics' answered with a level question puts the lever on stage, visibly", async () => {
+    const { s, events, warnings, actions } = await run(levelQuestion, ["mech.torque.static", "mech.moment-arm"]);
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]);
+    expect(s.state.activeScene).toBe("fx-lever");
+    expect(warnings.some((w) => /^scene selected by engine: .*starting scene for the topic/.test(w))).toBe(true);
+  });
+  it("in a turn: 'teach me guitar' (unsupported, empty shortlist) puts nothing on stage", async () => {
+    const guitar = { ...levelQuestion, move: "answer", coverage: "unsupported", prompt: undefined, narration: [{ id: "n1", text: "Guitar isn't something I can teach yet." }] };
+    const { events, warnings, actions } = await run(guitar, ["mech.nothing-covered"]);
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(actions).toEqual([]);
+    expect(warnings.some((w) => w.startsWith("scene selected by engine"))).toBe(false);
+  });
+  it("in a turn: a scene already on stage stays; nothing is added", async () => {
+    const { actions } = await run(levelQuestion, ["mech.torque.static"], { history: { posture: "learning", learner_level: "unknown", entries: [] }, activeScene: "fx-lever" });
+    expect(actions).toEqual([]);
+  });
+
+  // KNOWN GAP (reported to Lucky 2026-10-14): narration that refers to a highlight or a part the answer
+  // never put on stage is not flagged by any check today. The turn below passes with no warning about
+  // it. This test pins today's behaviour so a future check changes it on purpose.
+  it("known gap: narration about a highlighted part that is not highlighted passes unflagged today", async () => {
+    const claims = { ...levelQuestion, narration: [{ id: "n1", text: "Look at the highlighted weight at the end of the ruler." }] };
+    const { events, warnings, actions } = await run(claims, ["mech.torque.static"]);
+    expect(events.at(-1)!.type).toBe("turn.done");
+    expect(actions).toEqual([{ type: "select_scene", scene: "fx-lever" }]); // the scene, but no highlight_part
+    expect(warnings.filter((w) => /highlight|part/i.test(w) && !w.startsWith("scene selected by engine"))).toEqual([]);
+  });
+});
