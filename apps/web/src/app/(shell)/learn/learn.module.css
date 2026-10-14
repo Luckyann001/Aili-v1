@@ -1204,3 +1204,151 @@
   color: var(--aili-text-muted);
   font-size: 0.875rem;
 }
+
+/* ── Servo + arm: torque at the joint and the margin (M4 slice 2a) ── */
+
+/* Placed like the inspector: at the right from 900 px, along the bottom below (data-reserve="auto"). */
+.margin {
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+
+@media (min-width: 900px) {
+  .margin {
+    top: var(--aili-space-2);
+    right: var(--aili-space-2);
+    bottom: auto;
+    left: auto;
+    width: min(300px, calc(100% - 16px));
+  }
+}
+
+@media (max-width: 899px) {
+  .margin {
+    right: var(--aili-space-2);
+    width: auto;
+  }
+}
+
+.splitTrack {
+  display: flex;
+  height: 14px;
+  margin: var(--aili-space-2) 0 var(--aili-space-1);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-bg);
+  overflow: hidden;
+}
+
+/* Load: solid. Arm's own weight: striped. The legend names both, so colour is never the only cue. */
+.splitLoad,
+.swatchLoad {
+  background: var(--aili-fill-expressive);
+}
+
+.splitArm,
+.swatchArm {
+  background: repeating-linear-gradient(135deg, var(--aili-fill-discovery) 0 3px, var(--aili-surface) 3px 5px);
+}
+
+.splitLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1) var(--aili-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.splitLegend li {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+}
+
+.swatchLoad,
+.swatchArm {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 2px;
+}
+
+.marginStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-1) var(--aili-space-2);
+  margin: var(--aili-space-2) 0 0;
+  padding: var(--aili-space-1) var(--aili-space-2);
+  border: 2px solid;
+  border-radius: var(--aili-radius-md);
+  color: var(--aili-text);
+  font-size: 0.85rem;
+}
+
+.marginStatus[data-status="pass"] {
+  border-color: var(--aili-status-pass-border);
+  background: var(--aili-status-pass-bg);
+}
+
+.marginStatus[data-status="warn"] {
+  border-style: dashed;
+  border-color: var(--aili-status-warn-border);
+  background: var(--aili-status-warn-bg);
+}
+
+.marginStatus[data-status="fail"] {
+  border-width: 3px;
+  border-color: var(--aili-status-fail-border);
+  background: var(--aili-status-fail-bg);
+}
+
+.marginNote {
+  margin: var(--aili-space-2) 0 0;
+  color: var(--aili-text-muted);
+  font-size: 0.75rem;
+}
+
+.linkButton {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--aili-link);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin-top: var(--aili-space-1);
+}
+
+.ratingInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 1rem var(--aili-font-mono);
+}
+
+.ratingInput::placeholder {
+  color: var(--aili-text-muted);
+  opacity: 1;
+}
+
+.ratingInput[aria-invalid="true"] {
+  border-width: 2px;
+  border-color: var(--aili-status-fail-border);
+}

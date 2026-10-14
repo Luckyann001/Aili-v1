@@ -1,5 +1,5 @@
 {
-  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Test builds only.",
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Test builds only.",
   "router": {
     "source": "hand-written",
     "steps": [
@@ -36,6 +36,24 @@
             "wants_direct_answer": false
           },
           "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1600,
           "output_tokens": 92
         }
       }
@@ -151,6 +169,66 @@
           },
           "input_tokens": 7600,
           "output_tokens": 400
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_3",
+            "state_rev": 3,
+            "move": "explain",
+            "concepts": [
+              "mech.arm-own-mass",
+              "mech.torque.static"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Now the same idea on a robot joint: a generic servo turning an arm.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-servo-arm"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "The load sits partway along the arm, and the arm's own weight pulls down too.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "load"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Watch the load slide out to the end: the arrow at the joint grows with the torque.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "slide-load-out"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What would you check on your own servo's datasheet before trusting it with this arm?"
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7700,
+          "output_tokens": 320
         }
       }
     ]

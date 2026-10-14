@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
 import { MODELS, type SceneId } from "./models";
+import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type ServoParamId, type ServoParams } from "./servoArm";
 
 /** loading: 3D code still downloading · ready: rendering · fallback: still picture (no WebGL or it failed). */
 export type ViewerStatus = "loading" | "ready" | "fallback";
@@ -12,6 +13,13 @@ export interface SceneState {
   /** Lever analogy: distance of the weight from the hand, metres (drawing; effort comes from the solver). */
   leverDistance_m: number;
   setLeverDistance: (d: number) => void;
+  /** Servo + arm settings (SI). The torque shown comes from the solver, never from the drawing. */
+  servo: ServoParams;
+  setServoParam: (id: ServoParamId, value: number) => void;
+  /** The servo's rated torque, N·m, as the learner typed it from their datasheet; null until then. */
+  ratedTorque_nm: number | null;
+  /** Out-of-bounds values are refused (returns false) and nothing changes. */
+  setRatedTorque: (value: number | null) => boolean;
   viewer: ViewerStatus;
   setViewer: (v: ViewerStatus) => void;
   selectedId: string | null;
@@ -39,6 +47,15 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   setScene: (id) => set((s) => (s.activeScene === id ? {} : { activeScene: id, selectedId: null, inspectorOpen: false, exploded: false })),
   leverDistance_m: 0.05,
   setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
+  servo: DEFAULT_SERVO_PARAMS,
+  setServoParam: (id, value) => set((s) => ({ servo: setServoParam(s.servo, id, value) })),
+  ratedTorque_nm: null,
+  setRatedTorque: (value) => {
+    const v = value === null ? null : parseRating(value);
+    if (value !== null && v === null) return false;
+    set(() => ({ ratedTorque_nm: v }));
+    return true;
+  },
   viewer: "loading",
   setViewer: (viewer) => set(() => ({ viewer })),
   selectedId: null,

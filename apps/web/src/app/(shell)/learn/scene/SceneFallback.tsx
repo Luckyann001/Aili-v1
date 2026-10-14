@@ -3,6 +3,7 @@
 import { LEVER_LENGTH_M } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
+import type { ServoParams } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // Still side views used when WebGL is unavailable or fails. Same parts, same selection.
@@ -24,13 +25,27 @@ function lever(distance_m: number): Record<string, Shape> {
   };
 }
 
+/** Servo + arm, side view: the joint at (80, 96), 650 px per metre along the arm. */
+function servoArm(p: ServoParams): Record<string, Shape> {
+  const px = (m: number) => m * 650;
+  const lx = 80 + px(Math.min(p.arm_length_m, p.load_distance_m));
+  return {
+    base: { x: 30, y: 150, w: 100, h: 14, label: [80, 184] },
+    "servo-case": { x: 62, y: 96, w: 36, h: 54, label: [80, 140] },
+    horn: { x: 70, y: 86, w: 20, h: 20, label: [52, 80] },
+    "arm-link": { x: 80, y: 92, w: px(p.arm_length_m), h: 8, label: [80 + px(p.arm_length_m) * 0.6, 118] },
+    load: { x: lx - 12, y: 68, w: 24, h: 24, label: [lx, 60] },
+  };
+}
+
 /** `loading`: shown while the 3D code downloads, then replaced by the 3D view in the same place. */
 export function SceneFallback({ loading = false }: { loading?: boolean }) {
   const selectedId = useScene((s) => s.selectedId);
   const activeScene = useScene((s) => s.activeScene);
   const distance = useScene((s) => s.leverDistance_m);
+  const servo = useScene((s) => s.servo);
   const model = MODELS[activeScene];
-  const shapes = activeScene === "lever-analogy" ? lever(distance) : ARM;
+  const shapes = activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : ARM;
   const names = model.parts.map((p) => p.name.toLowerCase()).join(", ");
   return (
     <div className={styles.fallback} data-fallback={loading ? "loading" : "no-webgl"}>

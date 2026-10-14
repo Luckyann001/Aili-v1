@@ -1,14 +1,16 @@
 import { LEVER_LENGTH_M, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
+import { layoutServoArm, servoFraming, type ServoParams } from "./servoArm";
 
 // The scenes the Learn stage can show (manifests: content/robotics/scenes/*.json). Each model lays
 // out its parts from the scene state; the 3D view, labels, framing and fallback all use this.
 
-export type SceneId = "base-joint-arm" | "lever-analogy";
+export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm";
 
 export interface ModelState {
   params: Params;
   leverDistance_m: number;
+  servo: ServoParams;
 }
 
 export interface SceneModel {
@@ -49,6 +51,21 @@ export const MODELS: Record<SceneId, SceneModel> = {
     layout: (s) => layoutLever(s.leverDistance_m),
     // The weight slides along the whole ruler in the lesson: frame both ends of its travel.
     framing: () => [layoutLever(0), layoutLever(LEVER_LENGTH_M)],
+  },
+  "servo-arm": {
+    id: "servo-arm",
+    title: "Generic servo and arm",
+    parts: [
+      { id: "base", name: "Base", fill: "explore" },
+      { id: "servo-case", name: "Servo (generic)", fill: "technical" },
+      { id: "horn", name: "Output horn", fill: "expressive" },
+      { id: "arm-link", name: "Arm link", fill: "discovery" },
+      { id: "load", name: "Load", fill: "expressive" },
+    ],
+    note: "Illustrative (AI-composed). Generic servo, simplified teaching model: not a specific product.",
+    explodable: false,
+    layout: (s) => layoutServoArm(s.servo),
+    framing: () => servoFraming(),
   },
 };
 

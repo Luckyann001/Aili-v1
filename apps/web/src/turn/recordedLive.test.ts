@@ -55,6 +55,21 @@ describe("recorded live path (test builds only)", () => {
     expect(sessions.get("recorded-test-0001")!.teaching!.predictions[0]).toMatchObject({ guess: "It gets harder", status: "revealed" });
   });
 
+  it("turn 3 puts the servo + arm on stage, each action bound to the segment that names it (M4 slice 2a)", async () => {
+    const { handleTurn, sessions } = await load();
+    const sid = "recorded-test-0007";
+    await readAll(await handleTurn(post(body(1, "teach me robotics", sid))));
+    await readAll(await handleTurn(post(body(2, "It gets harder", sid))));
+    const t3 = await readAll(await handleTurn(post(body(3, "show me a real servo", sid))));
+    expect(t3.at(-1)!.type, JSON.stringify(t3.at(-1))).toBe("turn.done");
+    expect(t3.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([
+      { type: "select_scene", scene: "fx-servo-arm", at: "n1" },
+      { type: "highlight_part", part: "load", at: "n2" },
+      { type: "play_animation", animation: "slide-load-out", at: "n3" },
+    ]);
+    expect(sessions.get(sid)!.activeScene).toBe("fx-servo-arm");
+  });
+
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
     const { handleTurn, sessions } = await load();
     // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,
@@ -63,8 +78,9 @@ describe("recorded live path (test builds only)", () => {
     expect(sessions.get("recorded-test-0003")!.activeScene).toBe("fx-lever");
     const t6 = await readAll(await handleTurn(post({ ...body(6, "It gets harder", "recorded-test-0003"), previous_shown: { state_rev: 5, shown_through: "n1" } })));
     // Turn 6 was checked against the stage the learner saw (no scene): its recorded answer plays the
-    // weight slide without selecting the lever, so it is rejected; without the note it would pass.
-    expect(JSON.stringify(t6.at(-1))).toMatch(/"play_animation\\" needs a shortlisted scene on stage/);
+    // weight slide without selecting the lever, so it is rejected (its repair, the recording's next
+    // step, fails too); without the note it would pass.
+    expect(t6.at(-1)!.type).toBe("turn.error");
     expect(sessions.get("recorded-test-0003")!.activeScene).toBeUndefined();
 
     // Without the note (the learner saw both segments), the lever stays.

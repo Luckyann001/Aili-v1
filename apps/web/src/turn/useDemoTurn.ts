@@ -9,6 +9,7 @@ import { useScene } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
 import { ANIMATIONS } from "@/scene/animations";
+import { isServoParam, type ServoParams } from "@/scene/servoArm";
 import { actionsByLine, DROPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 import { useStageContent } from "./stageContent";
 import { useTurnLog } from "./turnLog";
@@ -24,6 +25,7 @@ export interface StageSnapshot {
   activeScene: SceneId;
   selectedId: string | null;
   leverDistance_m: number;
+  servo: ServoParams;
   /** Whether fixture content (from an earlier, completed turn) was already on stage. */
   fixture: boolean;
   /** Whether that earlier turn was a live one. */
@@ -33,7 +35,7 @@ export interface StageSnapshot {
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
-const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy" };
+const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy", "fx-servo-arm": "servo-arm" };
 
 /** Live turns whose answer failed the checks twice: what the learner sees (their text is kept). */
 export const REJECTED_LIVE_MESSAGE = "I couldn't put a good answer together for that. Your message is back in the box: try rephrasing it, or send it again. Nothing on the stage changed.";
@@ -52,13 +54,14 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
 };
 
 function restoreStage(snap: StageSnapshot) {
   const s = useScene.getState();
   s.setScene(snap.activeScene);
   s.setLeverDistance(snap.leverDistance_m);
+  useScene.setState({ servo: snap.servo });
   s.highlight(snap.selectedId);
   useStageContent.getState().setFixture(snap.fixture, snap.live);
   useStageContent.getState().setScenePicked(snap.scenePicked);
@@ -80,7 +83,11 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
       s.highlight(a.part);
       break;
     case "set_parameter":
+      // The validator checked the setting exists on the scene on stage and its bounds; the
+      // learner's rating is never in this list (Aili may not set it).
       if (a.param === "weight_distance_m") s.setLeverDistance(a.value);
+      else if (s.activeScene === "servo-arm" && isServoParam(a.param)) s.setServoParam(a.param, a.value);
+      else console.warn(`[turn] the page has no setting "${a.param}" on this scene`);
       break;
     case "play_animation": {
       const play = ANIMATIONS[a.animation];

@@ -14,6 +14,7 @@ import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
 import { useScene } from "@/scene/sceneStore";
+import { JOINT, arrowSweep, servoReadout } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
 export interface SceneCanvasProps {
@@ -73,6 +74,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       {MODELS[activeScene].parts.map((p) => (
         <PartMesh key={`${activeScene}:${p.id}`} id={p.id} fill={p.fill} colors={props.colors} />
       ))}
+      {activeScene === "servo-arm" && <TorqueArrow colors={props.colors} />}
       <OrbitControls
         makeDefault
         target={DEFAULT_VIEW.target}
@@ -105,13 +107,14 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const activeScene = useScene((s) => s.activeScene);
   const params = useScene((s) => s.params);
   const leverDistance_m = useScene((s) => s.leverDistance_m);
+  const servo = useScene((s) => s.servo);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
 
-  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, invalidate]);
 
   // Size depends on the scene settings; position also on the explode amount (set per frame).
-  const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m }, k)[id]!;
+  const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m, servo }, k)[id]!;
   const { kind, size } = layoutAt(0);
   useFrame(() => {
     ref.current?.position.set(...layoutAt(anim.explode).position);
@@ -148,6 +151,46 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
         </mesh>
       )}
     </mesh>
+  );
+}
+
+/**
+ * Servo + arm: a curved arrow round the joint, the direction gravity turns the arm. Its sweep follows
+ * the solver's needed torque on a fixed visual scale (not a measurement). It splits in two: the
+ * load's share (thick, in the load's colour) then the arm's own share (thin, in the arm's colour);
+ * the margin panel names both, so the split never depends on colour alone. Not selectable.
+ */
+function TorqueArrow({ colors }: { colors: SceneColors }) {
+  const servo = useScene((s) => s.servo);
+  const invalidate = useThree((s) => s.invalidate);
+  const r = servoReadout(servo, null);
+  useEffect(() => invalidate(), [r.torque_nm, colors, invalidate]);
+  const total = arrowSweep(r.torque_nm);
+  const loadSweep = r.torque_nm > 0 ? total * (r.load_torque_nm / r.torque_nm) : 0;
+  const armSweep = total - loadSweep;
+  const R = 0.032;
+  const start = Math.PI / 2; // from the top, clockwise as seen from the front
+  const end = start - total;
+  return (
+    <group position={[JOINT[0], JOINT[1], JOINT[2] + 0.008]} name="torque-arrow">
+      {loadSweep > 0.01 && (
+        <mesh rotation={[0, 0, start - loadSweep]} raycast={() => null}>
+          <torusGeometry args={[R, 0.003, 6, 32, loadSweep]} />
+          <meshBasicMaterial color={colors.fills.expressive} toneMapped={false} />
+        </mesh>
+      )}
+      {armSweep > 0.01 && (
+        <mesh rotation={[0, 0, end]} raycast={() => null}>
+          <torusGeometry args={[R, 0.0016, 6, 24, armSweep]} />
+          <meshBasicMaterial color={colors.fills.discovery} toneMapped={false} />
+        </mesh>
+      )}
+      {/* The head points along the turn at the arrow's end. */}
+      <mesh position={[R * Math.cos(end), R * Math.sin(end), 0]} rotation={[0, 0, end + Math.PI]} raycast={() => null}>
+        <coneGeometry args={[0.006, 0.012, 12]} />
+        <meshBasicMaterial color={colors.outline} toneMapped={false} />
+      </mesh>
+    </group>
   );
 }
 
@@ -203,7 +246,8 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const inspectorShown = useScene((s) => s.inspectorOpen && s.selectedId !== null);
   const gaugeShown = useLesson((s) => s.gauge);
-  const reserveKey = `${inspectorShown}|${gaugeShown}`;
+  const marginShown = useScene((s) => s.activeScene === "servo-arm" && !s.inspectorOpen);
+  const reserveKey = `${inspectorShown}|${gaugeShown}|${marginShown}`;
   const placed = useRef(false);
   const lastReserve = useRef(reserveKey);
 
@@ -211,7 +255,8 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
     const el = safeArea.current;
     if (!el || !(camera instanceof PerspectiveCamera)) return;
     // Panels inside the safe area that the model must stay clear of: the inspector (right from
-    // 900 px, bottom below; data-reserve="auto") and the effort gauge (bottom; data-reserve="bottom").
+    // 900 px, bottom below; data-reserve="auto"), the servo + arm's torque panel (the same) and the
+    // effort gauge (bottom; data-reserve="bottom").
     const reserved = () => Array.from(el.querySelectorAll<HTMLElement>("[data-reserve]"));
     const apply = () => {
       const side = window.matchMedia("(min-width: 900px)").matches; // matches learn.module.css
@@ -284,16 +329,17 @@ function LabelTracker({
   const activeScene = useScene((s) => s.activeScene);
   const params = useScene((s) => s.params);
   const leverDistance_m = useScene((s) => s.leverDistance_m);
+  const servo = useScene((s) => s.servo);
 
   // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, activeScene, invalidate]);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, activeScene, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
     if (!area) return;
     const w = area.clientWidth;
     const h = area.clientHeight;
-    const layout = MODELS[activeScene].layout({ params, leverDistance_m }, anim.explode);
+    const layout = MODELS[activeScene].layout({ params, leverDistance_m, servo }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
     // 1. Where each shown label wants to go (clamped inside the safe area).
     const wanted: LabelBox[] = [];
