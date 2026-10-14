@@ -1,0 +1,9 @@
+{
+  "_about": "Torque margin bands for the servo + arm scene: margin = the learner's rated torque divided by the solver's needed torque. Teaching thresholds chosen by Lucky (2026-10-14), not a design standard; to be reviewed by a roboticist.",
+  "torque_margin": {
+    "fail_below": 1.0,
+    "pass_at_or_above": 2.0,
+    "label": "Teaching thresholds, not a design standard",
+    "review_status": "draft"
+  }
+}

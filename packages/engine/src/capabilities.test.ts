@@ -101,7 +101,7 @@ describe("capability registry: the files in content/robotics", () => {
     expect(r.registry.simulations.map((s) => s.id)).toEqual(["sim.servo-static-load"]);
     expect(r.registry.solvers.map((s) => s.id)).toEqual(["solver.static-torque-single-link"]);
     expect(r.registry.sources.map((s) => s.id).sort()).toEqual(["src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
-    expect(r.registry.scenes).toHaveLength(2);
+    expect(r.registry.scenes.map((s) => s.id).sort()).toEqual(["base-joint-arm", "lever-analogy", "servo-arm"]);
   });
 
   it("are drafts written by the AI: no review record, not fixtures", () => {

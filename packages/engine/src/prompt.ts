@@ -52,7 +52,7 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
       kind: "scene",
       rank: s.id === activeScene ? 100 : 30,
       keep: s.id === activeScene || hasSafety(s),
-      data: { id: s.id, title: s.title, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id) },
+      data: { id: s.id, title: s.title, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.filter((p) => !p.learner_supplied).map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id) },
     });
   const usedSolvers = new Set(sl.simulations.map((s) => s.solver.id));
   for (const s of sl.simulations)

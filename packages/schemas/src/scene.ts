@@ -12,22 +12,32 @@ export const Provenance = z.enum(["authored", "commissioned", "open_licensed", "
 
 export const ScenePart = z.object({ id: KebabId, name: z.string().min(1) }).strict();
 
+/** Each setting unit and the suffix its ID must end with (newton-metres: `_nm`). */
+export const PARAM_UNIT_SUFFIX = { m: "_m", kg: "_kg", deg: "_deg", "N·m": "_nm" } as const;
+
 /** A setting a scene allows, with unit and bounds. The unit is part of the ID (arm_length_m). */
 export const SceneParam = z
   .object({
-    id: z.string().regex(/^[a-z][a-z0-9_]*_(m|kg|deg)$/, "setting IDs end with their unit: _m, _kg or _deg"),
+    id: z.string().regex(/^[a-z][a-z0-9_]*_(m|kg|deg|nm)$/, "setting IDs end with their unit: _m, _kg, _deg or _nm"),
     label: z.string().min(1),
-    unit: z.enum(["m", "kg", "deg"]),
+    unit: z.enum(["m", "kg", "deg", "N·m"]),
     min: z.number(),
     max: z.number(),
     step: z.number().positive(),
-    default: z.number(),
+    default: z.number().optional(),
+    /**
+     * The learner enters this value from their own datasheet (a servo's rated torque): it has no
+     * default, so no number is ever presented as a real product's spec, and Aili may not set it.
+     */
+    learner_supplied: z.literal(true).optional(),
   })
   .strict()
   .superRefine((p, ctx) => {
     if (!(p.min < p.max)) ctx.addIssue({ code: "custom", message: `${p.id}: min must be below max` });
-    if (p.default < p.min || p.default > p.max) ctx.addIssue({ code: "custom", message: `${p.id}: default ${p.default} is outside ${p.min}–${p.max}` });
-    if (!p.id.endsWith(`_${p.unit}`)) ctx.addIssue({ code: "custom", message: `${p.id}: unit "${p.unit}" does not match the ID` });
+    if (p.learner_supplied && p.default !== undefined) ctx.addIssue({ code: "custom", message: `${p.id}: a learner-supplied setting has no default` });
+    if (!p.learner_supplied && p.default === undefined) ctx.addIssue({ code: "custom", message: `${p.id}: a default is required` });
+    if (p.default !== undefined && (p.default < p.min || p.default > p.max)) ctx.addIssue({ code: "custom", message: `${p.id}: default ${p.default} is outside ${p.min}–${p.max}` });
+    if (!p.id.endsWith(PARAM_UNIT_SUFFIX[p.unit])) ctx.addIssue({ code: "custom", message: `${p.id}: unit "${p.unit}" does not match the ID` });
   });
 
 export const SceneAnimation = z.object({ id: KebabId, description: z.string().min(1) }).strict();
@@ -82,3 +92,24 @@ export const ConceptSeed = z
 export type ConceptSeed = z.infer<typeof ConceptSeed>;
 
 export { REVIEW_LABEL } from "./labels";
+
+/**
+ * Teaching thresholds (config/teaching-thresholds.json): the servo + arm scene's torque margin
+ * bands, margin = the learner's rated torque ÷ the solver's needed torque. Config, not code: a
+ * design choice for Lucky, not engineering fact, and labelled as such until a roboticist reviews it.
+ */
+export const TeachingThresholds = z
+  .object({
+    _about: z.string().min(1),
+    torque_margin: z
+      .object({
+        fail_below: z.number().positive(),
+        pass_at_or_above: z.number().positive(),
+        label: z.string().min(1),
+        review_status: ReviewStatus,
+      })
+      .strict()
+      .refine((t) => t.fail_below < t.pass_at_or_above, "fail_below must be below pass_at_or_above"),
+  })
+  .strict();
+export type TeachingThresholds = z.infer<typeof TeachingThresholds>;

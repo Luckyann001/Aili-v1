@@ -263,7 +263,7 @@ describe("repair feedback", () => {
     expect(repair).toContain("concepts[0]:");
     expect(repair).toContain("evidence[0]:");
     expect(repair).toContain("narration[0].text: 223 characters, at most 200");
-    expect(repair).toContain("valid: mech.moment-arm, mech.torque.static");
+    expect(repair).toContain("valid: act.rated-vs-stall, act.servo-parts, act.servo-what-it-is, mech.arm-own-mass, mech.mass-vs-weight, mech.moment-arm, mech.pivot, mech.torque-margin, mech.torque.static, sys.joint-and-link");
     // the previous answer travels with the errors, as escaped data, so the content can be kept
     expect(repair).toContain("<previous_answer>");
     expect(repair).toContain('"concepts":["servo"]');

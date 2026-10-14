@@ -1,0 +1,102 @@
+{
+  "id": "servo-arm",
+  "title": "Generic servo turning an arm with a load",
+  "teaches": [
+    "sys.joint-and-link",
+    "mech.pivot",
+    "mech.moment-arm",
+    "mech.mass-vs-weight",
+    "mech.torque.static",
+    "mech.arm-own-mass",
+    "act.servo-what-it-is",
+    "act.servo-parts",
+    "act.rated-vs-stall",
+    "mech.torque-margin"
+  ],
+  "level": "L2",
+  "fidelity": "simplified_teaching",
+  "version": "0.1.0",
+  "review_status": "draft",
+  "provenance": "ai_composed",
+  "parts": [
+    {
+      "id": "base",
+      "name": "Base"
+    },
+    {
+      "id": "servo-case",
+      "name": "Servo (generic)"
+    },
+    {
+      "id": "horn",
+      "name": "Output horn"
+    },
+    {
+      "id": "arm-link",
+      "name": "Arm link"
+    },
+    {
+      "id": "load",
+      "name": "Load"
+    }
+  ],
+  "params": [
+    {
+      "id": "arm_length_m",
+      "label": "Arm length",
+      "unit": "m",
+      "min": 0.08,
+      "max": 0.3,
+      "step": 0.01,
+      "default": 0.15
+    },
+    {
+      "id": "arm_mass_kg",
+      "label": "Arm mass",
+      "unit": "kg",
+      "min": 0.01,
+      "max": 0.2,
+      "step": 0.005,
+      "default": 0.04
+    },
+    {
+      "id": "load_mass_kg",
+      "label": "Load mass",
+      "unit": "kg",
+      "min": 0,
+      "max": 0.5,
+      "step": 0.01,
+      "default": 0.1
+    },
+    {
+      "id": "load_distance_m",
+      "label": "Load distance from the joint",
+      "unit": "m",
+      "min": 0.02,
+      "max": 0.3,
+      "step": 0.01,
+      "default": 0.08
+    },
+    {
+      "id": "rated_torque_nm",
+      "label": "Servo rated torque (from your datasheet)",
+      "unit": "N·m",
+      "min": 0.05,
+      "max": 5,
+      "step": 0.01,
+      "learner_supplied": true
+    }
+  ],
+  "animations": [
+    {
+      "id": "slide-load-out",
+      "description": "The load slides along the arm to its end."
+    }
+  ],
+  "solver": {
+    "id": "solver.static-torque-single-link",
+    "constants": {
+      "angle_deg": 0
+    }
+  }
+}

@@ -353,7 +353,8 @@ function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResp
       errors.push(`${at}.animation: "${a.animation}" is not an animation of scene "${scene.id}"`);
     if (a.type === "set_parameter") {
       const p = scene.params.find((x) => x.id === a.param);
-      if (!p) errors.push(`${at}.param: "${a.param}" is not a setting of scene "${scene.id}" (settings: ${scene.params.map((x) => x.id).join(", ") || "none"})`);
+      if (!p) errors.push(`${at}.param: "${a.param}" is not a setting of scene "${scene.id}" (settings: ${scene.params.filter((x) => !x.learner_supplied).map((x) => x.id).join(", ") || "none"})`);
+      else if (p.learner_supplied) errors.push(`${at}.param: "${a.param}" is entered by the learner from their own datasheet; Aili never sets it`);
       else if (a.value < p.min || a.value > p.max) errors.push(`${at}.value: ${a.value} is outside ${p.id} ${p.min}–${p.max} ${p.unit}`);
     }
   });

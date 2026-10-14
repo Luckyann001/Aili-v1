@@ -30,13 +30,16 @@ const good = () => ({
   assumptions: ["static hold only"],
   limitations: ["does not cover acceleration"],
 });
+/** The fixture shortlist's valid concepts, in the order error messages list them. */
+const DEMO_CONCEPTS = ["act.rated-vs-stall", "act.servo-parts", "act.servo-what-it-is", "mech.arm-own-mass", "mech.mass-vs-weight", "mech.moment-arm", "mech.pivot", "mech.torque-margin", "mech.torque.static", "sys.joint-and-link"];
+const VALID = DEMO_CONCEPTS.join(", ");
 const run = (o: object, ctx = CTX) => validateDirectorResponse({ ...good(), ...o }, ctx);
 const errs = (o: object, ctx = CTX) => run(o, ctx).errors;
 
 describe("director response: setup", () => {
   it("the fixture registry loads, and its shortlist holds the fixtures only (real content is draft)", () => {
     expect(loaded.errors).toEqual([]);
-    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-shopping-bag", "fx-lever", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
+    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-shopping-bag", "fx-lever", "fx-servo-arm", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
   });
 
   it("a valid response passes", () => {
@@ -85,6 +88,15 @@ describe("rule: every ID is in this turn's shortlist", () => {
 describe("rule: values and calculation inputs within manifest bounds, under the right unit field", () => {
   it("a setting value outside its bounds", () => {
     expect(errs({ actions: [{ type: "set_parameter", param: "weight_distance_m", value: 0.5 }] })).toContain("actions[0].value: 0.5 is outside weight_distance_m 0.03–0.3 m");
+  });
+
+  it("servo + arm (M4 slice 2a): its settings are checked against their bounds, and the learner's rating is never Aili's to set", () => {
+    const servo: TurnContext = { shortlist: SL, activeScene: "fx-servo-arm" };
+    const set = (param: string, value: number) => errs({ actions: [{ type: "set_parameter", param, value }] }, servo);
+    expect(set("load_mass_kg", 0.2)).toEqual([]);
+    expect(set("load_mass_kg", 0.9)).toContain("actions[0].value: 0.9 is outside load_mass_kg 0–0.5 kg");
+    expect(set("rated_torque_nm", 1)).toEqual([`actions[0].param: "rated_torque_nm" is entered by the learner from their own datasheet; Aili never sets it`]);
+    expect(errs({ actions: [{ type: "play_animation", animation: "slide-load-out" }] }, servo)).toEqual([]);
   });
 
   it("a calculation input outside the simulation's bounds, a wrong unit field, a missing input", () => {
@@ -212,11 +224,12 @@ describe("concepts and evidence against this turn's shortlist; every error at on
   const LONG = "x".repeat(NARRATION_MAX_CHARS + 63);
 
   it("the shortlist names its valid concepts: the requested ones in the registry plus what its items teach", () => {
-    expect(SL.concepts).toEqual(["mech.moment-arm", "mech.torque.static"]);
+    // The fixture lever teaches two; the fixture servo + arm (M4 slice 2a) the ten demo-path concepts.
+    expect(SL.concepts).toEqual(DEMO_CONCEPTS);
   });
 
   it("an invented concept ID in the right format is rejected, with the valid IDs listed", () => {
-    expect(errs({ concepts: ["mech.servo.basics"] })).toEqual([`concepts[0]: "mech.servo.basics" is not a concept in this turn's shortlist (valid: mech.moment-arm, mech.torque.static)`]);
+    expect(errs({ concepts: ["mech.servo.basics"] })).toEqual([`concepts[0]: "mech.servo.basics" is not a concept in this turn's shortlist (valid: ${VALID})`]);
     expect(errs({ concepts: ["mech.torque.static", "mech.moment-arm"] })).toEqual([]);
   });
 
@@ -234,8 +247,8 @@ describe("concepts and evidence against this turn's shortlist; every error at on
     // The first live answer's mistakes: plain-word concepts, an analogy as evidence, long narration.
     const e = errs({ concepts: ["servo", "mech.servo.basics"], evidence: ["analogy.fx-shopping-bag"], narration: [{ id: "n1", text: LONG }] });
     expect(e.filter((x) => x.startsWith("concepts[0]"))).toHaveLength(1); // format error, not also a membership error
-    expect(e.find((x) => x.startsWith("concepts[0]"))).toMatch(/valid: mech.moment-arm, mech.torque.static/);
-    expect(e).toContain(`concepts[1]: "mech.servo.basics" is not a concept in this turn's shortlist (valid: mech.moment-arm, mech.torque.static)`);
+    expect(e.find((x) => x.startsWith("concepts[0]"))).toContain(`valid: ${VALID}`);
+    expect(e).toContain(`concepts[1]: "mech.servo.basics" is not a concept in this turn's shortlist (valid: ${VALID})`);
     expect(e.find((x) => x.startsWith("evidence[0]"))).toMatch(/valid: read.fx-moments/);
     expect(e).toContain(`narration[0].text: ${LONG.length} characters, at most ${NARRATION_MAX_CHARS}`);
   });
@@ -317,7 +330,7 @@ describe("narration hard limit 200, warning above 160 (Lucky's decisions 2026-10
 describe("a prediction prompt needs a concept: the engine records the prediction under the first (Lucky's decision 2026-10-13)", () => {
   const prompt = { kind: "prediction", text: "What happens?", chips: ["More", "Less", "Not sure"] };
   it("with no concepts it is rejected, listing the valid concept IDs", () => {
-    expect(errs({ prompt, concepts: [] })).toEqual([`concepts: a prediction prompt needs the concept it tests, listed first in "concepts" (valid: mech.moment-arm, mech.torque.static)`]);
+    expect(errs({ prompt, concepts: [] })).toEqual([`concepts: a prediction prompt needs the concept it tests, listed first in "concepts" (valid: ${VALID})`]);
   });
   it("with a concept it passes", () => {
     expect(errs({ prompt, concepts: ["mech.torque.static"] })).toEqual([]);

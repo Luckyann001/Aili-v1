@@ -28,7 +28,7 @@ describe("scene registry: the files in content/robotics", () => {
   it("all load and validate", () => {
     const r = validateRegistry(sceneFiles(), concepts());
     expect(r.errors).toEqual([]);
-    expect(r.scenes.map((s) => s.id).sort()).toEqual(["base-joint-arm", "lever-analogy"]);
+    expect(r.scenes.map((s) => s.id).sort()).toEqual(["base-joint-arm", "lever-analogy", "servo-arm"]);
   });
 
   it("files written by the AI are drafts (the AI never publishes)", () => {
@@ -69,13 +69,31 @@ describe("scene registry: rejects bad scenes", () => {
   });
 });
 
+describe("servo + arm scene (M4 slice 2a)", () => {
+  const servo = () => readJson("scenes/servo-arm.json");
+  it("is a draft, simplified-teaching, AI-composed scene that teaches the demo path, with a learner-supplied rating", () => {
+    const s = validateRegistry([{ file: "servo-arm.json", data: servo() }], concepts()).scenes[0]!;
+    expect(s).toMatchObject({ review_status: "draft", fidelity: "simplified_teaching", provenance: "ai_composed" });
+    expect(s.teaches).toEqual(concepts().map((c: { id: string }) => c.id));
+    expect(s.params.find((p) => p.id === "rated_torque_nm")).toMatchObject({ unit: "N·m", learner_supplied: true });
+    expect(s.params.find((p) => p.id === "rated_torque_nm")!.default).toBeUndefined();
+  });
+  it("a learner-supplied setting may not carry a default, any other setting must, and units match their suffix", () => {
+    const withParam = (p: object) => validateRegistry([{ file: "x.json", data: { ...servo(), params: [p] } }], concepts()).errors.join("\n");
+    const rating = servo().params.at(-1);
+    expect(withParam({ ...rating, default: 1 })).toMatch(/a learner-supplied setting has no default/);
+    expect(withParam({ ...servo().params[0], default: undefined })).toMatch(/a default is required/);
+    expect(withParam({ ...rating, unit: "kg" })).toMatch(/does not match the ID/);
+  });
+});
+
 describe("drafts: visibility and label", () => {
   const scenes = validateRegistry(sceneFiles(), concepts()).scenes;
   const reviewed = { ...scenes[0]!, id: "reviewed-scene", review_status: "reviewed", review: { by: "A. Roboticist", on: "2026-10-10" } } as SceneManifest;
 
   it("production excludes drafts unless the dev flag is set", () => {
     expect(visibleScenes([...scenes, reviewed], { includeDrafts: includeDraftsFromEnv({}) }).map((s) => s.id)).toEqual(["reviewed-scene"]);
-    expect(visibleScenes([...scenes, reviewed], { includeDrafts: includeDraftsFromEnv({ NEXT_PUBLIC_AILI_INCLUDE_DRAFTS: "1" }) })).toHaveLength(3);
+    expect(visibleScenes([...scenes, reviewed], { includeDrafts: includeDraftsFromEnv({ NEXT_PUBLIC_AILI_INCLUDE_DRAFTS: "1" }) })).toHaveLength(4);
     expect(includeDraftsFromEnv({ NEXT_PUBLIC_AILI_INCLUDE_DRAFTS: "true" })).toBe(false); // only "1" turns it on
   });
 

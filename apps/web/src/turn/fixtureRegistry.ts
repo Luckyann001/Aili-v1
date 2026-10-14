@@ -6,7 +6,9 @@ import srcUp1 from "../../../../content/robotics/capabilities/src.openstax-unive
 import srcCp2 from "../../../../content/robotics/capabilities/src.openstax-college-physics-2e.json";
 import arm from "../../../../content/robotics/scenes/base-joint-arm.json";
 import lever from "../../../../content/robotics/scenes/lever-analogy.json";
+import servoArm from "../../../../content/robotics/scenes/servo-arm.json";
 import fxScene from "../../../../content/robotics/test-fixtures/scene.fx-lever.json";
+import fxServoArm from "../../../../content/robotics/test-fixtures/scene.fx-servo-arm.json";
 import fxSolver from "../../../../content/robotics/test-fixtures/solver.fx-torque.json";
 import fxSim from "../../../../content/robotics/test-fixtures/sim.fx-servo-load.json";
 import fxSource from "../../../../content/robotics/test-fixtures/src.fx-book.json";
@@ -27,7 +29,9 @@ export function fixtureTurnRegistry() {
       scenes: [
         { file: "base-joint-arm.json", data: arm },
         { file: "lever-analogy.json", data: lever },
+        { file: "servo-arm.json", data: servoArm },
         { file: "test-fixtures/scene.fx-lever.json", data: fxScene },
+        { file: "test-fixtures/scene.fx-servo-arm.json", data: fxServoArm },
       ],
       capabilities: [solver, sim, srcUp1, srcCp2, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
     },

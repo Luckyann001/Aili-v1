@@ -1,4 +1,12 @@
 [
+  { "id": "sys.joint-and-link", "title": "Joints turn, links carry", "review_status": "draft" },
+  { "id": "mech.pivot", "title": "A point things turn about", "review_status": "draft" },
   { "id": "mech.moment-arm", "title": "Moment arm: distance from the pivot", "review_status": "draft" },
-  { "id": "mech.torque.static", "title": "Static torque about a joint", "review_status": "draft" }
+  { "id": "mech.mass-vs-weight", "title": "Mass, and the weight gravity gives it", "review_status": "draft" },
+  { "id": "mech.torque.static", "title": "Static torque about a joint", "review_status": "draft" },
+  { "id": "mech.arm-own-mass", "title": "The arm's own weight counts", "review_status": "draft" },
+  { "id": "act.servo-what-it-is", "title": "A motor that holds a position", "review_status": "draft" },
+  { "id": "act.servo-parts", "title": "Motor, gears, position sensor, control board, horn", "review_status": "draft" },
+  { "id": "act.rated-vs-stall", "title": "Use the rated figure, not the stall figure", "review_status": "draft" },
+  { "id": "mech.torque-margin", "title": "Rated torque versus needed torque", "review_status": "draft" }
 ]

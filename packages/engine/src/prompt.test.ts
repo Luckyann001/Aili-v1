@@ -55,6 +55,9 @@ describe("assembly", () => {
     const sl = JSON.parse(unescape(blockOf(a.input, "shortlist")));
     expect(sl.scenes[0]).toMatchObject({ id: "fx-lever", on_stage: true });
     expect(sl.scenes[0].settings[0]).toEqual({ id: "weight_distance_m", unit: "m", min: 0.03, max: 0.3 });
+    // The servo + arm's rated torque is the learner's to enter, so it is not offered to the model.
+    const servo = sl.scenes.find((x: { id: string }) => x.id === "fx-servo-arm");
+    expect(servo.settings.map((x: { id: string }) => x.id)).toEqual(["arm_length_m", "arm_mass_kg", "load_mass_kg", "load_distance_m"]);
     expect(sl.simulations[0].inputs.arm_length_m).toEqual({ unit: "m", min: 0.05, max: 0.5 });
     expect(Object.keys(sl.solvers[0].outputs)).toContain("torque_nm");
     expect(sl.readings[0].guide.key_claims[0]).toBe("Moment is force times distance");
@@ -239,10 +242,10 @@ describe("first live run fixes (2026-10-12)", () => {
     const shortlistJson = (input: string) => JSON.parse(/<shortlist>\n([\s\S]*?)\n<\/shortlist>/.exec(input)![1]!.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
     const full = shortlistJson(assemble().input);
     expect(Object.keys(full)[0]).toBe("concept_ids");
-    expect(full.concept_ids).toEqual(["mech.moment-arm", "mech.torque.static"]);
+    expect(full.concept_ids).toEqual(["act.rated-vs-stall", "act.servo-parts", "act.servo-what-it-is", "mech.arm-own-mass", "mech.mass-vs-weight", "mech.moment-arm", "mech.pivot", "mech.torque-margin", "mech.torque.static", "sys.joint-and-link"]); // fixture lever + fixture servo + arm
     const tight = assemble({ budgetTokens: 100 });
     expect(tight.dropped.length).toBeGreaterThan(0);
-    expect(shortlistJson(tight.input).concept_ids).toEqual(["mech.moment-arm", "mech.torque.static"]);
+    expect(shortlistJson(tight.input).concept_ids).toEqual(full.concept_ids);
   });
 });
 
