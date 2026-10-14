@@ -274,3 +274,17 @@ describe("direct_answer_requested in session_state (Lucky's decision 2026-10-13)
     expect(state(undefined).direct_answer_requested).toBe(false);
   });
 });
+
+describe("the learner's level is marked as not stated (Lucky's decision 2026-10-13)", () => {
+  const state = (level: SessionHistory["learner_level"]) => {
+    const a = assembleProfessorPrompt({ template: TEMPLATE, shortlist: fixtureShortlist(), request: { ...request(), history: { ...history, learner_level: level } } });
+    return JSON.parse(a.input.match(/<session_state>\n([\s\S]*?)\n<\/session_state>/)![1]!.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+  };
+  it("an unknown level carries the note; a known one does not", () => {
+    expect(state("unknown")).toMatchObject({ learner_level: "unknown", learner_level_note: "not stated by the learner" });
+    expect(state("some_knowledge")).not.toHaveProperty("learner_level_note");
+  });
+  it("the system prompt says never to claim the learner said what they did not write", () => {
+    expect(systemPrompt(TEMPLATE)).toMatch(/Never say or imply the learner told you something they did not write/);
+  });
+});

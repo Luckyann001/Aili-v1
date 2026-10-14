@@ -91,7 +91,7 @@ describe("the dev terminal's attempt log (live only)", () => {
 
 describe("POST /api/turn in live mode", () => {
   it("runs the provider-backed director and router (recorded here): a repaired turn streams to turn.done", async () => {
-    const { handleTurn, sent, ledger } = await load();
+    const { handleTurn, sent, ledger, sessions } = await load();
     const res = await handleTurn(post(body()));
     expect(res.status).toBe(200);
     const events = await readAll(res);
@@ -99,6 +99,8 @@ describe("POST /api/turn in live mode", () => {
     expect(sent).toEqual(["professor", "router"]);
     expect(events.some((e) => e.type === "narration")).toBe(true);
     expect(ledger.spent("live-test-0001")).toBeGreaterThan(0); // every attempt metered at config prices
+    // The level starts "unknown": the learner has not said it (Lucky's decision 2026-10-13).
+    expect(sessions.get("live-test-0001")!.history.learner_level).toBe("unknown");
   });
 
   it("flag off and the fake director off: 404", async () => {

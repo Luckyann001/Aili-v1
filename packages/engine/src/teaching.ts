@@ -92,6 +92,29 @@ export const OPEN_QUESTION_REOFFERED = "open question re-offered";
 
 export const SCENE_SELECTED_BY_ENGINE = "scene selected by engine";
 
+export const UNSUPPORTED_ATTRIBUTION = "unsupported attribution";
+const ATTRIBUTION = /\b(?:you said|you've said|you have said|as you said|you told me|you mentioned|you've mentioned)\b([^.!?;,]{0,80})/gi;
+const FUNCTION_WORDS = new Set("that this these those with about have been were your yours from they them their what which would could should just also then than some into onto over very really want wants like".split(" "));
+
+/**
+ * A narration line that says "you said / you told me / you mentioned …" with words the learner did not
+ * write (a heuristic warning, never a rejection). Checked on the first turn only: the engine keeps
+ * the learner's earlier replies as flags, not their words, so later turns cannot be checked.
+ */
+export function unsupportedAttributions(narration: ReadonlyArray<{ text: string }>, learnerText: string, firstTurn: boolean): string[] {
+  if (!firstTurn) return [];
+  const said = new Set(learnerText.toLowerCase().match(/[a-z0-9']+/g) ?? []);
+  const out: string[] = [];
+  narration.forEach((n, i) => {
+    for (const m of n.text.matchAll(ATTRIBUTION)) {
+      const words = (m[1]!.toLowerCase().match(/[a-z']{4,}/g) ?? []).filter((w) => !FUNCTION_WORDS.has(w));
+      const missing = words.filter((w) => !said.has(w));
+      if (missing.length) out.push(`${UNSUPPORTED_ATTRIBUTION}: narration[${i}] says "${m[0].trim()}", but the learner did not write ${missing.map((w) => `"${w}"`).join(", ")}`);
+    }
+  });
+  return out;
+}
+
 /**
  * When the answer's first concept has a scene in this turn's shortlist (the registry's own `teaches`
  * link) and the model put no scene on stage, the engine selects it (Lucky's decision 2026-10-13).

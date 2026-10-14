@@ -1,5 +1,5 @@
 import { EMPTY_ANSWER, GUIDE_QUESTION_SUBSTITUTED, NARRATION_SPLIT, STRAY_ACTION_FIELD_DROPPED } from "../director";
-import { OPEN_QUESTION_REOFFERED, SCENE_SELECTED_BY_ENGINE, READING_FILLED_IN } from "../teaching";
+import { OPEN_QUESTION_REOFFERED, SCENE_SELECTED_BY_ENGINE, READING_FILLED_IN, UNSUPPORTED_ATTRIBUTION } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
 // Bake-off report (docs/m3-plan.md slice 7a): numbers code can measure, and one transcript per
@@ -126,6 +126,8 @@ export function metrics(turns: TurnRecord[]): Metrics {
             ? "scene selected by engine"
             : w.startsWith(STRAY_ACTION_FIELD_DROPPED)
             ? "stray action field dropped"
+            : w.startsWith(UNSUPPORTED_ATTRIBUTION)
+            ? "unsupported attribution"
             : w.startsWith("analogy:")
               ? "analogy"
               : /mild praise/.test(w)

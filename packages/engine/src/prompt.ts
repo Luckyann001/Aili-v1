@@ -107,6 +107,8 @@ export function assembleProfessorPrompt(o: {
     state_rev: o.request.state_rev,
     posture: h.posture,
     learner_level: h.learner_level,
+    // The learner never states a level here: say so, so it is never put in their mouth (Lucky's decision 2026-10-13).
+    ...(h.learner_level === "unknown" ? { learner_level_note: "not stated by the learner" } : {}),
     // This turn only: the learner asked for a direct answer (Lucky's decision 2026-10-13).
     direct_answer_requested: o.request.direct_answer === true,
     active_scene: o.request.active_scene ?? null,

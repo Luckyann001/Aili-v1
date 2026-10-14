@@ -30,7 +30,8 @@ export const ledger = new InMemoryLedger();
  * stage. In memory only: lost on restart and separate per server instance (database stage later).
  */
 export const sessions = new InMemorySessionStore();
-const fresh = (): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: [] } });
+// The level starts "unknown": the learner has not said it (Lucky's decision 2026-10-13).
+const fresh = (): SessionState => ({ history: { posture: "learning", learner_level: "unknown", entries: [] } });
 
 /** The turn in flight for each page session: a newer turn stops the older one. */
 const inFlight = new Map<string, TurnSession>();

@@ -5,7 +5,7 @@ import { shortlist } from "./capabilities";
 import { dropStrayActionFields, NARRATION_SPLIT_MAX_SEGMENTS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
-import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept } from "./teaching";
+import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept, unsupportedAttributions } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
@@ -403,6 +403,8 @@ export class TurnSession {
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
       if (reoffersOpenQuestion(v.response, history, teaching)) warnings.push(`${OPEN_QUESTION_REOFFERED} (${v.response.prompt!.kind}): "${v.response.prompt!.text}"`);
       if (p.length) return { reason: "pedagogy", errors: p, warnings };
+      // "You said …" about words the learner did not write (first turn only; a warning).
+      warnings.push(...unsupportedAttributions(v.response.narration, input.text, !before.history.entries.some((e) => e.kind === "learner")));
       // A passing answer about a concept with a scene, but no scene on stage: the engine selects it.
       const picked = selectSceneForConcept(v.response, sl.scenes, before.activeScene);
       return picked ? { r: picked.r, warnings: [...warnings, picked.warning] } : { r: v.response, warnings };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, matchOpenChoice, selectSceneForConcept, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, matchOpenChoice, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 
@@ -659,5 +659,28 @@ describe("one repair lists every problem (Lucky's decision 2026-10-13)", () => {
     expect(repairs).toHaveLength(1);
     expect(repairs[0]!.some((e) => /Unrecognized key: "colour"/.test(e))).toBe(true);
     expect(repairs[0]!.some((e) => /^prompt: missing; move "probe"/.test(e))).toBe(true);
+  });
+});
+
+describe("the learner's level is never put in their mouth (Lucky's decision 2026-10-13)", () => {
+  it("first turn: 'You said you know some robotics' after 'robotics' is a warning naming the words the learner did not write", () => {
+    const w = unsupportedAttributions([{ text: "You said you know some robotics, so let's build on that." }], "robotics", true);
+    expect(w).toEqual(['unsupported attribution: narration[0] says "You said you know some robotics", but the learner did not write "know"']);
+  });
+  it("no warning when the words are the learner's, when nothing is attributed, or after the first turn", () => {
+    expect(unsupportedAttributions([{ text: "You said robotics, so let's start with one idea." }], "robotics", true)).toEqual([]);
+    expect(unsupportedAttributions([{ text: "You told me you want to build an arm." }], "I want to build an arm", true)).toEqual([]);
+    expect(unsupportedAttributions([{ text: "Robotics is broad." }], "robotics", true)).toEqual([]);
+    expect(unsupportedAttributions([{ text: "You said you know some robotics." }], "yes", false)).toEqual([]); // not checkable: earlier words are not kept
+  });
+  it("in a turn: the warning is visible and the turn still passes", async () => {
+    const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const warnings: string[] = [];
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, narration: [{ id: "n0", text: "You said you know some robotics, so here is a lever." }, ...(VALID.narration as object[]).slice(0, 1)] } }; } };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "unknown", entries: [] } }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => warnings.push(...c.warnings) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "robotics" }, (e) => events.push(e));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(warnings.some((w) => w.startsWith("unsupported attribution"))).toBe(true);
   });
 });
