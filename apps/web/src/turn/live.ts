@@ -74,12 +74,18 @@ export function liveTurnParts(config: AiConfig) {
   };
 }
 
-/** A short, key-free summary of what the model sent, for the dev terminal: move, prompt kind, narration lengths. */
+/**
+ * A short, key-free summary of what the model sent, for the dev terminal and the session log: move,
+ * prompt kind, narration lengths, actions, calculations, the concept IDs it named and the scene it
+ * selected. Never any learner text.
+ */
 export function summarizeAttempt(raw: unknown): string {
-  const r = (raw ?? {}) as { move?: unknown; prompt?: { kind?: unknown } | null; narration?: Array<{ text?: unknown }>; actions?: Array<{ type?: unknown }>; calc_requests?: unknown[] };
+  const r = (raw ?? {}) as { move?: unknown; prompt?: { kind?: unknown } | null; narration?: Array<{ text?: unknown }>; actions?: Array<{ type?: unknown; scene?: unknown }>; calc_requests?: unknown[]; concepts?: unknown };
   const lengths = Array.isArray(r.narration) ? r.narration.map((n) => (typeof n?.text === "string" ? n.text.length : "?")).join("+") : "none";
   const actions = Array.isArray(r.actions) ? r.actions.map((a) => String(a?.type)).join(",") || "none" : "none";
-  return `move=${String(r.move)} prompt=${r.prompt ? String(r.prompt.kind ?? "question") : "none"} narration=${lengths} chars actions=${actions} calcs=${Array.isArray(r.calc_requests) ? r.calc_requests.length : 0}`;
+  const concepts = Array.isArray(r.concepts) ? r.concepts.map(String).join(",") || "none" : "none";
+  const scene = Array.isArray(r.actions) ? r.actions.find((a) => a?.type === "select_scene")?.scene : undefined;
+  return `move=${String(r.move)} prompt=${r.prompt ? String(r.prompt.kind ?? "question") : "none"} narration=${lengths} chars actions=${actions} calcs=${Array.isArray(r.calc_requests) ? r.calc_requests.length : 0} concepts=${concepts} scene=${scene === undefined ? "none" : String(scene)}`;
 }
 
 type CheckLog = { attempt: 1 | 2; outcome: string; errors: string[]; warnings: string[]; raw?: unknown };

@@ -72,8 +72,11 @@ describe("when live mode is on", () => {
 
 describe("the dev terminal's attempt log (live only)", () => {
   it("summarizes what the model sent: move, prompt kind, narration lengths; no text", () => {
-    expect(summarizeAttempt({ move: "probe", prompt: { kind: "prediction", text: "secret?" }, narration: [{ text: "abc" }, { text: "hello" }], actions: [{ type: "select_scene" }], calc_requests: [] })).toBe("move=probe prompt=prediction narration=3+5 chars actions=select_scene calcs=0");
-    expect(summarizeAttempt(undefined)).toBe("move=undefined prompt=none narration=none chars actions=none calcs=0");
+    expect(summarizeAttempt({ move: "probe", prompt: { kind: "prediction", text: "secret?" }, narration: [{ text: "abc" }, { text: "hello" }], actions: [{ type: "select_scene", scene: "fx-lever" }], calc_requests: [], concepts: ["mech.torque.static", "mech.moment-arm"] })).toBe(
+      "move=probe prompt=prediction narration=3+5 chars actions=select_scene calcs=0 concepts=mech.torque.static,mech.moment-arm scene=fx-lever",
+    );
+    expect(summarizeAttempt({ move: "probe", concepts: [], actions: [{ type: "highlight_part", part: "weight" }] })).toMatch(/concepts=none scene=none$/);
+    expect(summarizeAttempt(undefined)).toBe("move=undefined prompt=none narration=none chars actions=none calcs=0 concepts=none scene=none");
   });
   it("a live turn logs each attempt's outcome and rejection reasons", async () => {
     const { handleTurn } = await load();
@@ -159,6 +162,7 @@ describe("the local session log (slice 5): live turns only, laptop only", () => 
     expect(text).toMatch(/- done \(move /);
     expect(text).toMatch(/\*\*Router:\*\* /);
     expect(text).toMatch(/- attempt 1: validation · move=explain/);
+    expect(text).toMatch(/- attempt 2: pass · .* concepts=mech\.torque\.static scene=fx-lever/); // concepts and scene in the session log
     expect(text).toMatch(/  - rejected: /);
     expect(text).toMatch(/- attempt 2: pass/);
     expect(text).toMatch(/## Turn 1 · .* · \d+\.\d s · \d+\.\d{4} USD \(session \d+\.\d{4} USD\)/);
