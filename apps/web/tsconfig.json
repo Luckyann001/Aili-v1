@@ -28,6 +28,9 @@
       ],
       "aili-turn-fixtures": [
         "./src/turn/fixtureRegistry.ts"
+      ],
+      "aili-recorded-live": [
+        "./src/turn/recordedLive.ts"
       ]
     }
   },

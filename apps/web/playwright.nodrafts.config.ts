@@ -5,6 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3300;
 // The fake-director and demo-tools flags are pinned off too, as in a real production deployment.
 // AILI_LIVE is pinned ON on purpose: a production build and server must refuse live mode anyway.
+// AILI_E2E_RECORDED_LIVE is set at RUN time only (not at build): a build made without it must refuse
+// the recorded live path even when the variable and the test's cookie are present.
 const ENV = "AILI_DIST_DIR=.next-nodrafts NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=0 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=0 NEXT_PUBLIC_AILI_DEMO_TOOLS=0 AILI_LIVE=1";
 
 export default defineConfig({
@@ -16,7 +18,7 @@ export default defineConfig({
     { name: "phone", use: { ...devices["Pixel 7"], channel: "chrome" } },
   ],
   webServer: {
-    command: `${ENV} npx next build && ${ENV} npx next start --port ${PORT}`,
+    command: `${ENV} npx next build && ${ENV} AILI_E2E_RECORDED_LIVE=1 npx next start --port ${PORT}`,
     url: `http://localhost:${PORT}/home`,
     timeout: 300_000,
     reuseExistingServer: false,

@@ -1,0 +1,62 @@
+{
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the engine's response shape. Test builds only.",
+  "router": {
+    "source": "hand-written",
+    "steps": [
+      { "ok": { "json": { "answered_prompt": false, "pushback": false, "new_evidence": false, "frustrated": false, "wants_another_example": false, "acknowledged": false, "guess": null, "wants_stop": false, "asks_for_source": null, "wants_direct_answer": false }, "input_tokens": 1470, "output_tokens": 92 } },
+      { "ok": { "json": { "answered_prompt": true, "pushback": false, "new_evidence": false, "frustrated": false, "wants_another_example": false, "acknowledged": false, "guess": "It gets harder", "wants_stop": false, "asks_for_source": null, "wants_direct_answer": false }, "input_tokens": 1550, "output_tokens": 92 } }
+    ]
+  },
+  "professor": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_1",
+            "state_rev": 1,
+            "move": "probe",
+            "concepts": ["mech.moment-arm"],
+            "narration": [
+              { "id": "n1", "text": "Robotics is broad, so let's start with one idea that shows up in every arm: how far a load sits from the joint." },
+              { "id": "n2", "text": "Here is a ruler held out with a weight on it." }
+            ],
+            "actions": [
+              { "type": "select_scene", "scene": "fx-lever" },
+              { "type": "highlight_part", "part": "weight" }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": { "kind": "prediction", "text": "If the weight slides farther from your hand, does it get harder, easier, or no different to hold?", "chips": ["It gets harder", "It gets easier", "No different", "Not sure"] },
+            "assumptions": [],
+            "limitations": []
+          },
+          "input_tokens": 7400,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_2",
+            "state_rev": 2,
+            "move": "explain",
+            "concepts": ["mech.moment-arm", "mech.torque.static"],
+            "narration": [
+              { "id": "n1", "text": "Yes, farther out is harder: your hand must resist more twist, called torque." },
+              { "id": "n2", "text": "With the weight at the end of the ruler, holding it level takes {{c1.torque_nm}} newton-metres." }
+            ],
+            "actions": [{ "type": "set_parameter", "param": "weight_distance_m", "value": 0.3 }],
+            "calc_requests": [{ "id": "c1", "solver": "solver.fx-torque", "simulation": "sim.fx-servo-load", "inputs": { "arm_length_m": 0.3, "payload_kg": 0.2, "arm_kg_per_m": 0.25, "angle_deg": 0 } }],
+            "evidence": ["read.fx-moments"],
+            "reveal": { "prediction": "p-turn-1", "calc": "c1", "outcome": "as_predicted" },
+            "assumptions": ["a static hold", "the ruler is level"],
+            "limitations": ["no acceleration or friction"]
+          },
+          "input_tokens": 7600,
+          "output_tokens": 400
+        }
+      }
+    ]
+  }
+}

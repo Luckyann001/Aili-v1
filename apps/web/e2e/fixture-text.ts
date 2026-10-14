@@ -7,13 +7,18 @@ export const FIXTURE_ONLY_TEXT = ["Test fixture: not a real source.", "read.fx-d
 
 /** Files in a build folder (skipping Next's cache) whose text contains any fixture-only string. */
 export function filesWithFixtureText(buildDir: string): string[] {
+  return filesWithText(buildDir, ...FIXTURE_ONLY_TEXT);
+}
+
+/** Files in a build folder (skipping Next's cache) whose text contains any of these strings. */
+export function filesWithText(buildDir: string, ...texts: string[]): string[] {
   const hits: string[] = [];
   const walk = (d: string) => {
     for (const name of readdirSync(d)) {
       if (name === "cache") continue;
       const p = join(d, name);
       if (statSync(p).isDirectory()) walk(p);
-      else if (FIXTURE_ONLY_TEXT.some((t) => readFileSync(p, "latin1").includes(t))) hits.push(p);
+      else if (texts.some((t) => readFileSync(p, "latin1").includes(t))) hits.push(p);
     }
   };
   walk(buildDir);

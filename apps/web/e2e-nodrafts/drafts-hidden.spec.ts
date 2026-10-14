@@ -70,6 +70,19 @@ test("live mode is off in production even with AILI_LIVE=1", async ({ request })
   expect(await status.json()).toEqual({ live: false });
 });
 
+// The e2e recording of the live path (slice 6) is only in builds made with AILI_E2E_RECORDED_LIVE=1.
+test("the recorded live path is off: the variable at run time and the test's cookie are not enough", async ({ request, context }) => {
+  await context.addCookies([{ name: "aili-e2e-live", value: "1", domain: "localhost", path: "/" }]);
+  const headers = { cookie: "aili-e2e-live=1" };
+  expect(await (await request.get("/api/live", { headers })).json()).toEqual({ live: false });
+  expect((await request.post("/api/turn", { headers, data: { session_id: "nodrafts-0002", state_rev: 1, input: { text: "x" } } })).status()).toBe(404);
+});
+
+test("the production build contains no part of the e2e recording", async () => {
+  const { filesWithText } = await import("../e2e/fixture-text");
+  expect(filesWithText(".next-nodrafts", "AILI-E2E-RECORDING")).toEqual([]);
+});
+
 test("the production build contains nothing from content/robotics/test-fixtures", async () => {
   const { filesWithFixtureText } = await import("../e2e/fixture-text");
   expect(filesWithFixtureText(".next-nodrafts")).toEqual([]);

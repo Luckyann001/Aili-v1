@@ -41,9 +41,18 @@ export function isLocalRequest(request: Request, env: Env = process.env): boolea
 export const LIVE_CONCEPTS = ["mech.torque.static", "mech.moment-arm"];
 export const LIVE_LEVEL = "L2";
 
+/**
+ * The e2e test of the live path (slice 6): a test build (AILI_E2E_RECORDED_LIVE=1 at build time, so
+ * the recording is in it) answers live-path requests from the recording, only for requests carrying
+ * the test's cookie `aili-e2e-live=1` and only while the same variable is set at run time. No model.
+ */
+export function recordedLiveRequested(request: Request, env: Env = process.env): boolean {
+  return env.AILI_E2E_RECORDED_LIVE === "1" && /(?:^|;\s*)aili-e2e-live=1(?:;|$)/.test(request.headers.get("cookie") ?? "");
+}
+
 let templates: { professor: string; router: string } | null = null;
-/** The prompt templates, read once from content/prompts (the dev server runs in apps/web). */
-function loadTemplates() {
+/** The prompt templates, read once from content/prompts (the server runs in apps/web). */
+export function loadTemplates() {
   const dir = join(process.cwd(), "..", "..", "content", "prompts");
   templates ??= { professor: readFileSync(join(dir, "professor.v1.md"), "utf8"), router: readFileSync(join(dir, "router.v1.md"), "utf8") };
   return templates;

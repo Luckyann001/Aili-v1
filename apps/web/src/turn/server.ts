@@ -2,7 +2,8 @@ import { createFakeDirector, createFakeRouter, encodeEvent, InMemoryLedger, InMe
 import { AiConfig, InterruptRequest, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import { FAKE_DIRECTOR } from "./flags";
-import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, logCheck, summarizeAttempt } from "./live";
+import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, loadTemplates, logCheck, recordedLiveRequested, summarizeAttempt } from "./live";
+import { recordedLiveParts } from "aili-recorded-live";
 import { logLiveTurn, type LoggedAttempt } from "./sessionLog";
 
 // Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Two modes:
@@ -50,8 +51,12 @@ const notFound = () => new Response("Not found", { status: 404 });
 const badRequest = (issues: string[]) => Response.json({ error: "bad request", issues }, { status: 400 });
 const notLocal = () => Response.json({ error: "Live answers only take requests from this computer." }, { status: 403 });
 
-/** Which mode answers this request, or the response that refuses it. */
-function mode(request: Request): "live" | "fake" | Response {
+/**
+ * Which mode answers this request, or the response that refuses it. "recorded": the live path
+ * answered from the e2e recording (test builds only; see live.ts recordedLiveRequested).
+ */
+function mode(request: Request): "live" | "recorded" | "fake" | Response {
+  if (recordedLiveParts && recordedLiveRequested(request)) return isLocalRequest(request) ? "recorded" : notLocal();
   if (liveEnabled()) return isLocalRequest(request) ? "live" : notLocal();
   return FAKE_DIRECTOR ? "fake" : notFound();
 }
@@ -77,7 +82,11 @@ export async function handleTurn(request: Request): Promise<Response> {
   inFlight.get(req.session_id)?.interrupt();
   const start = sessions.get(req.session_id) ?? fresh();
   // Live: the case field is ignored; the turn budget comes from config (turn and attempt timeouts).
-  const live = m === "live" ? liveTurnParts(aiConfig.data) : null;
+  // Recorded: the same live path (director, router, concepts, config timeouts), answered from the
+  // recording; no key checks, no terminal log and no session log, since no model is called.
+  const real = m === "live";
+  const liveParts = real ? liveTurnParts(aiConfig.data) : null;
+  const live = liveParts ?? (m === "recorded" ? recordedLiveParts!(aiConfig.data, req.session_id, loadTemplates()) : null);
   // Live only: what the local session log keeps for this turn (slice 5).
   const startedAt = new Date();
   const attempts: LoggedAttempt[] = [];
@@ -92,7 +101,7 @@ export async function handleTurn(request: Request): Promise<Response> {
     concepts: live ? LIVE_CONCEPTS : ["mech.torque.static"],
     level: live ? LIVE_LEVEL : "L2",
     startRev: req.state_rev - 1,
-    ...(live
+    ...(real
       ? {
           onCheck: (c: Parameters<typeof terminalLog>[0]) => {
             terminalLog(c);
@@ -100,9 +109,11 @@ export async function handleTurn(request: Request): Promise<Response> {
           },
           onRoute: (r: { classification: object }) => (routed = { ...r.classification }),
         }
-      : { timeoutMs: TIMEOUT_MS }),
+      : live
+        ? {}
+        : { timeoutMs: TIMEOUT_MS }),
     // The kill switch is read on every request (server-only env, so it can be flipped without a rebuild).
-    meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env), ...(live ? { live: live.live } : {}) },
+    meter: { ledger, sessionId: req.session_id, config: aiConfig.data, killSwitch: killSwitchFromEnv(process.env), ...(liveParts ? { live: liveParts.live } : {}) },
   });
   const spentBefore = ledger.spent(req.session_id);
   const key = `${req.session_id}/turn_${req.state_rev}`;
@@ -112,7 +123,7 @@ export async function handleTurn(request: Request): Promise<Response> {
       running.set(key, session);
       inFlight.set(req.session_id, session);
       const emit = (e: TurnEvent) => {
-        if (live) sent.push(e);
+        if (real) sent.push(e);
         try {
           controller.enqueue(enc.encode(encodeEvent(e)));
         } catch {
@@ -125,7 +136,7 @@ export async function handleTurn(request: Request): Promise<Response> {
         if (session.state !== start) sessions.commit(req.session_id, req.state_rev, session.state);
       } finally {
         // Live cost to the dev server's terminal (no learner text, no key): this turn and this page session.
-        if (live) {
+        if (real) {
           console.error(`[live] session ${req.session_id.slice(0, 8)} turn ${req.state_rev}: ${((ledger.spent(req.session_id) - spentBefore) / 1e6).toFixed(4)} USD, page session ${(ledger.spent(req.session_id) / 1e6).toFixed(4)} USD`);
           // The local session log (laptop only, git-ignored). A failure to write never breaks the turn.
           try {

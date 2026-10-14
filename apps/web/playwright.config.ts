@@ -6,7 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3200;
 
 // The fake-director and demo-tools flags are set here too: the ?demo=1 tools are tested in this build.
-const ENV = "AILI_DIST_DIR=.next-e2e AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1 NEXT_PUBLIC_AILI_DEMO_TOOLS=1";
+const ENV = "AILI_DIST_DIR=.next-e2e AILI_ENABLE_PREVIEW=1 NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=1 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1 NEXT_PUBLIC_AILI_DEMO_TOOLS=1 AILI_E2E_RECORDED_LIVE=1";
 
 export default defineConfig({
   testDir: "e2e",

@@ -172,7 +172,7 @@ describe("no provider, no key, no network on this path", () => {
   it("imports only the engine, the schemas, local modules and content JSON; reads only the two testing flags", () => {
     for (const f of files) {
       const src = readFileSync(new URL(f, import.meta.url), "utf8");
-      for (const [, spec] of src.matchAll(/from\s+"([^"]+)"/g)) expect(spec, `${f} imports ${spec}`).toMatch(/^(@aili\/(engine|schemas)|aili-turn-fixtures|\.\.?\/.*)$/);
+      for (const [, spec] of src.matchAll(/from\s+"([^"]+)"/g)) expect(spec, `${f} imports ${spec}`).toMatch(/^(@aili\/(engine|schemas)|aili-turn-fixtures|aili-recorded-live|\.\.?\/.*)$/);
       expect(src, f).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/);
       for (const [, name] of src.matchAll(/process\.env\.([A-Z0-9_]+)/g)) expect(["NEXT_PUBLIC_AILI_FAKE_DIRECTOR", "NEXT_PUBLIC_AILI_DEMO_TOOLS"], f).toContain(name);
       // The only other environment read is the server-only kill switch, through the engine's helper.
