@@ -30,6 +30,8 @@ const STEPS: Record<string, { label: string; apply: (s: Schema) => Schema }> = {
   f: { label: "without calc_requests[].simulation", apply: (s) => withoutCalcSimulation(s) },
   g: { label: "actions flattened (one shape: type list + optional fields)", apply: (s) => flattenActions(s) },
   h: { label: "prediction carries its question and choices", apply: (s) => predictionWithQuestion(s) },
+  i: { label: "each action carries its narration segment index (at: integer)", apply: (s) => actionsWithSegmentIndex(s) },
+  j: { label: "actions nested under their narration segment", apply: (s) => actionsNestedInNarration(s) },
   z: { label: "the current schema, unchanged", apply: (s) => s },
 };
 
@@ -40,6 +42,21 @@ function predictionWithQuestion(s: Schema): Schema {
   pred.properties = { ...pred.properties, question: { type: "string" }, choices: { type: "array", items: { type: "string" } } };
   pred.required = [...pred.required, "question", "choices"];
   return { ...s, properties: { ...s.properties, prediction: pred } };
+}
+
+/** M4 slice 1 gate (Lucky, 14 Oct 2026): a required integer "at" on every action shape. */
+function actionsWithSegmentIndex(s: Schema): Schema {
+  const actions = structuredClone(s.properties.actions) as { items: Schema & { anyOf?: Schema[] } };
+  const add = (o: Schema) => ({ ...o, properties: { ...o.properties, at: { type: "integer" } }, required: [...(o.required ?? []), "at"] });
+  actions.items = actions.items.anyOf ? { ...actions.items, anyOf: actions.items.anyOf.map(add) } : add(actions.items);
+  return { ...s, properties: { ...s.properties, actions } };
+}
+
+/** M4 slice 1 gate: each narration segment holds its own actions; no top-level actions. */
+function actionsNestedInNarration(s: Schema): Schema {
+  const narration = structuredClone(s.properties.narration) as { items: Schema };
+  narration.items = { ...narration.items, properties: { ...narration.items.properties, actions: s.properties.actions }, required: [...narration.items.required, "actions"] };
+  return without({ ...s, properties: { ...s.properties, narration } }, ["actions"]);
 }
 
 function withoutCalcSimulation(s: Schema): Schema {
@@ -61,6 +78,13 @@ async function main() {
   const a = args();
   const root = repoRoot();
   const config: AiConfig = loadConfig(root);
+  // --sizes-only: print each variant's size and stop; no provider call, no key needed.
+  if (a["sizes-only"] === true) {
+    const full = toAnthropicSchema(directorResponseJsonSchema()).schema as Schema;
+    const ids = typeof a.variants === "string" ? a.variants.split(",") : ["z"];
+    for (const id of ids) console.log(`${id}: ${id.split("+").map((l) => STEPS[l]!.label).join(" + ")}: ${JSON.stringify(id.split("+").reduce((x, l) => STEPS[l]!.apply(x), full)).length} characters`);
+    return;
+  }
   const refusals = liveRefusals(config, process.env);
   if (refusals.length) throw new Error(`refused:\n${refusals.join("\n")}`);
   const ids = typeof a.variants === "string" ? a.variants.split(",") : [];
