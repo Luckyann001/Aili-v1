@@ -417,3 +417,96 @@ segments stay short.
 **Effort in scope:** about 6–7 sessions (A 0.5, B 1.5–2, C 3, D 0.5–1, live checks 0.5–1). If it must shrink:
 keep two poses and drop the tremble (−0.5), merge `eq-arm-share` into `eq-torque` (−0.25), make the recap
 still-only with no tap to restore (−0.25).
+
+---
+
+## Addendum (15 Oct 2026): setup cards and the Plan tab (plan only; nothing built)
+
+**Principle.** The stage shows scenes, never the study plan. Before any scene exists, at most three short
+**setup cards** appear one after another on the empty (dimmed) stage. Once the plan is built, its table of
+contents lives in a **Plan** tab of the right explanation panel: closed by default, opened once when the plan is
+first created, a bottom sheet on phones. The plan is built and validated by code from the concept graph; the
+model only picks the goal.
+
+### 1. Setup cards (on the empty stage, before the first scene)
+- **Order:** the learner types what they want at the existing welcome box ("What do you want to learn?"), then:
+  1. **Level:** "What do you already know about this?" chips *Nothing yet / A little / Some / A lot* (the same
+     content file as the engine's level question, `content/level-question.json`, so the wording lives in one place).
+  2. **Time:** "How long do you have per session?" chips such as *10 min / 20 min / 30 min+* (from a content file).
+  3. **Goal:** "Which of these fits what you want?" chips from a fixed topic list, matched to the typed text by
+     the router (the model only picks among listed goals), plus *Not sure*. A goal that matches nothing says
+     plainly "That isn't covered yet" and offers the nearest covered goal (logged as demand). The intent
+     (understand / build / both) is folded into the goal chips, so there are never more than three cards.
+- **Each card:** one question, chips (44 px or more), a **Skip** button, keyboard and screen-reader friendly
+  (the card is a labelled group; focus moves to the next card's first chip); reduced motion: cards cut in, no slide.
+  Skipped answers stay "not stated". Cards are page UI, not model turns: no cost.
+- **No double asking:** a level answered on the card sets the learner level; a level *skipped* on the card is
+  remembered as asked, so the engine does not supply the level question again (needs a small session flag,
+  for example `level_asked`).
+- **How answers reach the server:** today the client sends only its text (an M3 hard rule). The cards need a
+  small structured field on the turn request (for example `setup: { level?, minutes?, goal? }`, enums only,
+  validated against the content files). **This changes that rule: Lucky's decision.**
+
+### 2. The Plan tab (right panel)
+- **Tabs:** Explanation · **Plan** · Library (Plan added; `SideView` gains "plan"; the existing tab keyboard
+  model is kept: arrows move between tabs, Escape closes).
+- **Opens once:** when the plan is first created, the panel opens on the Plan tab (desktop: beside the stage;
+  phone: bottom sheet at half height, so the stage stays visible). Focus stays where it was; a polite
+  announcement says "Your plan is ready: 4 units". After that it opens only on request (and from the menu).
+- **Contents:**
+  - a heading "Your plan" and the label **"Draft plan, not yet expert-reviewed"** (icon + text);
+  - units in order (an ordered list), each with its title, its concepts in plain words, an estimated time
+    (from the time card), and its **checkpoint** ("Checkpoint: explain it back", "Checkpoint: predict, then
+    check");
+  - **status by icon + label, never colour alone:** *Done* (check), *Now* (filled marker plus a heavier border on
+    the current unit), *Not started* (open circle);
+  - **Edit order:** a "Reorder" button switches each unit to Move up / Move down buttons (no drag, so it works
+    with a keyboard and on phones). A move that would put a unit before its prerequisites is disabled, with
+    the reason ("Needs unit 2 first"). The server re-validates every change. Skipping a unit needs a waiver
+    (§5); safety-critical units need an explicit acknowledgement.
+- **Phone:** the same tab inside the bottom sheet; units collapse to title + status + checkpoint, details on tap.
+
+### 3. Proposed wording for `docs/aili-stage-layout.md` (for approval; not edited yet)
+- §1 Top bar, current: "menu (plan/table of contents, notes, settings, help, sign out)."
+  Proposed: "menu (**Plan**, which opens the panel's Plan tab; notes, settings, help, sign out)."
+- §1 Text explanation panel, add after the current text:
+  > **Plan tab:** the study plan's table of contents (units in order, a checkpoint per unit, the current unit marked, done / not done by icon and label, an editable order within prerequisite limits), labelled "Draft plan, not yet expert-reviewed". Closed by default; opens once when the plan is first created. Never shown on the stage.
+- §1 Stage, add:
+  > **Setup cards:** before the first scene exists, at most three short cards (level, time, goal), one after another on the empty stage, each with chips and a Skip option. They are not scenes and never return once the plan exists.
+- §1 Phone, current: "text panel as bottom sheet". Proposed: "text panel as bottom sheet (with the Explanation, Plan and Library tabs)".
+
+### 4. What it needs from the study planner (§5)
+- **The concept graph (§1)** with prerequisites, coverage and safety flags. Today `concepts.json` is a flat list
+  of ten draft concepts with no prerequisites, so this comes first.
+- **Units as content:** the four demo-path units (§5) authored in content (concepts, activities, checkpoint,
+  estimated minutes), so the planner orders and checks them rather than inventing groupings.
+- **The planner itself (code):** targets → prerequisite closure → order → units; validation (prerequisites
+  first, IDs exist, every unit has a checkpoint); pure and tested.
+- **Goal picking:** the fixed topic list mapped to target concepts, and the router's choice among them only.
+- **Session state:** the plan and the current unit on the server (in memory until the database stage); a plan
+  event to the page; a reorder request the server validates.
+- **Progress:** a unit is *Done* when its checkpoint passes (a revealed prediction or a graded teach-back),
+  never from one answer claimed as mastery.
+- **The shortlist from the current unit** (replacing today's live stand-in of all fixture concepts).
+
+### 5. Effort and risks
+| Part | Sessions |
+|---|---|
+| Concept graph with prerequisites, coverage, safety flags; validation (§1) | 1 |
+| Units content and the planner core with validation tests (§5) | 1 |
+| Setup cards (three, Skip, accessibility, phone, reduced motion), setup request field, plan creation on the server | 1 |
+| Plan tab (list, status, checkpoint, current unit, draft label, opens once, bottom sheet) | 0.5–1 |
+| Reorder within prerequisite limits, server-validated | 0.5 |
+| Goal picking (topic list, router choice, "not covered yet") | 0.5–1 |
+| Current unit drives the shortlist; progress on checkpoints | 1 |
+| **Total** | **about 5.5–6.5** (§5's earlier 2-session estimate did not include the graph, the cards or the tab) |
+
+**Cut first if needed:** reorder (−0.5; show the order read-only), the time card (−0.25; estimates in minutes
+only), progress by checkpoint (−0.5; mark *Now* only).
+
+**Risks:**
+- Setup before teaching can feel like a form: keep it to three cards, each skippable, under ten seconds.
+- The structured setup field changes the "client sends only text" rule (a decision above).
+- Prompt budget: the typical professor prompt is at 4,949 of 5,000 estimated tokens; a current-unit shortlist
+  should shrink it, but the plan must not add text to every turn.
+- The concept graph and units are Claude's drafts and need a roboticist's review before beta; the tab says "Draft".
