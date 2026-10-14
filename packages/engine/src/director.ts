@@ -1,4 +1,4 @@
-import { DirectorResponse, type BoundedInput, type SceneManifest } from "@aili/schemas";
+import { Action, DirectorResponse, type BoundedInput, type SceneManifest } from "@aili/schemas";
 import type { Shortlist } from "./capabilities";
 import { checkNarration } from "./narration";
 import { findPhrases, WARN_PHRASES } from "./pedagogy";
@@ -50,6 +50,36 @@ export interface TurnContext {
   safetyCritical?: ReadonlySet<string>;
   /** The segment limit for this answer: NARRATION_SPLIT_MAX_SEGMENTS when the engine split it, else the default. */
   maxSegments?: number;
+}
+
+export const STRAY_ACTION_FIELD_DROPPED = "stray action field dropped";
+
+/**
+ * The provider's reduced schema flattens the actions union, so a model sometimes adds a field that
+ * belongs to ANOTHER action type (for example "scene" on highlight_part). Before the checks, such a
+ * field is dropped, but only when the rest of the action is valid for its own type; each drop is a
+ * visible warning (Lucky's decision 2026-10-13). Anything else is left for the checks to report.
+ */
+export function dropStrayActionFields(raw: unknown): { raw: unknown; warnings: string[] } {
+  const r = raw as { actions?: unknown } | null;
+  if (!r || typeof r !== "object" || !Array.isArray(r.actions)) return { raw, warnings: [] };
+  const warnings: string[] = [];
+  const keysOf = (o: (typeof Action.options)[number]) => Object.keys(o.shape);
+  const actions = r.actions.map((a: unknown, i) => {
+    if (!a || typeof a !== "object") return a;
+    const type = (a as { type?: unknown }).type;
+    const own = Action.options.find((o) => o.shape.type.safeParse(type).success);
+    if (!own) return a;
+    const allowed = new Set(keysOf(own));
+    const others = new Set(Action.options.filter((o) => o !== own).flatMap(keysOf));
+    const stray = Object.keys(a).filter((k) => !allowed.has(k));
+    if (!stray.length || !stray.every((k) => others.has(k))) return a;
+    const kept = Object.fromEntries(Object.entries(a).filter(([k]) => allowed.has(k)));
+    if (!own.safeParse(kept).success) return a;
+    warnings.push(`${STRAY_ACTION_FIELD_DROPPED}: actions[${i}] (${String(type)}) ${stray.map((k) => `"${k}"`).join(", ")}`);
+    return kept;
+  });
+  return warnings.length ? { raw: { ...r, actions }, warnings } : { raw, warnings };
 }
 
 /** The error for an answer with no narration and no prompt (actions alone tell the learner nothing). */

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { checkNarration, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { checkNarration, dropStrayActionFields, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -541,5 +541,24 @@ describe("split up to five segments within 700 characters: the live c1, j1 and f
     expect(parts).toHaveLength(5);
     expect(parts.map((p) => p.text).join(" ")).toContain("{{c1.torque_nm}}");
     expect(parts.map((p) => p.text).join(" ")).toContain("{{c2.torque_nm}}");
+  });
+});
+
+describe("stray action fields from another action type are dropped before the checks (Lucky's decision 2026-10-13)", () => {
+  it("drops 'scene' on highlight_part when the rest is valid, with a warning per action", () => {
+    const raw = { move: "probe", actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight", scene: "fx-lever" }] };
+    const out = dropStrayActionFields(raw);
+    expect((out.raw as typeof raw).actions).toEqual([{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight" }]);
+    expect(out.warnings).toEqual(['stray action field dropped: actions[1] (highlight_part) "scene"']);
+  });
+  it("leaves the action alone when the rest is invalid, when the field belongs to no action type, or when nothing is stray", () => {
+    const badRest = { actions: [{ type: "highlight_part", part: "Not Kebab", scene: "fx-lever" }] };
+    expect(dropStrayActionFields(badRest)).toEqual({ raw: badRest, warnings: [] });
+    const unknownKey = { actions: [{ type: "highlight_part", part: "weight", colour: "red" }] };
+    expect(dropStrayActionFields(unknownKey)).toEqual({ raw: unknownKey, warnings: [] });
+    const clean = { actions: [{ type: "highlight_part", part: "weight" }] };
+    expect(dropStrayActionFields(clean)).toEqual({ raw: clean, warnings: [] });
+    expect(dropStrayActionFields({ actions: [{ type: "fly", scene: "x" }] }).warnings).toEqual([]);
+    expect(dropStrayActionFields(null)).toEqual({ raw: null, warnings: [] });
   });
 });

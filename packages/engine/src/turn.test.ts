@@ -619,3 +619,23 @@ describe("scene on stage: the engine selects the concept's scene when the answer
     expect(selectSceneForConcept(r, scenes, "fx-lever")).toBeNull();
   });
 });
+
+describe("a stray action field no longer costs a repair (Lucky's decision 2026-10-13)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  it("the live 'robotics' case: 'scene' on highlight_part is dropped and the first attempt passes, with the warning", async () => {
+    const warnings: string[] = [];
+    let calls = 0;
+    const director: Director = {
+      async respond(req) {
+        calls += 1;
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "weight", scene: "fx-lever" }] } };
+      },
+    };
+    const s = new TurnSession({ registry: fixtureRegistry().registry, director, router: createFakeRouter(), state: { history: { posture: "learning", learner_level: "some_knowledge", entries: [] } }, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => warnings.push(...c.warnings) });
+    const events: TurnEvent[] = [];
+    await s.run({ text: "robotics" }, (e) => events.push(e));
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(calls).toBe(1);
+    expect(warnings).toContain('stray action field dropped: actions[1] (highlight_part) "scene"');
+  });
+});

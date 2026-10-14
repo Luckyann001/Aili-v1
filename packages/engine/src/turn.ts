@@ -2,7 +2,7 @@ import type { DirectorResponse, SessionHistory } from "@aili/schemas";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
-import { NARRATION_SPLIT_MAX_SEGMENTS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
+import { dropStrayActionFields, NARRATION_SPLIT_MAX_SEGMENTS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse } from "./director";
 import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept } from "./teaching";
@@ -382,7 +382,9 @@ export class TurnSession {
       // A teach-back question with no reading gets the one open reading (a warning, never silent).
       const filled = fillTeachBackReading(answer, teaching);
       const split = splitLongNarration(filled.raw);
-      const v = validateDirectorResponse(split.raw, {
+      // A field from another action type, on an otherwise valid action, is dropped (a warning).
+      const stray = dropStrayActionFields(split.raw);
+      const v = validateDirectorResponse(stray.raw, {
         shortlist: sl,
         activeScene: before.activeScene,
         expected: { request_id: turn_id, state_rev: rev },
@@ -390,7 +392,7 @@ export class TurnSession {
         // An answer the engine split may have up to five segments (the split checks the 700-character total).
         maxSegments: split.warnings.length ? NARRATION_SPLIT_MAX_SEGMENTS : undefined,
       });
-      const warnings = [...(filled.warning ? [filled.warning] : []), ...split.warnings, ...v.warnings];
+      const warnings = [...(filled.warning ? [filled.warning] : []), ...split.warnings, ...stray.warnings, ...v.warnings];
       if (!v.response) return { reason: "validation", errors: v.errors, warnings };
       const p = validatePedagogy(v.response, history, teaching, pedagogyContext);
       // A re-offer of the open question is allowed, and always visible (Lucky's decision 2026-10-13).
