@@ -59,7 +59,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
       await toTurn6(page, { muted: mode === "captions only" });
       await expect(page.locator("[data-viewer]")).toHaveAttribute("data-viewer", "ready", { timeout: 20_000 });
       // n1 puts the servo + arm on stage; no step yet.
-      await expect(page.getByRole("region", { name: "Torque at the joint" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Explanation space" })).toBeVisible();
       await expect(page.locator("span[data-eq-label]")).toHaveCount(0);
       await expect(caption(page)).toHaveText(N2, { timeout: 20_000 });
       await expect(label(page, "eq-force")).toHaveText(/^F = m × g = \d+\.\d+ N, the load's weight$/);
@@ -148,7 +148,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
         };
         const eq = [...document.querySelectorAll("span[data-eq-label]")].map((el) => ({ id: el.getAttribute("data-eq-label")!, visible: vis(el), ...box(el) }));
         const parts = [...document.querySelectorAll("span[data-part-id]")].filter(vis).map((el) => ({ id: `part:${el.getAttribute("data-part-id")}`, ...box(el) }));
-        const panel = document.querySelector('section[aria-label="Torque at the joint"]');
+        const panel = document.querySelector('section[aria-label="Explanation space"]');
         return { eq, others: [...parts, ...(panel ? [{ id: "panel", ...box(panel) }] : [])] };
       });
     const hit = (a: { x: number; y: number; w: number; h: number }, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -200,7 +200,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
         const vis = (el: Element) => getComputedStyle(el).visibility !== "hidden" && (el as HTMLElement).offsetWidth > 0;
         return {
           note: r(document.querySelector("[data-settings-note]")!),
-          others: [...document.querySelectorAll("span[data-eq-label], span[data-part-id], section[aria-label='Torque at the joint']")].filter(vis).map(r),
+          others: [...document.querySelectorAll("span[data-eq-label], span[data-part-id], section[aria-label='Explanation space']")].filter(vis).map(r),
         };
       });
       const hit = (a: typeof boxes.note, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;

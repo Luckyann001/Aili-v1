@@ -1,12 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 import { paramsFor } from "@/scene/layout";
 import { partNameIn } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { useStageContent } from "@/turn/stageContent";
-import { RATING_DEF, SERVO_PARAMS, SERVO_PARAMS_BY_PART, isServoParam, servoReadout, type ServoParamId } from "@/scene/servoArm";
-import { MarginLine } from "./TorqueMargin";
+import { SERVO_PARAMS, SERVO_PARAMS_BY_PART, isServoParam, servoReadout, type ServoParamId } from "@/scene/servoArm";
+import { MarginLine } from "./ExplanationSpace";
 import styles from "../learn.module.css";
 
 interface SettingDef {
@@ -88,7 +88,20 @@ export function Inspector({ onClosed }: { onClosed: () => void }) {
                 }}
               />
             ) : (
-              <RatingSetting key={d.id} />
+              // The rating is entered in the stage's explanation space (one field for the whole stage).
+              <p key={d.id} className={styles.inspectorNote}>
+                The servo&apos;s rated torque goes in the explanation space.{" "}
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => {
+                    closeInspector();
+                    useStageContent.getState().requestRatingField(activeScene);
+                  }}
+                >
+                  Enter rating
+                </button>
+              </p>
             ),
           )}
           <MarginLine r={servoReadout(servo, rating)} />
@@ -130,75 +143,6 @@ function Setting({ def, value, onChange }: { def: SettingDef; value: number; onC
       />
       <p className={styles.settingBounds}>
         {fmt(def, def.min)} {def.unit} to {fmt(def, def.max)} {def.unit}
-      </p>
-    </div>
-  );
-}
-
-/**
- * The servo's rated torque, typed by the learner from their own datasheet: empty until then (no
- * value is ever offered as a product's spec). Out-of-bounds values are refused with a message and
- * change nothing. Once set, a slider adjusts it within the same bounds.
- */
-function RatingSetting() {
-  const id = useId();
-  const msgId = useId();
-  const rating = useScene((s) => s.ratedTorque_nm);
-  const setRatedTorque = useScene((s) => s.setRatedTorque);
-  const [draft, setDraft] = useState(rating === null ? "" : String(rating));
-  const [refused, setRefused] = useState(false);
-  const d = RATING_DEF;
-  const commit = (raw: string) => {
-    setDraft(raw);
-    if (raw.trim() === "") {
-      setRefused(false);
-      setRatedTorque(null);
-      return;
-    }
-    setRefused(!setRatedTorque(Number(raw)));
-  };
-  return (
-    <div className={styles.setting}>
-      <div className={styles.settingTop}>
-        <label htmlFor={id}>{d.label}</label>
-        <span className={styles.settingValue}>{rating === null ? "Not set" : `${fmt(d, rating)} ${d.unit}`}</span>
-      </div>
-      <div className={styles.ratingRow}>
-        <input
-          id={id}
-          type="number"
-          inputMode="decimal"
-          className={styles.ratingInput}
-          min={d.min}
-          max={d.max}
-          step={d.step}
-          placeholder="From your datasheet"
-          value={draft}
-          aria-invalid={refused || undefined}
-          aria-describedby={msgId}
-          onChange={(e) => commit(e.target.value)}
-        />
-        <span aria-hidden="true">{d.unit}</span>
-      </div>
-      {rating !== null && (
-        <input
-          type="range"
-          className={styles.slider}
-          aria-label="Rated torque"
-          min={d.min}
-          max={d.max}
-          step={d.step}
-          value={rating}
-          aria-valuetext={`${fmt(d, rating)} newton-metres`}
-          onChange={(e) => {
-            setRatedTorque(Number(e.target.value));
-            setDraft(e.target.value);
-            setRefused(false);
-          }}
-        />
-      )}
-      <p id={msgId} className={styles.settingBounds} role={refused ? "alert" : undefined}>
-        {refused ? `Enter a value from ${fmt(d, d.min)} to ${fmt(d, d.max)} ${d.unit}. Nothing was changed.` : `${fmt(d, d.min)} ${d.unit} to ${fmt(d, d.max)} ${d.unit}. Use the rated figure, not the stall figure.`}
       </p>
     </div>
   );

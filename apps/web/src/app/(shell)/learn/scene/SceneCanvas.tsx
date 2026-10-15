@@ -321,8 +321,10 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
     const reserved = () => Array.from(el.querySelectorAll<HTMLElement>("[data-reserve]"));
     const apply = () => {
       const { takeW, takeH } = reservedSpace(el);
-      const freeW = el.clientWidth - takeW;
-      const freeH = el.clientHeight - takeH;
+      // Never less than a third of the area: a panel that covers most of it (the phone inspector)
+      // otherwise left no room, and the fit divided by zero (NaN camera, nothing drawn after it closed).
+      const freeW = Math.max(el.clientWidth - takeW, el.clientWidth / 3);
+      const freeH = Math.max(el.clientHeight - takeH, el.clientHeight / 3);
       const shiftX = el.offsetLeft + freeW / 2 - size.width / 2;
       const shiftY = el.offsetTop + freeH / 2 - size.height / 2;
       camera.setViewOffset(size.width, size.height, -shiftX, -shiftY, size.width, size.height);

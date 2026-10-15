@@ -33,7 +33,7 @@ import { PartsMenu } from "./scene/PartsMenu";
 import { SceneFallback } from "./scene/SceneFallback";
 import { SceneLabels } from "./scene/SceneLabels";
 import { SceneViewport } from "./scene/SceneViewport";
-import { TorqueMargin } from "./scene/TorqueMargin";
+import { ExplanationSpace } from "./scene/ExplanationSpace";
 import { EquationLabels, EquationList } from "./scene/EquationLabels";
 import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
@@ -229,7 +229,7 @@ export function LearnStage() {
               {viewer === "fallback" && <EquationList />}
               <Inspector onClosed={focusParts} />
               <EffortGauge />
-              <TorqueMargin />
+              <ExplanationSpace />
             </>
           )}
         </div>

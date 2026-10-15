@@ -19,6 +19,12 @@ export const useStageContent = create<{
   /** A professor turn gave numbers about the scene on stage (and none since the learner's changes). */
   stageNumbersGiven: boolean;
   settingsNote: boolean;
+  /** The scene whose explanation-space sheet is open (narrow screens); another scene means closed. */
+  spaceOpenFor: string | null;
+  setSpaceOpenFor: (scene: string | null) => void;
+  /** Bumped by the servo's inspector: the explanation space opens and focuses the rating field. */
+  ratingRequest: number;
+  requestRatingField: (scene: string) => void;
   /** A turn with numbers about the scene: the note goes. */
   stageNumbersTurn: () => void;
   /** The learner moved a slider: the note shows if an earlier turn gave numbers about the scene. */
@@ -31,6 +37,10 @@ export const useStageContent = create<{
   scenePicked: false,
   wordsOnlyAnalogy: null,
   setWordsOnlyAnalogy: (wordsOnlyAnalogy) => set({ wordsOnlyAnalogy }),
+  spaceOpenFor: null,
+  setSpaceOpenFor: (spaceOpenFor) => set({ spaceOpenFor }),
+  ratingRequest: 0,
+  requestRatingField: (scene) => set((s) => ({ ratingRequest: s.ratingRequest + 1, spaceOpenFor: scene })),
   stageNumbersGiven: false,
   settingsNote: false,
   stageNumbersTurn: () => set({ stageNumbersGiven: true, settingsNote: false }),

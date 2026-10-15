@@ -412,6 +412,7 @@
 
 .settingValue {
   font-family: var(--aili-font-mono);
+  white-space: nowrap;
 }
 
 .slider {
@@ -1448,4 +1449,122 @@
 
 .settingsNote svg {
   flex: none;
+}
+
+/* ── The stage's explanation space (16 Oct 2026): a column at the right from 1,100 px; below that a
+   one-line strip at the bottom of the safe area with a button that opens the same content as a sheet.
+   Both are reserved (data-reserve), so the model is framed clear of them and labels stay outside. ── */
+.space {
+  position: absolute;
+  z-index: 3;
+  top: var(--aili-space-2);
+  right: var(--aili-space-2);
+  bottom: var(--aili-space-2);
+  width: min(340px, calc(100% - 16px));
+  overflow-y: auto;
+  padding: var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  pointer-events: auto;
+}
+
+.spaceHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin-bottom: var(--aili-space-2);
+  font: 600 0.9rem var(--aili-font-ui);
+}
+
+.spaceBlock + .spaceBlock {
+  margin-top: var(--aili-space-3);
+  padding-top: var(--aili-space-3);
+  border-top: 1px solid var(--aili-border);
+}
+
+.totalLine {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--aili-space-1);
+}
+
+.totalLabel {
+  font-size: 0.85rem;
+}
+
+.totalValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.totalValue strong {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.spaceInputs {
+  margin: var(--aili-space-2) 0 0;
+  color: var(--aili-text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.spaceStrip {
+  position: absolute;
+  z-index: 3;
+  left: var(--aili-space-2);
+  right: var(--aili-space-2);
+  bottom: var(--aili-space-2);
+  padding: var(--aili-space-1) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  pointer-events: auto;
+}
+
+/* Open, the sheet covers the stage area above the captions, as the inspector does on phones; the
+   model waits unchanged behind it (a squeezed or half-hidden model is no use on a small screen). */
+.spaceStripOpen {
+  top: var(--aili-space-2);
+  overflow-y: auto;
+  padding-top: 0;
+}
+
+/* The button row stays in view while the open sheet scrolls. */
+.spaceStripOpen .stripRow {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-top: var(--aili-space-1);
+  background: var(--aili-surface);
+}
+
+.stripRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-1) var(--aili-space-2);
+}
+
+.stripText {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stripText svg {
+  width: 16px;
+  height: 16px;
+}
+
+.spaceSheet {
+  margin-top: var(--aili-space-2);
 }

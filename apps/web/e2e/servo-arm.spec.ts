@@ -14,7 +14,7 @@ const bottomBox = (p: Page) => p.getByRole("textbox", { name: "Ask Aili or answe
 const replies = (p: Page) => p.getByRole("group", { name: "Suggested replies" });
 const caption = (p: Page) => p.locator("main [aria-live]").last();
 const partsButton = (p: Page) => p.getByRole("button", { name: /^Parts/ });
-const panel = (p: Page) => p.getByRole("region", { name: "Torque at the joint" });
+const panel = (p: Page) => p.getByRole("region", { name: "Explanation space" });
 const inspector = (p: Page) => p.getByRole("region", { name: /^Inspector:/ });
 const axe = async (p: Page) =>
   (await new AxeBuilder({ page: p }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" | ")}`);
@@ -45,11 +45,20 @@ async function onServoStage(page: Page, o: { speakMs?: number; muted?: boolean }
   await expect(panel(page)).toBeVisible();
 }
 
-/** Phones and tablets start with the one-line summary: open the details (wide screens start open). */
+/** Below 1,100 px the explanation space is a strip: open its sheet (wide screens show the column). */
 async function openDetails(page: Page) {
-  const more = panel(page).getByRole("button", { name: "Details", exact: true });
-  if (await more.isVisible()) await more.click();
-  await expect(panel(page).getByRole("button", { name: "Fewer details" })).toBeVisible();
+  const button = panel(page).getByRole("button", { name: "Explanation space", exact: true });
+  if (await button.isVisible()) await button.click();
+  await expect(panel(page).locator('[data-space-block="torque"]')).toBeVisible();
+}
+
+/** The rating field, reached from the servo's inspector ("Enter rating"), which focuses it. */
+async function ratingField(page: Page) {
+  await pickPart(page, "Servo (generic)");
+  await inspector(page).getByRole("button", { name: "Enter rating" }).click();
+  const field = panel(page).getByRole("spinbutton", { name: /Servo rated torque/ });
+  await expect(field).toBeFocused();
+  return field;
 }
 
 /** The solver's answer for the values the page shows (arm level; arm mass as a uniform bar; standard gravity, as the scene states). */
@@ -125,7 +134,9 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     await expect(panel(page)).toContainText("Teaching thresholds, not a design standard: Fail below 1.0×, Warn 1.0× up to 2.0×, Pass at 2.0× and above");
     await expect(panel(page)).toContainText("Simulation only; hardware untested");
     await expect(panel(page)).toContainText("Illustrative (AI-composed)");
-    await expect(panel(page)).toContainText("enter your servo's rated torque");
+    await expect(panel(page)).toContainText("Enter your servo's rated torque to see the margin.");
+    await expect(panel(page)).toContainText("g = 9.80665 m/s² (standard gravity)"); // the inputs line
+    await expect(panel(page)).toContainText("Total the servo must hold");
     expect(await axe(page)).toEqual([]);
 
     // Bounds: each slider declares its unit and range, and the keyboard cannot leave it.
@@ -143,19 +154,17 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     await expect(length).toHaveAttribute("aria-valuetext", "0.08 metres");
 
     // The rating: empty, no product value; out of bounds is refused; then the margin and its band.
-    await pickPart(page, "Servo (generic)");
-    const rating = inspector(page).getByRole("spinbutton", { name: /Servo rated torque/ });
+    await page.getByRole("button", { name: "Close inspector" }).click();
+    const rating = await ratingField(page);
     await expect(rating).toHaveValue("");
     await expect(rating).toHaveAttribute("placeholder", "From your datasheet");
-    await expect(inspector(page)).toContainText("Not set");
+    await expect(panel(page)).toContainText("Not set");
     await rating.fill("80");
-    await expect(inspector(page).getByRole("alert")).toHaveText("Enter a value from 0.05 to 5.00 N·m. Nothing was changed.");
-    await expect(inspector(page)).toContainText("Not set");
+    await expect(panel(page).getByRole("alert")).toHaveText("Enter a value from 0.05 to 5.00 N·m. Nothing was changed.");
+    await expect(panel(page)).toContainText("Not set");
     await rating.fill("0.25");
-    await expect(inspector(page)).toContainText("0.25 N·m");
+    await expect(panel(page)).toContainText("0.25 N·m");
     expect(await axe(page)).toEqual([]);
-    await page.getByRole("button", { name: "Close inspector" }).click();
-    await openDetails(page);
 
     const s2 = solve({ L: 0.08, armKg, loadKg, d: 0.08 }, 0.25);
     const margin = 0.25 / s2.torque_nm;
@@ -175,6 +184,42 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     await onServoStage(page);
     await pickPart(page, "Load");
     await expect.poll(async () => (await settingValue(page, "Load distance from the joint")) === 0.15, { timeout: 5_000 }).toBe(true);
+  });
+
+  test("the explanation space: a column from 1,100 px; below, a strip whose sheet opens and closes by keyboard (Escape returns focus)", async ({ page }, info) => {
+    await onServoStage(page);
+    if (info.project.name === "desktop") {
+      await expect(panel(page)).toHaveAttribute("data-space", "column");
+      await expect(panel(page).getByRole("button", { name: "Explanation space", exact: true })).toHaveCount(0);
+      return;
+    }
+    await expect(panel(page)).toHaveAttribute("data-space", "strip");
+    await expect(panel(page)).toContainText("Total the servo must hold:");
+    const button = panel(page).getByRole("button", { name: "Explanation space", exact: true });
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await expect(panel(page)).toHaveAttribute("data-space", "sheet");
+    await expect(panel(page).getByRole("button", { name: "Close the explanation space" })).toHaveAttribute("aria-expanded", "true");
+    await panel(page).getByRole("spinbutton", { name: /Servo rated torque/ }).focus();
+    await page.keyboard.press("Escape");
+    await expect(panel(page)).toHaveAttribute("data-space", "strip");
+    await expect(button).toBeFocused();
+    expect(await axe(page)).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  });
+
+  test("the model stays framed (finite camera) after an inspector that covers most of the stage closes, and with the sheet open", async ({ page }) => {
+    await onServoStage(page);
+    const host = page.locator("[data-viewer]");
+    test.skip((await host.getAttribute("data-viewer")) !== "ready", "3D view only");
+    const finite = async () => (await host.getAttribute("data-model-box"))!.split(",").every((n) => Number.isFinite(Number(n)));
+    await pickPart(page, "Arm link");
+    await page.getByRole("button", { name: "Close inspector" }).click();
+    await expect.poll(finite).toBe(true); // was NaN on phones: the inspector left no free area
+    const button = panel(page).getByRole("button", { name: "Explanation space", exact: true });
+    if (await button.isVisible()) await button.click();
+    await expect.poll(finite).toBe(true);
   });
 
   test("without WebGL: the still picture of the servo and arm, and the same panel", async ({ page }) => {
@@ -203,10 +248,7 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
         await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20_000 });
         await page.mouse.move(0, 0);
         await page.screenshot({ path: `${dir}/${name}-${scheme}-1-scene.png` });
-        await pickPart(page, "Servo (generic)");
-        await inspector(page).getByRole("spinbutton", { name: /Servo rated torque/ }).fill("0.25");
-        await page.getByRole("button", { name: "Close inspector" }).click();
-        await openDetails(page);
+        await (await ratingField(page)).fill("0.25");
         await page.screenshot({ path: `${dir}/${name}-${scheme}-2-margin.png` });
       }
   });

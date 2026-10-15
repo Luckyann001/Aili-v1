@@ -43,7 +43,7 @@ test.describe("analogy honesty rule (addendum A), recorded live path", () => {
     await send(page, "the rated torque");
     await expect(caption(page)).toHaveText(/picture holding a shopping bag/, { timeout: 30_000 });
     await expect(note(page)).toHaveText(/^Analogy in words only\. No picture of this yet\./);
-    await expect(page.getByRole("region", { name: "Torque at the joint" })).toBeVisible(); // still the servo + arm
+    await expect(page.getByRole("region", { name: "Explanation space" })).toBeVisible(); // still the servo + arm
     // Captions off: the label stays (the stage is still not a picture of the bag).
     await page.getByRole("button", { name: "Captions" }).click();
     await expect(note(page)).toBeVisible();
@@ -56,7 +56,7 @@ test.describe("analogy honesty rule (addendum A), recorded live path", () => {
     await expect(caption(page)).toHaveText(/^Why does the far weight take more effort to hold/, { timeout: 30_000 });
     await expect(note(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Parts/ })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Torque at the joint" })).toHaveCount(0); // the lever is on stage
+    await expect(page.getByRole("region", { name: "Explanation space" })).toHaveCount(0); // the lever is on stage
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   });
 });
