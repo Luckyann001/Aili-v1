@@ -510,3 +510,19 @@ only), progress by checkpoint (−0.5; mark *Now* only).
 - Prompt budget: the typical professor prompt is at 4,949 of 5,000 estimated tokens; a current-unit shortlist
   should shrink it, but the plan must not add text to every turn.
 - The concept graph and units are Claude's drafts and need a roboticist's review before beta; the tab says "Draft".
+
+---
+
+## Addendum (15 Oct 2026): post-demo option, scene settings and the rating sent with each turn (not approved)
+
+Today the page sends only the learner's text (an M3 hard rule), so the professor never sees the sliders the
+learner moved or the rated torque they typed. Consequences: the professor cannot state the real margin (it is
+told to point to the panel instead, and a rated-torque calculation input is rejected), and a calculation about
+the stage can only use the settings the turns themselves set.
+
+**Option for after the demo:** send the scene's current settings and the learner's rating as a small,
+validated structured field with each turn (for example `stage: { scene, settings: { arm_length_m, … },
+rated_torque_nm? }`), every value checked against the scene manifest's bounds on the server and never trusted
+otherwise. The engine would then use them for calculations about the scene on stage, and a rating share could
+become a real placeholder. **This changes the "page sends only text" rule and is to be approved separately**;
+nothing is built for it.
