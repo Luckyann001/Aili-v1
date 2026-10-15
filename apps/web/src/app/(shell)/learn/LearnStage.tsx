@@ -34,7 +34,7 @@ import { SceneFallback } from "./scene/SceneFallback";
 import { SceneLabels } from "./scene/SceneLabels";
 import { SceneViewport } from "./scene/SceneViewport";
 import { ExplanationSpace } from "./scene/ExplanationSpace";
-import { EquationLabels, EquationList } from "./scene/EquationLabels";
+import { EquationLabels } from "./scene/EquationLabels";
 import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
 import styles from "./learn.module.css";
@@ -226,7 +226,6 @@ export function LearnStage() {
               {viewer === "fallback" && <SceneFallback />}
               {viewer === "ready" && <SceneLabels labels={labelEls} />}
               {viewer === "ready" && <EquationLabels labels={labelEls} />}
-              {viewer === "fallback" && <EquationList />}
               <Inspector onClosed={focusParts} />
               <EffortGauge />
               <ExplanationSpace />

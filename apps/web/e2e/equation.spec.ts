@@ -12,6 +12,7 @@ const welcomeBox = (p: Page) => p.getByRole("textbox", { name: "What do you want
 const bottomBox = (p: Page) => p.getByRole("textbox", { name: "Ask Aili or answer" });
 const caption = (p: Page) => p.locator("main [aria-live]").last();
 const label = (p: Page, step: string) => p.locator(`span[data-eq-label="${step}"]`);
+const line = (p: Page, step: string) => p.locator(`li[data-eq-line="${step}"]`);
 const send = async (p: Page, text: string) => {
   await bottomBox(p).fill(text);
   await p.getByRole("button", { name: "Send" }).click();
@@ -55,48 +56,63 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
   });
 
   for (const mode of ["voice on", "captions only"] as const) {
-    test(`${mode}: each step appears with its own segment, with solver numbers and units`, async ({ page }, info) => {
+    test(`${mode}: each step's line appears in the explanation space with its own segment; the diagram keeps short symbols`, async ({ page }, info) => {
       await toTurn6(page, { muted: mode === "captions only" });
       await expect(page.locator("[data-viewer]")).toHaveAttribute("data-viewer", "ready", { timeout: 20_000 });
+      const space = page.getByRole("region", { name: "Explanation space" });
+      const wide = info.project.name === "desktop";
       // n1 puts the servo + arm on stage; no step yet.
-      await expect(page.getByRole("region", { name: "Explanation space" })).toBeVisible();
+      await expect(space).toBeVisible();
+      await expect(line(page, "eq-force")).toHaveCount(0);
       await expect(page.locator("span[data-eq-label]")).toHaveCount(0);
+
       await expect(caption(page)).toHaveText(N2, { timeout: 20_000 });
-      await expect(label(page, "eq-force")).toHaveText(/^F = m × g = \d+\.\d+ N, the load's weight$/);
-      await expect(label(page, "eq-distance")).toHaveCount(0);
+      await expect(line(page, "eq-force")).toHaveAttribute("data-state", "now");
+      await expect(line(page, "eq-force")).toContainText(/F = m × g\s*\d+\.\d+ N/);
+      await expect(line(page, "eq-distance")).toHaveAttribute("data-state", "next"); // formula only, no value yet
+      await expect(line(page, "eq-distance")).not.toContainText(" m");
+      await expect(line(page, "eq-torque")).toHaveCount(0);
+
       await expect(caption(page)).toHaveText(N3, { timeout: 20_000 });
-      await expect(label(page, "eq-distance")).toHaveText(/^d = 0\.\d\d m from the joint$/);
-      await expect(label(page, "eq-torque")).toHaveCount(0);
+      await expect(line(page, "eq-force")).toHaveAttribute("data-state", "done");
+      await expect(line(page, "eq-distance")).toHaveAttribute("data-state", "now");
+      await expect(line(page, "eq-distance")).toContainText(/0\.\d\d m/);
+
       await expect(caption(page)).toHaveText(N4, { timeout: 20_000 });
-      await expect(label(page, "eq-torque")).toHaveText(/^τ = F × d = \d\.\d+ N·m$/);
-      // Phones: only the latest step in full; the earlier ones are small marks.
-      if (info.project.name === "phone") {
-        await expect(label(page, "eq-force")).toHaveText("F");
-        await expect(label(page, "eq-distance")).toHaveText("d");
-      } else {
-        await expect(label(page, "eq-force")).toHaveText(/^F = /);
-      }
+      await expect(line(page, "eq-torque")).toHaveAttribute("data-state", "now");
+      await expect(line(page, "eq-torque")).toContainText(/τ = F × d\s*\d\.\d+ N·m/);
+      for (const [step, tag] of [["eq-force", "Done"], ["eq-distance", "Done"], ["eq-torque", "Now"], ["eq-arm-share", "Next"]] as const)
+        await expect(line(page, step).locator("span").last()).toHaveText(tag); // text tags, not colour alone
+      // The diagram: short symbols only.
+      await expect(label(page, "eq-force")).toHaveText("F");
+      await expect(label(page, "eq-distance")).toHaveText("d");
+      await expect(label(page, "eq-torque")).toHaveText("τ");
+      if (!wide) await expect(space.locator("[data-strip-now]")).toContainText(/Now\s*τ = F × d\s*= \d\.\d+ N·m/);
       expect(await axe(page)).toEqual([]);
 
       // Turn 7: the arm's own share, then the margin (no rating yet: it asks for one).
       await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 20_000 });
       await send(page, "The arm itself");
       await expect(caption(page)).toHaveText(/^Yes: the arm's own weight/, { timeout: 30_000 });
-      await expect(label(page, "eq-arm-share")).toHaveText(/^\+ the arm's own weight \(\d\.\d+ N at mid-arm\): \d\.\d+ N·m$/);
-      await expect(label(page, "eq-margin")).toHaveCount(0);
+      await expect(line(page, "eq-arm-share")).toHaveAttribute("data-state", "now");
+      await expect(line(page, "eq-arm-share")).toContainText(/W × L\/2\s*\d\.\d+ N·m/);
+      await expect(label(page, "eq-arm-share")).toHaveText("W");
       await expect(caption(page)).toHaveText(/^Compare that total with your servo's rated torque/, { timeout: 20_000 });
-      await expect(label(page, "eq-margin")).toHaveText(/^Total \d\.\d+ N·m\. Enter your servo's rated torque$/);
+      await expect(line(page, "eq-margin")).toHaveAttribute("data-state", "now");
+      await expect(line(page, "eq-margin")).toContainText(/Total \d\.\d+ N·m\. Enter your servo's rated torque/);
+      await expect(label(page, "eq-margin")).toHaveCount(0); // the margin lives in the space, not on the diagram
+      if (wide) await expect(line(page, "eq-margin")).toBeInViewport(); // the current line is kept in view
       expect(await axe(page)).toEqual([]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     });
   }
 
-  test("reduced motion: the steps appear at once, with no motion, and the labels are the same", async ({ page }) => {
+  test("reduced motion: lines appear at once, with no fade, and the same text", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await toTurn6(page);
     await expect(caption(page)).toHaveText(N4, { timeout: 30_000 });
-    await expect(label(page, "eq-torque")).toHaveText(/^τ = F × d = /);
-    const anim = await label(page, "eq-torque").evaluate((el) => parseFloat(getComputedStyle(el).animationDuration));
+    await expect(line(page, "eq-torque")).toHaveAttribute("data-state", "now");
+    const anim = await line(page, "eq-torque").evaluate((el) => parseFloat(getComputedStyle(el).animationDuration));
     expect(anim).toBeLessThan(0.001); // the UI duration token is (near) zero under reduced motion
   });
 
@@ -128,7 +144,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
     await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 30_000 });
     await send(page, "The arm itself");
     await expect(caption(page)).toHaveText(/^What could you change on the arm/, { timeout: 30_000 });
-    await expect(page.locator("span[data-eq-label]")).toHaveCount(5);
+    await expect(page.locator("span[data-eq-label]")).toHaveCount(4); // F, d, τ, W (the margin has no symbol on the diagram)
 
     const inspector = page.getByRole("region", { name: /^Inspector:/ });
     const setSlider = async (part: string, name: string, key: "Home" | "End") => {

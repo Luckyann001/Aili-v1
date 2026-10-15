@@ -5,7 +5,7 @@ import { StatusIcon } from "@/components/StatusIcon";
 import type { SceneId } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { useStageContent } from "@/turn/stageContent";
-import { GRAVITY_TEXT, MARGIN, RATING_DEF, servoReadout, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
+import { EQ_STEPS, eqLine, eqText, GRAVITY_TEXT, MARGIN, RATING_DEF, servoReadout, type EqStep, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // The stage's explanation space (docs/m4-plan.md, 16 Oct 2026): a column at the stage's right,
@@ -157,16 +157,78 @@ function TorqueBlock() {
   );
 }
 
+/**
+ * τ = F × d, line by line as the professor plays the eq-* steps (each with the segment that explains
+ * it): a round symbol chip, the formula, the solver's value with its unit, and a text tag. The
+ * current step is "Now", earlier ones "Done" (dimmed), the step after it "Next" (formula only).
+ */
+function EquationBlock() {
+  const equation = useScene((s) => s.equation);
+  const servo = useScene((s) => s.servo);
+  const rating = useScene((s) => s.ratedTorque_nm);
+  const latest = equation.at(-1);
+  // The current line stays in view as the space scrolls (no jump: "nearest").
+  useEffect(() => {
+    if (latest) document.querySelector(`[data-eq-line="${latest}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [latest]);
+  if (!latest) return null;
+  const r = servoReadout(servo, rating);
+  const d = Math.min(servo.arm_length_m, servo.load_distance_m);
+  const next = EQ_STEPS.find((x) => !equation.includes(x));
+  const rows: Array<{ step: EqStep; state: "done" | "now" | "next" }> = [...equation.map((step) => ({ step, state: step === latest ? ("now" as const) : ("done" as const) })), ...(next ? [{ step: next, state: "next" as const }] : [])];
+  const TAG = { done: "Done", now: "Now", next: "Next" } as const;
+  return (
+    <div className={styles.spaceBlock} data-space-block="equation">
+      <ol className={styles.eqLines} aria-label="The torque, step by step">
+        {rows.map(({ step, state }) => {
+          const l = eqLine(step, r, d);
+          return (
+            <li key={step} className={styles.eqLine} data-eq-line={step} data-state={state}>
+              <span className={styles.eqChip} aria-hidden="true">
+                {l.symbol}
+              </span>
+              <span className={styles.eqBody}>
+                <span className={styles.eqFormula}>{l.formula}</span>
+                {state !== "next" && l.value !== null && <span className={styles.eqValue}>{l.value}</span>}
+                {state !== "next" && <span className={styles.eqNote}>{l.note}</span>}
+              </span>
+              <span className={styles.eqTag}>{TAG[state]}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {/* For screen readers: the new step in full, politely, as it appears. */}
+      <p className={styles.srOnly} aria-live="polite">
+        Now: {eqText(latest, r, d)}
+      </p>
+    </div>
+  );
+}
+
 /** What each scene shows in the space, in order. A scene not listed has no space (the scene keeps the full width). */
 export const SPACE_BLOCKS: Partial<Record<SceneId, Array<{ id: string; render: () => ReactNode }>>> = {
-  "servo-arm": [{ id: "torque", render: () => <TorqueBlock key="torque" /> }],
+  "servo-arm": [
+    { id: "equation", render: () => <EquationBlock key="equation" /> },
+    { id: "torque", render: () => <TorqueBlock key="torque" /> },
+  ],
 };
 
-/** The one-line summary for the strip (narrow screens). */
+/** The one-line summary for the strip (narrow screens): the current step, else the total. */
 function Summary() {
   const servo = useScene((s) => s.servo);
   const rating = useScene((s) => s.ratedTorque_nm);
+  const equation = useScene((s) => s.equation);
   const r = servoReadout(servo, rating);
+  // While the equation is being built, the strip shows the current step.
+  if (equation.length) {
+    const l = eqLine(equation.at(-1)!, r, Math.min(servo.arm_length_m, servo.load_distance_m));
+    return (
+      <span className={styles.stripText} data-strip-now="">
+        <span className={styles.eqTag}>Now</span> <span className={styles.eqFormula}>{l.formula}</span>
+        {l.value !== null ? <strong>= {l.value}</strong> : <span>{l.note}</span>}
+      </span>
+    );
+  }
   return (
     <span className={styles.stripText}>
       Total the servo must hold: <strong>{nm(r.torque_nm)}</strong>

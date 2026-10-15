@@ -164,20 +164,35 @@ export function eqAnchors(p: ServoParams): Record<EqStep, [number, number, numbe
 const sig3 = (x: number) => x.toPrecision(3);
 const WORD = { pass: "Pass", warn: "Warn", fail: "Fail" } as const;
 
-/** The full text of a step, from the solver readout (and, for d, the setting itself). */
-export function eqText(step: EqStep, r: ServoReadout, d_m: number): string {
+/** One step of the equation, as the explanation space shows it: chip symbol, formula, value, note. */
+export interface EqLine {
+  symbol: string;
+  formula: string;
+  /** The solver's value with its unit (absent: the margin before a rating is entered). */
+  value: string | null;
+  note: string;
+}
+
+/** A step's line, from the solver readout (and, for d, the setting itself). */
+export function eqLine(step: EqStep, r: ServoReadout, d_m: number): EqLine {
   switch (step) {
     case "eq-force":
-      return `F = m × g = ${sig3(r.load_force_n)} N, the load's weight`;
+      return { symbol: "F", formula: "F = m × g", value: `${sig3(r.load_force_n)} N`, note: "the load's weight" };
     case "eq-distance":
-      return `d = ${d_m.toFixed(2)} m from the joint`;
+      return { symbol: "d", formula: "d", value: `${d_m.toFixed(2)} m`, note: "from the joint to the load" };
     case "eq-torque":
-      return `τ = F × d = ${sig3(r.load_torque_nm)} N·m`;
+      return { symbol: "τ", formula: "τ = F × d", value: `${sig3(r.load_torque_nm)} N·m`, note: "the load's twist at the joint" };
     case "eq-arm-share":
-      return `+ the arm's own weight (${sig3(r.arm_weight_n)} N at mid-arm): ${sig3(r.arm_torque_nm)} N·m`;
+      return { symbol: "W", formula: "W × L/2", value: `${sig3(r.arm_torque_nm)} N·m`, note: `the arm's own weight (${sig3(r.arm_weight_n)} N) at mid-arm` };
     case "eq-margin":
       return r.margin === null || r.status === null
-        ? `Total ${sig3(r.torque_nm)} N·m. Enter your servo's rated torque`
-        : `Total ${sig3(r.torque_nm)} N·m, margin ${r.margin.toFixed(2)}×: ${WORD[r.status]}`;
+        ? { symbol: "Στ", formula: "Total vs rating", value: null, note: `Total ${sig3(r.torque_nm)} N·m. Enter your servo's rated torque` }
+        : { symbol: "Στ", formula: "Rating ÷ total", value: `${r.margin.toFixed(2)}×`, note: `Total ${sig3(r.torque_nm)} N·m: ${WORD[r.status]}` };
   }
+}
+
+/** The step in one line of text (screen readers, the narrow-screen strip). */
+export function eqText(step: EqStep, r: ServoReadout, d_m: number): string {
+  const l = eqLine(step, r, d_m);
+  return l.value === null ? `${l.formula}: ${l.note}` : `${l.formula} = ${l.value}, ${l.note}`;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import { createSceneSlice, type SceneState } from "./sceneStore";
-import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqText, MARGIN, SCENE_G_M_PER_S2, GRAVITY_TEXT, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
+import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqLine, eqText, MARGIN, SCENE_G_M_PER_S2, GRAVITY_TEXT, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
 
 // Servo + arm scene (M4 slice 2a): every number from the solver, bounds enforced, bands from config.
 
@@ -91,14 +91,16 @@ describe("τ = F × d on the servo + arm (M4 slice B)", () => {
   });
   it("each step's label text, numbers from the readout with units; the margin asks for a rating until one is entered", () => {
     const r = servoReadout(lucky, null);
-    expect(EQ_STEPS.map((s) => eqText(s, r, 0.25))).toEqual([
-      "F = m × g = 4.90 N, the load's weight",
-      "d = 0.25 m from the joint",
-      "τ = F × d = 1.23 N·m",
-      "+ the arm's own weight (1.96 N at mid-arm): 0.294 N·m",
-      "Total 1.52 N·m. Enter your servo's rated torque",
+    expect(EQ_STEPS.map((s) => eqLine(s, r, 0.25))).toEqual([
+      { symbol: "F", formula: "F = m × g", value: "4.90 N", note: "the load's weight" },
+      { symbol: "d", formula: "d", value: "0.25 m", note: "from the joint to the load" },
+      { symbol: "τ", formula: "τ = F × d", value: "1.23 N·m", note: "the load's twist at the joint" },
+      { symbol: "W", formula: "W × L/2", value: "0.294 N·m", note: "the arm's own weight (1.96 N) at mid-arm" },
+      { symbol: "Στ", formula: "Total vs rating", value: null, note: "Total 1.52 N·m. Enter your servo's rated torque" },
     ]);
-    expect(eqText("eq-margin", servoReadout(lucky, 2), 0.25)).toBe("Total 1.52 N·m, margin 1.32×: Warn");
+    expect(eqLine("eq-margin", servoReadout(lucky, 2), 0.25)).toEqual({ symbol: "Στ", formula: "Rating ÷ total", value: "1.32×", note: "Total 1.52 N·m: Warn" });
+    expect(eqText("eq-torque", r, 0.25)).toBe("τ = F × d = 1.23 N·m, the load's twist at the joint");
+    expect(eqText("eq-margin", r, 0.25)).toBe("Total vs rating: Total 1.52 N·m. Enter your servo's rated torque");
   });
   it("the store keeps the steps in order, a repeat moves to the end, a new scene clears them, a snapshot puts them back", () => {
     const store = createStore<SceneState>()((set) => createSceneSlice(set));
