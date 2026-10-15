@@ -8,7 +8,7 @@ import type { DirectorResponse, ReplyClassification, TeachingState } from "@aili
 /** Answers that say the learner does not know: not a guess (behavior spec A1a: "no idea" is a valid commitment). */
 export const NOT_SURE = /^(not sure|i don['’]?t know|idk|no idea)[.!]?$/i;
 
-export function applyLearnerReply(t: TeachingState, c: ReplyClassification, today: string): TeachingState {
+export function applyLearnerReply(t: TeachingState, c: ReplyClassification, today: string, superseded = false, clarification = false): TeachingState {
   let predictions = t.predictions;
   let open_items = t.open_items;
   const open = predictions.find((p) => p.status === "open");
@@ -17,7 +17,8 @@ export function applyLearnerReply(t: TeachingState, c: ReplyClassification, toda
     predictions = predictions.map((p) => (p === open ? { ...p, guess: null, status: "unsure" as const } : p));
     open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === open.id));
   } else if (open && c.guess !== null) predictions = predictions.map((p) => (p === open ? { ...p, guess: c.guess, status: "guessed" as const } : p));
-  else if (open && c.frustrated) {
+  else if (open && ((c.frustrated && !clarification) || superseded)) {
+    // A new request supersedes it too (Lucky's decision 2026-10-15): closed without a guess.
     // Frustration releases the open prediction: closed without a guess, so a simpler question may follow (spec A4).
     predictions = predictions.map((p) => (p === open ? { ...p, status: "released" as const } : p));
     open_items = open_items.filter((o) => !(o.kind === "prediction" && o.ref === open.id));

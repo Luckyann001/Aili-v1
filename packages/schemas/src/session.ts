@@ -55,6 +55,11 @@ export const LearnerTurn = z
      * an answer) so a simpler new one may be asked (behavior spec A4; Lucky's decision 2026-10-13).
      */
     released_prompt: z.boolean().default(false),
+    /**
+     * The open question was released because the learner asked for something new instead (Lucky's
+     * decision 2026-10-15): the professor answers the request and does not re-offer it.
+     */
+    superseded_prompt: z.boolean().default(false),
   })
   .strict();
 

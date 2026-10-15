@@ -38,6 +38,42 @@ export function openPrompt(h: SessionHistory): { turn: number } | null {
   return open === null ? null : { turn: open };
 }
 
+/**
+ * The open question may not be released: it came from a safety turn, or a safety acknowledgement or
+ * a safety-critical waiver is still waiting (Lucky's decision 2026-10-15: never release a safety correction).
+ */
+export function safetyQuestionOpen(h: SessionHistory, teaching: TeachingState | undefined): boolean {
+  const open = openPrompt(h);
+  if (!open) return false;
+  const asked = h.entries.filter((e) => e.kind === "aili")[open.turn - 1];
+  return (asked?.kind === "aili" && asked.safety) || (teaching?.safety_acks ?? []).some((a) => a.acknowledged === null) || (teaching?.waivers ?? []).some((w) => w.safety_critical && w.acknowledged === null);
+}
+
+/** A reply asking about the open question itself: it stays open and is re-offered more simply. */
+const CLARIFICATION = /\b(what do you mean|what does (that|it) mean|i don['’]?t (understand|get it)|don['’]?t follow|which one|(can|could) you repeat|repeat (that|the question)|say (that|it) again|what was the question|huh|pardon)\b/i;
+/** Whether a reply asks about the open question itself (it is then kept open, even if the learner is confused). */
+export const isClarification = (text: string): boolean => CLARIFICATION.test(text.trim());
+
+/** A reply that asks for something: a question, or one that starts with a request word. */
+const REQUEST = /^(show|explain|tell|teach|can|could|would|how|what|why|give|let['’]?s|i want|i['’]?d like|please)\b/i;
+
+/**
+ * A new request supersedes the open question (Lucky's decision 2026-10-15): the router says the reply
+ * did not answer it, AND the reply is a request (ends with "?" or starts with a request word), AND it
+ * is not a clarification of the question, AND the question is not a safety correction or tied to an
+ * assigned reading (an open item). Anything else,
+ * or any doubt, keeps the question open (the behaviour before).
+ */
+export function supersedesOpenQuestion(text: string, c: { answered_prompt: boolean }, h: SessionHistory, teaching: TeachingState | undefined): boolean {
+  const open = openPrompt(h);
+  if (!open || c.answered_prompt || safetyQuestionOpen(h, teaching)) return false;
+  // A question that comes with an assigned reading is an open item, not a passing question: it stays.
+  if ((teaching?.open_items ?? []).some((o) => o.kind === "reading" && o.opened_turn === open.turn)) return false;
+  const said = text.trim();
+  if (!said || isClarification(said)) return false;
+  return /\?\s*$/.test(said) || REQUEST.test(said);
+}
+
 const NO_TEACHING: TeachingState = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
 
 /** Open items allowed at once before new ones must wait (spec A5: "do not pile on new ones"). */

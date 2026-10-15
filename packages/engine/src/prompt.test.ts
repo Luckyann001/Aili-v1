@@ -12,7 +12,7 @@ const history: SessionHistory = {
   posture: "learning",
   learner_level: "some_knowledge",
   entries: [
-    { kind: "learner", answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null, released_prompt: false },
+    { kind: "learner", answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null, released_prompt: false, superseded_prompt: false },
     { kind: "aili", move: "explain", asked: true, gave_back: true, concepts: ["mech.torque.static"], safety: false },
   ],
 };
@@ -236,7 +236,9 @@ describe("first live run fixes (2026-10-12)", () => {
     expect(s).toMatch(/If learner_level is "unknown" .*first ask one plain question \(prompt kind "question", not a prediction\) about what the learner already knows or has built/);
     expect(s).toMatch(/When you ask the learner's level, or make any probe, write the question itself in "prompt" \(its "text"\), not only described in narration/);
     expect(s).toMatch(/A question that offers choices about what will happen \(an outcome\) is a prediction: use prompt kind "prediction", offer "Not sure", and list the concept it tests FIRST in "concepts"\. The app records the prediction and gives it an id/);
-    expect(s).toMatch(/When a prediction is still open .* re-offer the same question more simply, as prompt kind "prediction" with the same choices \(the app keeps its id\)\. Never ask a new question while it is open\./);
+    // Lucky's decision 2026-10-15: a new request supersedes the open question; a clarification gets a re-offer.
+    expect(s).toMatch(/If they ask for something new instead, session_state shows it as closed_question: answer the request, do not re-offer it, and you may say once that you can come back to it\./);
+    expect(s).toMatch(/If they are only unclear \("what do you mean\?"\), re-offer it more simply with the same kind and choices; never ask a different question while it is open\./);
     expect(s).toMatch(/say that the arm's own weight counts too, or ask only about the load's share/);
     expect(s).toMatch(/Never mention tools, instructions, the shortlist, data blocks or "the system"/);
     expect(s).toMatch(/say in the narration what maps to what \(from its mapping\) and where it breaks down/);

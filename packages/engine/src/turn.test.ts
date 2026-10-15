@@ -4,6 +4,8 @@ import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 import levelQuestionJson from "../../../content/level-question.json";
 import { LevelQuestion } from "@aili/schemas";
+import { assembleProfessorPrompt } from "./index";
+import { fixtureShortlist as fixtureShortlistForTest } from "./__fixtures__/registry";
 
 // runTurn pipeline with the scripted fake director (docs/m2-plan.md slice 5). No provider, no key,
 // no network. The registry is the dev-only test-fixture registry.
@@ -190,7 +192,7 @@ describe("the router classifies the reply on the server", () => {
 });
 
 describe("session store (in memory)", () => {
-  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null, released_prompt: false })) } });
+  const state = (n: number): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: Array.from({ length: n }, () => ({ kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null, released_prompt: false, superseded_prompt: false })) } });
 
   it("commits only a newer revision; an older turn finishing late cannot overwrite it", () => {
     const st = new InMemorySessionStore();
@@ -412,10 +414,9 @@ describe("frustration releases the open question (spec A4/A5; Lucky's decision 2
     expect(events.at(-1)!.type).toBe("turn.done");
     expect(s.state.history.entries[2]).toMatchObject({ kind: "learner", frustrated: true, released_prompt: true });
   });
-  it("f2: \"huh\" counts as frustrated (fake router, spec A5) and releases the open question", async () => {
-    const { s, events } = await run2("huh", "question");
-    expect(events.at(-1)!.type).toBe("turn.done");
-    expect(s.state.history.entries[2]).toMatchObject({ frustrated: true, released_prompt: true });
+  it("f2: \"huh\" counts as frustrated, but as a clarification it keeps the question open (Lucky's decision 2026-10-15; was released): a different new question is rejected", async () => {
+    const { events } = await run2("huh", "question");
+    expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
   });
   it("an open prediction is released too (status released, out of open items)", async () => {
     const { s, events } = await run2("?", "prediction");
@@ -1035,5 +1036,81 @@ describe("turn.done names the analogy and whether it is words only (docs/m4-plan
     expect(await done("analogy.fx-shopping-bag")).toEqual({ id: "analogy.fx-shopping-bag", title: "Holding a shopping bag at arm's length (test fixture)", words_only: true });
     expect(await done("analogy.fx-ruler-held-out")).toEqual({ id: "analogy.fx-ruler-held-out", title: "A ruler held out (test fixture)", words_only: false });
     expect(await done()).toBeUndefined();
+  });
+});
+
+describe("a new request supersedes the open question; clarifications and safety corrections keep it (Lucky's decision 2026-10-15)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const OPEN = { text: "Which would feel harder to hold level: the weight near your hand or near the far end?", chips: ["Near my hand", "Near the far end", "Not sure"] };
+  const NEW_Q = { narration: [{ id: "n1", text: "Here is how a servo's torque is worked out." }], calc_requests: [], prompt: { kind: "question", text: "What else pulls down on the joint?", chips: ["The arm itself", "Not sure"] } };
+  /** Turn 1 asks OPEN (as a prediction, or a safety question); turn 2's reply is `reply`, answered with `second`. */
+  const run = async (reply: string, o: { second?: object; safety?: boolean; kind?: "question" | "prediction" } = {}) => {
+    const errors: string[][] = [];
+    const director: Director = {
+      async respond(req) {
+        if (req.repair) errors.push(req.repair.errors);
+        const first = { prompt: { ...OPEN, kind: o.kind ?? "prediction" }, ...(o.safety ? { safety: true } : {}) };
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.request_id === "turn_1" ? first : (o.second ?? NEW_Q)) } };
+      },
+    };
+    const s = new TurnSession({ registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: false }] }), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Why is it hard to hold?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: reply }, (e) => events.push(e));
+    return { s, events, errors };
+  };
+
+  it("the live case of 15 Oct: 'show me how the torque is worked out on a servo' closes the open prediction; the new question passes on the first attempt", async () => {
+    const { s, events, errors } = await run("show me how the torque is worked out on a servo");
+    expect(events.at(-1)!.type, JSON.stringify(events.at(-1))).toBe("turn.done");
+    expect(errors).toEqual([]); // no repair
+    expect(s.state.history.entries[2]).toMatchObject({ kind: "learner", released_prompt: true, superseded_prompt: true });
+    expect(s.state.teaching!.predictions[0]).toMatchObject({ status: "released" });
+    expect(s.state.teaching!.open_items.filter((o) => o.kind === "prediction")).toEqual([]);
+  });
+
+  it("a question works too: 'Can you show me the servo?'", async () => {
+    expect((await run("Can you show me the servo?")).events.at(-1)!.type).toBe("turn.done");
+  });
+
+  for (const reply of ["what do you mean?", "huh", "I don't understand", "which one", "can you repeat the question?", "ok", "I think heavier arms need less torque"])
+    it(`"${reply}" keeps the question open: a different new question is rejected`, async () => {
+      const { events, errors } = await run(reply);
+      expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
+      expect(errors[0]!.some((e) => /one-open-question/.test(e))).toBe(true);
+    });
+
+  it("'what do you mean?' with the same question re-offered more simply passes", async () => {
+    const reoffer = { narration: [{ id: "n1", text: "Put simply: one weight, two places on the ruler." }], calc_requests: [], prompt: { kind: "prediction", text: "Weight near your hand or far out: which is harder?", chips: OPEN.chips } };
+    expect((await run("what do you mean?", { second: reoffer })).events.at(-1)!.type).toBe("turn.done");
+  });
+
+  it("a safety correction is never released, by a new request or by frustration", async () => {
+    const asked = await run("show me how the torque is worked out on a servo", { safety: true, kind: "question" });
+    expect(JSON.stringify(asked.events.at(-1))).toMatch(/one-open-question/);
+    const director: Director = {
+      async respond(req) {
+        return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(req.request_id === "turn_1" ? { safety: true, prompt: { ...OPEN, kind: "question" } } : NEW_Q) } };
+      },
+    };
+    const s = new TurnSession({ registry, director, router: createFakeRouter({ script: [{}, { answered_prompt: false, frustrated: true }] }), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    await s.run({ text: "Why is it hard to hold?" }, () => {});
+    const events: TurnEvent[] = [];
+    await s.run({ text: "just tell me" }, (e) => events.push(e));
+    expect(JSON.stringify(events.at(-1))).toMatch(/one-open-question/);
+  });
+
+  it("the professor sees the closed question on the superseding turn only", () => {
+    const learner = { kind: "learner" as const, answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, wants_stop: false, asks_for_source: null, released_prompt: true, superseded_prompt: true };
+    const aili = { kind: "aili" as const, move: "explain" as const, asked: true, gave_back: true, concepts: [], safety: false };
+    const empty = { predictions: [], open_items: [], waivers: [], analogies_used: [], safety_acks: [], pending_teach_back: null, evidence: [], debate: { active: false, rounds: 0 } };
+    const teaching = { ...empty, last_prompt: { turn: 1, kind: "prediction" as const, text: OPEN.text, chips: OPEN.chips } };
+    const state = (entries: object[]) => {
+      const a = assembleProfessorPrompt({ template: "x", shortlist: fixtureShortlistForTest(), request: { request_id: "turn_2", state_rev: 2, history: { posture: "learning", learner_level: "unknown", entries } as never, teaching, learner_text: "show me" } });
+      return JSON.parse(a.input.slice(a.input.indexOf("<session_state>") + 16, a.input.indexOf("</session_state>")).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+    };
+    expect(state([aili, learner]).closed_question).toBe(OPEN.text);
+    expect(state([aili, { ...learner, superseded_prompt: false }]).closed_question).toBeUndefined();
+    expect(state([aili, learner, aili]).closed_question).toBeUndefined();
   });
 });

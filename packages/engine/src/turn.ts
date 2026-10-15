@@ -9,7 +9,7 @@ import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_R
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
-import { openPrompt } from "./pedagogy";
+import { isClarification, openPrompt, safetyQuestionOpen, supersedesOpenQuestion } from "./pedagogy";
 import { costMicroUsd, refuseTurn, type Ledger, type TokenUsage } from "./metering";
 import { explainTurn, type TurnExplanation } from "./explanation";
 
@@ -333,6 +333,7 @@ export class TurnSession {
     const c = matchOpenChoice(classified.data, input.text, openQuestion(before)?.choices);
     // A chip of the level question, while it is the open question, sets the learner's level.
     const level = levelFromReply(this.opts.levelQuestion, openQuestion(before), input.text);
+    const superseded = supersedesOpenQuestion(input.text, c, before.history, before.teaching);
     const history: SessionHistory = {
       ...before.history,
       ...(level ? { learner_level: level } : {}),
@@ -341,8 +342,11 @@ export class TurnSession {
         {
           kind: "learner",
           answered_prompt: c.answered_prompt,
-          // Frustration releases an open question that was not answered (spec A4; Lucky's decision 2026-10-13).
-          released_prompt: c.frustrated && !c.answered_prompt && openPrompt(before.history) !== null,
+          // Frustration releases an open question that was not answered (spec A4; Lucky's decision
+          // 2026-10-13), and so does a new request (Lucky's decision 2026-10-15); a safety correction never.
+          // A clarification ("huh", "what do you mean") keeps it open, to be re-offered more simply.
+          released_prompt: ((c.frustrated && !isClarification(input.text)) || superseded) && !c.answered_prompt && openPrompt(before.history) !== null && !safetyQuestionOpen(before.history, before.teaching),
+          superseded_prompt: superseded,
           // Pushback needs a position to push against: on a first turn (no earlier Aili turn) the
           // router's flag is ignored (Lucky's decision 2026-10-12, after s05 turn 1); and a guess on an
           // open prediction is never pushback (Lucky's decision 2026-10-13, after s04 and c1).
@@ -358,7 +362,7 @@ export class TurnSession {
     };
     // What the reply changes (a prediction's guess, a waiver acknowledged): pending until the turn completes.
     const today = (this.opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
-    const teaching = applyLearnerReply({ ...EMPTY_TEACHING, ...before.teaching }, c, today);
+    const teaching = applyLearnerReply({ ...EMPTY_TEACHING, ...before.teaching }, c, today, superseded, isClarification(input.text));
     // A source the learner named that is not in the library (spec A8, A10: "I can't verify that").
     const asked = c.asks_for_source?.toLowerCase();
     const listed = asked ? reg.sources.some((s) => s.title.toLowerCase().includes(asked) || asked.includes(s.title.toLowerCase())) : true;

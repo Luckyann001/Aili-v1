@@ -363,19 +363,6 @@ describe("mild praise is a warning only (config flattery_warn; Lucky's decision 
   });
 });
 
-describe("the re-offer example in professor.v1.md (Lucky's decisions 2026-10-12/13)", () => {
-  it("is labelled format only, keeps the kind and the same choices, has no prediction object, and passes the validator", () => {
-    const template = readFileSync(new URL("../../../content/prompts/professor.v1.md", import.meta.url), "utf8");
-    const line = template.split("\n").find((l) => l.startsWith("Example of a re-offer (format only; write your own wording):"))!;
-    const example = JSON.parse(`{${line.slice(line.indexOf('"prompt"'), line.indexOf("<!--")).trim()}}`);
-    expect(example.prompt).toEqual(expect.objectContaining({ kind: "prediction", chips: ["More", "Less", "The same", "Not sure"] }));
-    expect(line).toContain(`the choices ["More", "Less", "The same", "Not sure"]`);
-    expect(example.prediction).toBeUndefined();
-    expect(line).not.toMatch(/servo|ruler/i);
-    expect(errs(example)).toEqual([]);
-  });
-});
-
 describe("mild praise: a good/fine/great/nice start (Lucky's decision 2026-10-12), warning only", () => {
   it.each(["good", "fine", "great", "nice"])("\"a %s start\" warns and is still accepted", (w) => {
     const r = run({ narration: [{ id: "n1", text: `A Lego car is a ${w} start: wheels turn because a motor twists an axle.` }] });

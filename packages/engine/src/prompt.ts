@@ -129,6 +129,8 @@ export function assembleProfessorPrompt(o: {
     active_scene: o.request.active_scene ?? null,
     // The open question, with its text, kind and choices when known (so it can be kept and re-offered).
     open_prompt: open ? { from_turn: open.turn, ...(lastPrompt && lastPrompt.turn === open.turn ? { kind: lastPrompt.kind, text: lastPrompt.text, choices: lastPrompt.chips } : {}) } : null,
+    // This turn only: the learner asked for something new instead of answering; that question is closed.
+    ...(h.entries.at(-1)?.kind === "learner" && (h.entries.at(-1) as { superseded_prompt?: boolean }).superseded_prompt && lastPrompt ? { closed_question: lastPrompt.text } : {}),
     last_moves: ailiTurns.slice(-6).map((t) => ({ move: t.move, asked: t.asked, concepts: t.concepts, safety: t.safety })),
     // The real teaching state from the server (Lucky's decision 2026-10-12; was hard-coded empty).
     predictions: (teaching?.predictions ?? []).filter((p) => p.status !== "revealed").map((p) => ({ id: p.id, concept: p.concept, question: p.question ?? null, choices: p.choices, status: p.status, guess: p.guess })),

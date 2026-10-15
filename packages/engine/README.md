@@ -179,7 +179,7 @@ request as if config held those values; config is not changed.
   unused solvers, simulations. Never dropped: the scene on stage and any item with safety notes;
   kept items keep their bounds. The model is told what was left out. `overBudget` is reported if
   even that is not enough.
-  **Typical prompt: 4,939 of 5,000** estimated tokens (15 Oct 2026, after the check-question line), nothing dropped.
+  **Typical prompt: 4,834 of 5,000** estimated tokens (15 Oct 2026, after the supersede line replaced the re-offer rule and its example), nothing dropped.
 - **No repetition**: a solver that a shortlisted simulation runs says `inputs: "as in <simulation>"`
   when they match, and lists only the assumptions and exclusions the simulation does not already
   state (`also_states` names it). This made room for slice B without raising the budget.
@@ -229,6 +229,7 @@ request as if config held those values; config is not changed.
 | Rule | Checks | Cannot check |
 |---|---|---|
 | one-open-question | no new prompt while the last one is unanswered | whether the learner's reply really answered it (a classification made outside) |
+| (2026-10-15) new request supersedes | when a question is open and the router says the reply did not answer it, a reply that is a request (ends with "?" or starts with show, explain, tell, teach, can, could, would, how, what, why, give, let's, I want, I'd like, please) releases it: the history marks the learner turn `superseded_prompt`, an open prediction closes as released, and on that turn only `session_state.closed_question` gives its text so the professor can say once that it will come back to it, and does not re-offer it. Kept open (as before): a clarification ("what do you mean", "I don't understand", "huh", "which one", "can you repeat"…; also when frustrated), any other non-answer ("ok", a claim), a question from a safety turn or awaiting a safety acknowledgement (frustration does not release those either), and a question tied to an assigned reading. When in doubt, it stays open | whether the reply really is a new request (a word rule, not language understanding) |
 | give-before-asking-again | a second question in a row must come with narration, a result or a visual | whether that narration is substantial |
 | explain-after-probe | after a probe is answered, the move is `explain` (safety excepted) | the quality of the explanation |
 | explain-first-for-beginners | a true beginner's first probe on a concept follows an `explain` turn on it | whether that turn really explained the concept (it relies on the `concepts` each turn declares) |
