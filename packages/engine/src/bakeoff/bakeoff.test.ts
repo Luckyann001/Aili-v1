@@ -397,3 +397,12 @@ describe("reading filled in is counted (Lucky's decision 2026-10-13)", () => {
     expect(m.warnings_by_type).toEqual({ "reading filled in": 1 });
   });
 });
+
+describe("calculations given the stage's settings are counted (Lucky's decision 2026-10-15)", () => {
+  it("counts turns with the warning and lists it by type", () => {
+    const turn = (warnings: string[]) => ({ index: 1, learner: "x", events: [], latency_ms: 1, outcome: "done", checks: [], warnings, expectations: [], usage: [], cost_micro_usd: 0, unexpected: false, leaked_numbers: [], conceded: false, router_missed_answer: false }) as never;
+    const m = metrics([turn(["calculation inputs taken from the stage: c1 uses the stage's settings (the load at 0.08 m, not at the arm's tip)"]), turn([])]);
+    expect(m.stage_inputs_used).toBe(1);
+    expect(m.warnings_by_type).toEqual({ "calculation inputs taken from the stage": 1 });
+  });
+});

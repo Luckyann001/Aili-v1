@@ -87,7 +87,7 @@ export async function handleTurn(request: Request): Promise<Response> {
   // The previous turn was interrupted mid-speech: its stage keeps only what the learner saw, applied
   // here, before this turn reads it (M4 slice 1; inside the request, so it can never arrive too late).
   const saved = sessions.get(req.session_id) ?? fresh();
-  const start = req.previous_shown ? reconcileShown(saved, req.previous_shown.shown_through, req.previous_shown.state_rev) : saved;
+  const start = req.previous_shown ? reconcileShown(saved, req.previous_shown.shown_through, req.previous_shown.state_rev, registry.scenes) : saved;
   // Saved at once, so it holds even if this turn fails its checks and commits nothing.
   if (start !== saved) sessions.amend(req.session_id, req.previous_shown!.state_rev, () => start);
   // Live: the case field is ignored; the turn budget comes from config (turn and attempt timeouts).

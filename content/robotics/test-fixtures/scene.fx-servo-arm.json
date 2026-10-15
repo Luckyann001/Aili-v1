@@ -114,7 +114,7 @@
     }
   ],
   "solver": {
-    "id": "solver.static-torque-single-link",
+    "id": "solver.fx-torque",
     "constants": {
       "angle_deg": 0
     }

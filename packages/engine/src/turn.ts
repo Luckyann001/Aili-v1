@@ -7,6 +7,7 @@ import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept, unsupportedAttributions } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
+import { isArmWithLoad, stageAfterActions, stageCalculation, type StageScene, type StageSettings } from "./stage";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
 import { isClarification, openPrompt, safetyQuestionOpen, supersedesOpenQuestion } from "./pedagogy";
@@ -35,6 +36,8 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
       explanation: TurnExplanation;
       /** The analogy this turn used; `words_only` when the registry has no picture of it (the page says so). */
       analogy?: { id: string; title: string; words_only: boolean };
+      /** The turn gave numbers about the scene on stage, from the stage's settings (the page's note resets). */
+      stage_numbers?: true;
     }
   | { type: "turn.error"; reason: TurnFailure; message: string; details: string[] }
 );
@@ -167,10 +170,15 @@ export interface SessionState {
   /** The part an earlier turn highlighted on the scene still on stage (a new scene clears it). */
   highlightedPart?: string;
   /**
+   * The settings of the scene on stage as the turns left them (its defaults, then each set_parameter),
+   * from the shared stage function (stage.ts). Not the learner's own slider moves: the page sends only text.
+   */
+  stageSettings?: StageSettings;
+  /**
    * The last completed turn's stage changes, by segment, so an interrupt mid-speech can keep only
    * what the learner saw (M4 slice 1): the stage before the turn, the segment ids in order, the actions.
    */
-  lastTurn?: { rev: number; startScene?: string; startHighlight?: string; segments: string[]; actions: DirectorResponse["actions"] };
+  lastTurn?: { rev: number; startScene?: string; startHighlight?: string; startSettings?: StageSettings; segments: string[]; actions: DirectorResponse["actions"] };
   /** Predictions, open items, waivers and analogies used (slice 5a). Absent means all empty. */
   teaching?: TeachingState;
 }
@@ -442,8 +450,14 @@ export class TurnSession {
       warnings.push(...unsupportedAttributions(v.response.narration, input.text, !before.history.entries.some((e) => e.kind === "learner")));
       // A passing answer about a concept with a scene, but no scene on stage: the engine selects it.
       const picked = selectSceneForConcept(v.response, sl.scenes, before.activeScene, this.opts.concepts.filter((c) => sl.concepts.includes(c)));
-      return picked ? { r: picked.r, warnings: [...warnings, picked.warning] } : { r: v.response, warnings };
+      const chosen = picked ? picked.r : v.response;
+      // Calculations about the scene on stage use the stage's settings (a warning if they differed).
+      const staged = bindToStage(chosen, reg.scenes as ReadonlyArray<StageScene>, before);
+      stagedCalcs = staged.ids;
+      return { r: staged.r, warnings: [...warnings, ...(picked ? [picked.warning] : []), ...staged.warnings] };
     };
+    /** Calculation ids bound to the stage's settings in the answer that passed (set by `check`). */
+    let stagedCalcs = new Set<string>();
 
     let reply = await callDirector();
     if (reply === "stale") return;
@@ -475,12 +489,14 @@ export class TurnSession {
     // Solve every calculation before showing anything.
     const values: Record<string, string> = {};
     const results: Array<{ calc_id: string; outputs: Record<string, number> }> = [];
+    const stageNow = stageAfterActions(reg.scenes as ReadonlyArray<StageScene>, { scene: before.activeScene, settings: before.stageSettings }, r.actions);
     for (const c of r.calc_requests) {
       const fn = (this.opts.solvers ?? SOLVERS)[c.solver];
       if (!fn) return fail("solver", [`calc_requests ${c.id}: no implementation for ${c.solver}`]);
       let outputs: Record<string, number>;
       try {
-        outputs = fn(c.inputs);
+        const constants = reg.scenes.find((x) => x.id === stageNow.scene)?.solver?.constants;
+        outputs = stagedCalcs.has(c.id) && isArmWithLoad(stageNow.settings) ? stageCalculation(stageNow.settings, constants).outputs : fn(c.inputs);
       } catch (err) {
         return fail("solver", [`calc_requests ${c.id} (${c.solver}): ${errorText(err)}`]);
       }
@@ -525,18 +541,20 @@ export class TurnSession {
       if (a.type === "select_scene") (activeScene = a.scene), (highlightedPart = undefined);
       if (a.type === "highlight_part") highlightedPart = a.part;
     }
+    const stageSettings = stageAfterActions(reg.scenes as ReadonlyArray<StageScene>, { scene: before.activeScene, settings: before.stageSettings }, r.actions).settings;
     const ailiTurnNumber = history.entries.filter((e) => e.kind === "aili").length + 1;
     const next: SessionState = {
       history: { ...history, entries: [...history.entries, { kind: "aili", move: r.move, asked: !!r.prompt, gave_back: givesBack(r), concepts: r.concepts, safety: r.safety }] },
       activeScene,
       ...(highlightedPart ? { highlightedPart } : {}),
-      lastTurn: { rev, ...(before.activeScene ? { startScene: before.activeScene } : {}), ...(before.highlightedPart ? { startHighlight: before.highlightedPart } : {}), segments: r.narration.map((n) => n.id), actions: r.actions },
+      ...(stageSettings ? { stageSettings } : {}),
+      lastTurn: { rev, ...(before.activeScene ? { startScene: before.activeScene } : {}), ...(before.highlightedPart ? { startHighlight: before.highlightedPart } : {}), ...(before.stageSettings ? { startSettings: before.stageSettings } : {}), segments: r.narration.map((n) => n.id), actions: r.actions },
       teaching: applyResponse(teaching, r, ailiTurnNumber, today, safetyCritical, sl.readings.find((x) => x.id === r.reading)?.teaches ?? []),
     };
     if (rev !== this.rev) return;
     this.state = next;
     const an = r.analogy ? sl.analogies.find((a) => a.id === r.analogy) : undefined;
-    send({ type: "turn.done", move: r.move, explanation, ...(an ? { analogy: { id: an.id, title: an.title, words_only: !an.scene } } : {}) });
+    send({ type: "turn.done", move: r.move, explanation, ...(an ? { analogy: { id: an.id, title: an.title, words_only: !an.scene } } : {}), ...(stagedCalcs.size ? { stage_numbers: true as const } : {}) });
   }
 }
 
@@ -574,7 +592,37 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * the learner saw, up to and including `shownThrough` (null: none were shown). The turn itself still
  * happened (its history and teaching state stay); only the stage is put back to what was shown.
  */
-export function reconcileShown(state: SessionState, shownThrough: string | null, rev?: number): SessionState {
+/** The warning when a calculation about the scene on stage took the stage's settings (Lucky's decision 2026-10-15). */
+export const STAGE_INPUTS_USED = "calculation inputs taken from the stage";
+
+/**
+ * Calculations about the scene on stage (its manifest names their solver) use the stage's settings,
+ * the same ones the page shows (stage.ts). The answer's calculation inputs are replaced by them,
+ * including the load's own distance, so the explanation panel shows what was used; where the
+ * professor gave different values, a visible warning, never a rejection (no repair cost).
+ */
+export function bindToStage(r: DirectorResponse, scenes: ReadonlyArray<StageScene>, before: Pick<SessionState, "activeScene" | "stageSettings">): { r: DirectorResponse; warnings: string[]; ids: Set<string> } {
+  const stage = stageAfterActions(scenes, { scene: before.activeScene, settings: before.stageSettings }, r.actions);
+  const scene = scenes.find((x) => x.id === stage.scene);
+  const ids = new Set<string>();
+  const warnings: string[] = [];
+  if (!scene?.solver || !isArmWithLoad(stage.settings)) return { r, warnings, ids };
+  const calc_requests = r.calc_requests.map((c) => {
+    if (c.solver !== scene.solver!.id) return c;
+    ids.add(c.id);
+    const used = stageCalculation(stage.settings as Parameters<typeof stageCalculation>[0], scene.solver!.constants).inputs;
+    const near = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+    const diffs: string[] = [];
+    for (const k of ["arm_length_m", "payload_kg", "arm_kg_per_m", "angle_deg"] as const)
+      if (!near(c.inputs[k], used[k]!)) diffs.push(`${k} ${c.inputs[k] ?? "not given"} → ${Number(used[k]!.toPrecision(4))}`);
+    if (used.load_distance_m! < used.arm_length_m!) diffs.push(`the load at ${used.load_distance_m} m, not at the arm's tip`);
+    if (diffs.length) warnings.push(`${STAGE_INPUTS_USED}: ${c.id} uses the stage's settings (${diffs.join("; ")})`);
+    return { ...c, inputs: used };
+  });
+  return { r: { ...r, calc_requests }, warnings, ids };
+}
+
+export function reconcileShown(state: SessionState, shownThrough: string | null, rev?: number, scenes?: ReadonlyArray<StageScene>): SessionState {
   const t = state.lastTurn;
   if (!t || (rev !== undefined && t.rev !== rev)) return state; // not the turn the note is about
   const upTo = shownThrough === null ? -1 : t.segments.indexOf(shownThrough);
@@ -587,6 +635,9 @@ export function reconcileShown(state: SessionState, shownThrough: string | null,
     if (a.type === "select_scene") (activeScene = a.scene), (highlightedPart = undefined);
     if (a.type === "highlight_part") highlightedPart = a.part;
   }
-  const { activeScene: _s, highlightedPart: _h, ...rest } = state;
-  return { ...rest, ...(activeScene ? { activeScene } : {}), ...(highlightedPart ? { highlightedPart } : {}), lastTurn: { ...t, actions: t.actions.filter((a) => { const at = t.segments.indexOf(a.at); return at < 0 ? upTo >= 0 : at <= upTo; }) } };
+  const shown = t.actions.filter((a) => { const at = t.segments.indexOf(a.at); return at < 0 ? upTo >= 0 : at <= upTo; });
+  // The stage's settings too, replayed from where the turn started through the segments seen.
+  const stageSettings = scenes ? stageAfterActions(scenes, { scene: t.startScene, settings: t.startSettings }, shown).settings : state.stageSettings;
+  const { activeScene: _s, highlightedPart: _h, stageSettings: _p, ...rest } = state;
+  return { ...rest, ...(activeScene ? { activeScene } : {}), ...(highlightedPart ? { highlightedPart } : {}), ...(stageSettings ? { stageSettings } : {}), lastTurn: { ...t, actions: shown } };
 }

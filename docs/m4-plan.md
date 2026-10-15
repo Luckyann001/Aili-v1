@@ -526,3 +526,8 @@ rated_torque_nm? }`), every value checked against the scene manifest's bounds on
 otherwise. The engine would then use them for calculations about the scene on stage, and a rating share could
 become a real placeholder. **This changes the "page sends only text" rule and is to be approved separately**;
 nothing is built for it.
+
+**Decision (15 Oct 2026):** option C, structured stage settings (and the rating) sent with each turn, is the
+post-demo fix for numbers after the learner moves a slider. Until then the page shows "The professor's numbers
+use the settings from its last turn." (option A), and calculations about the scene on stage use the settings
+the turns themselves set (a shared stage function on the page and the server).

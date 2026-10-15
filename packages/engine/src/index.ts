@@ -21,3 +21,4 @@ export * from "./teaching";
 export * from "./explanation";
 export * from "./providers";
 export * from "./bakeoff";
+export * from "./stage";

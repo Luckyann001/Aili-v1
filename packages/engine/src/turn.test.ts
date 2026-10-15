@@ -1114,3 +1114,61 @@ describe("a new request supersedes the open question; clarifications and safety 
     expect(state([aili, learner, aili]).closed_question).toBeUndefined();
   });
 });
+
+describe("calculations about the scene on stage use the stage's settings (Lucky's decision 2026-10-15)", () => {
+  const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+  const CALC = { id: "c1", solver: "solver.fx-torque", simulation: "sim.fx-servo-load", inputs: { arm_length_m: 0.2, payload_kg: 0.3, arm_kg_per_m: 0.25, angle_deg: 0 } };
+  const turnWith = async (answer: object, state: SessionState = start()) => {
+    const checks: Array<{ outcome: string; warnings: string[] }> = [];
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, evidence: [], ...answer } }; } };
+    const s = new TurnSession({ registry, director, router: createFakeRouter(), state, concepts: ["mech.torque.static"], level: "L2", onCheck: (c) => checks.push(c) });
+    const events: TurnEvent[] = [];
+    await s.run(input, (e) => events.push(e));
+    const said = events.filter((e) => e.type === "narration").flatMap((e) => (e as { parts: Array<{ value?: string }> }).parts.filter((p) => p.value).map((p) => p.value));
+    return { s, events, said, warnings: checks.flatMap((c) => c.warnings), done: events.at(-1) };
+  };
+  // The live turn of 15 Oct: arm 0.2 m and load 0.3 kg set, distance left at its default (0.08 m); the
+  // professor's calculation put the load at the tip (0.588 N·m). The stage's label says about 0.235 N·m.
+  const live = {
+    narration: [{ id: "n1", text: "Here is a servo holding an arm level.", actions: [{ type: "select_scene", scene: "fx-servo-arm" }, { type: "set_parameter", param: "arm_length_m", value: 0.2 }, { type: "set_parameter", param: "load_mass_kg", value: 0.3 }] }, { id: "n2", text: "The load alone asks for {{c1.payload_torque_nm}} newton-metres.", actions: [] }],
+    actions: undefined,
+    calc_requests: [CALC],
+  };
+
+  it("the 15 Oct live case: the narration gets the stage's 0.235 N·m, not 0.588, with a visible warning (no repair)", async () => {
+    const { said, warnings, done, s } = await turnWith(live);
+    expect(done!.type, JSON.stringify(done)).toBe("turn.done");
+    expect(said).toEqual(["0.235"]);
+    expect(said).not.toContain("0.588");
+    expect(warnings).toContain("calculation inputs taken from the stage: c1 uses the stage's settings (arm_kg_per_m 0.25 → 0.2; the load at 0.08 m, not at the arm's tip)");
+    expect(done).toMatchObject({ stage_numbers: true });
+    // The explanation panel shows what was used, including the load's distance.
+    const shown = (done as { explanation: { calculations: Array<{ inputs: Array<{ label: string; value: string; unit: string }> }> } }).explanation.calculations[0]!.inputs;
+    expect(shown.map((i) => `${i.label} ${i.value} ${i.unit}`)).toContain("Load distance 0.08 m");
+    expect(s.state.stageSettings).toEqual({ arm_length_m: 0.2, arm_mass_kg: 0.04, load_mass_kg: 0.3, load_distance_m: 0.08 });
+  });
+
+  it("no warning when the professor's inputs already match the stage (the load at the tip)", async () => {
+    const atTip = { ...live, narration: [{ ...live.narration[0]!, actions: [...live.narration[0]!.actions, { type: "set_parameter", param: "load_distance_m", value: 0.2 }] }, live.narration[1]!], calc_requests: [{ ...CALC, inputs: { ...CALC.inputs, arm_kg_per_m: 0.2 } }] };
+    const { said, warnings } = await turnWith(atTip);
+    expect(said).toEqual(["0.588"]);
+    expect(warnings.filter((w) => w.startsWith("calculation inputs taken from the stage"))).toEqual([]);
+  });
+
+  it("a calculation while a scene without these settings is on stage (the lever) is unaffected", async () => {
+    const { said, warnings, done } = await turnWith({ narration: [{ id: "n1", text: "It takes {{c1.payload_torque_nm}} here.", actions: [] }], actions: undefined, calc_requests: [CALC] });
+    expect(said).toEqual(["0.588"]);
+    expect(warnings.filter((w) => w.startsWith("calculation inputs taken from the stage"))).toEqual([]);
+    expect(done).not.toHaveProperty("stage_numbers");
+  });
+
+  it("settings persist to the next turn, and an interrupt keeps only the settings of the segments seen", async () => {
+    const { s } = await turnWith(live);
+    const scenes = registry.scenes;
+    const cut = reconcileShown(s.state, "n1", s.state.lastTurn!.rev, scenes);
+    expect(cut.stageSettings).toEqual({ arm_length_m: 0.2, arm_mass_kg: 0.04, load_mass_kg: 0.3, load_distance_m: 0.08 }); // n1 carried the changes
+    const none = reconcileShown(s.state, null, s.state.lastTurn!.rev, scenes);
+    expect(none.activeScene).toBe("fx-lever");
+    expect(none.stageSettings).toEqual({ weight_distance_m: 0.05 });
+  });
+});
