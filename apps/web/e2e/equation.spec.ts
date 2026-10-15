@@ -118,4 +118,58 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
       await page.screenshot({ path: `${dir}/${name}-2-margin.png` });
     }
   });
+
+  // Desktop: at every combination of slider extremes, all five labels stay visible and none overlaps
+  // another label, a part label or the torque panel.
+  test("desktop: no label overlap at the slider extremes (arm length, load distance, load mass)", async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "desktop layout; phones show one full label at a time");
+    test.setTimeout(240_000);
+    await toTurn6(page);
+    await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 30_000 });
+    await send(page, "The arm itself");
+    await expect(caption(page)).toHaveText(/^What could you change on the arm/, { timeout: 30_000 });
+    await expect(page.locator("span[data-eq-label]")).toHaveCount(5);
+
+    const inspector = page.getByRole("region", { name: /^Inspector:/ });
+    const setSlider = async (part: string, name: string, key: "Home" | "End") => {
+      await page.getByRole("button", { name: /^Parts/ }).click();
+      await page.getByRole("option", { name: part }).click();
+      const slider = inspector.getByRole("slider", { name });
+      await slider.focus();
+      await page.keyboard.press(key);
+      await page.getByRole("button", { name: "Close inspector" }).click();
+    };
+    const boxes = async () =>
+      page.evaluate(() => {
+        const vis = (el: Element) => getComputedStyle(el).visibility !== "hidden" && (el as HTMLElement).offsetWidth > 0 && !(el as HTMLElement).hidden;
+        const box = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.x, y: r.y, w: r.width, h: r.height };
+        };
+        const eq = [...document.querySelectorAll("span[data-eq-label]")].map((el) => ({ id: el.getAttribute("data-eq-label")!, visible: vis(el), ...box(el) }));
+        const parts = [...document.querySelectorAll("span[data-part-id]")].filter(vis).map((el) => ({ id: `part:${el.getAttribute("data-part-id")}`, ...box(el) }));
+        const panel = document.querySelector('section[aria-label="Torque at the joint"]');
+        return { eq, others: [...parts, ...(panel ? [{ id: "panel", ...box(panel) }] : [])] };
+      });
+    const hit = (a: { x: number; y: number; w: number; h: number }, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+    const problems: string[] = [];
+    for (const L of ["Home", "End"] as const)
+      for (const d of ["Home", "End"] as const)
+        for (const m of ["Home", "End"] as const) {
+          await setSlider("Arm link", "Arm length", L);
+          await setSlider("Load", "Load distance from the joint", d);
+          await setSlider("Load", "Load mass", m);
+          await page.waitForTimeout(400); // the view re-places labels on the next frames
+          const { eq, others } = await boxes();
+          const at = `arm ${L === "Home" ? "min" : "max"}, distance ${d === "Home" ? "min" : "max"}, load ${m === "Home" ? "min" : "max"}`;
+          for (const e of eq) if (!e.visible) problems.push(`${at}: ${e.id} hidden`);
+          const shown = eq.filter((e) => e.visible);
+          for (let i = 0; i < shown.length; i++) {
+            for (let j = i + 1; j < shown.length; j++) if (hit(shown[i]!, shown[j]!)) problems.push(`${at}: ${shown[i]!.id} overlaps ${shown[j]!.id}`);
+            for (const o of others) if (hit(shown[i]!, o)) problems.push(`${at}: ${shown[i]!.id} overlaps ${o.id}`);
+          }
+        }
+    expect(problems).toEqual([]);
+  });
 });

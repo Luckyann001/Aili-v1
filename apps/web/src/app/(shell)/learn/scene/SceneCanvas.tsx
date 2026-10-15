@@ -320,13 +320,7 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
     // effort gauge (bottom; data-reserve="bottom").
     const reserved = () => Array.from(el.querySelectorAll<HTMLElement>("[data-reserve]"));
     const apply = () => {
-      const side = window.matchMedia("(min-width: 900px)").matches; // matches learn.module.css
-      let takeW = 0;
-      let takeH = 0;
-      for (const r of reserved()) {
-        if (r.dataset.reserve === "auto" && side) takeW = Math.max(takeW, r.offsetWidth + 16);
-        else takeH = Math.max(takeH, r.offsetHeight + 16);
-      }
+      const { takeW, takeH } = reservedSpace(el);
       const freeW = el.clientWidth - takeW;
       const freeH = el.clientHeight - takeH;
       const shiftX = el.offsetLeft + freeW / 2 - size.width / 2;
@@ -399,8 +393,11 @@ function LabelTracker({
   useFrame(() => {
     const area = safeArea.current;
     if (!area) return;
-    const w = area.clientWidth;
-    const h = area.clientHeight;
+    // Labels stay inside the same free area the framing uses: clear of the inspector, the torque
+    // panel and the effort gauge (found by the equation's overlap check at the slider extremes).
+    const { takeW, takeH } = reservedSpace(area);
+    const w = area.clientWidth - takeW;
+    const h = area.clientHeight - takeH;
     const layout = MODELS[activeScene].layout({ params, leverDistance_m, servo }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
     // 1. Where each shown label wants to go (clamped inside the safe area).
@@ -461,6 +458,21 @@ function LabelTracker({
     }
   });
   return null;
+}
+
+/**
+ * Room taken by panels inside the safe area: from 900 px a data-reserve="auto" panel takes the right
+ * side, otherwise any reserved panel takes the bottom. Shared by the framing and the labels.
+ */
+function reservedSpace(area: HTMLElement): { takeW: number; takeH: number } {
+  const side = window.matchMedia("(min-width: 900px)").matches; // matches learn.module.css
+  let takeW = 0;
+  let takeH = 0;
+  for (const r of Array.from(area.querySelectorAll<HTMLElement>("[data-reserve]"))) {
+    if (r.dataset.reserve === "auto" && side) takeW = Math.max(takeW, r.offsetWidth + 16);
+    else takeH = Math.max(takeH, r.offsetHeight + 16);
+  }
+  return { takeW, takeH };
 }
 
 /** True when every framing corner of the model, on screen, lies inside the free area (canvas px). */
