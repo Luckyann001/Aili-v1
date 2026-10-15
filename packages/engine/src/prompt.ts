@@ -55,8 +55,10 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
       data: { id: s.id, title: s.title, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.filter((p) => !p.learner_supplied).map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id) },
     });
   const usedSolvers = new Set(sl.simulations.map((s) => s.solver.id));
+  // The learner's rating never reaches the model: no rated-torque inputs, no rating share (Lucky's decision 2026-10-15).
+  const noRating = <T>(o: Record<string, T>) => Object.fromEntries(Object.entries(o).filter(([k]) => !/^rated_|^share_of_rating$/.test(k)));
   for (const s of sl.simulations)
-    items.push({ id: s.id, kind: "simulation", rank: 60, keep: hasSafety(s), data: { id: s.id, title: s.title, solver: s.solver.id, inputs: s.inputs, outputs: s.outputs, assumptions: s.assumptions, excludes: s.excludes, fidelity: s.fidelity } });
+    items.push({ id: s.id, kind: "simulation", rank: 60, keep: hasSafety(s), data: { id: s.id, title: s.title, solver: s.solver.id, inputs: noRating(s.inputs), outputs: s.outputs.filter((o) => o !== "share_of_rating"), assumptions: s.assumptions, excludes: s.excludes, fidelity: s.fidelity } });
   // A solver run by a shortlisted simulation repeats its inputs and most of its assumptions: say
   // "as in <simulation>" and list only what the simulation does not already state (prompt budget).
   for (const s of sl.solvers) {
@@ -66,8 +68,8 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
     const excludes = extra(s.excludes, sim?.excludes);
     const data = {
       id: s.id,
-      inputs: sim && JSON.stringify(sim.inputs) === JSON.stringify(s.inputs) ? `as in ${sim.id}` : s.inputs,
-      outputs: s.outputs,
+      inputs: sim && JSON.stringify(sim.inputs) === JSON.stringify(s.inputs) ? `as in ${sim.id}` : noRating(s.inputs),
+      outputs: noRating(s.outputs),
       ...(sim ? { also_states: `the assumptions and exclusions of ${sim.id}` } : {}),
       ...(assumptions.length || !sim ? { assumptions } : {}),
       ...(excludes.length || !sim ? { excludes } : {}),

@@ -1,6 +1,6 @@
 import type { FakeCase } from "@aili/schemas";
 import type { TokenUsage } from "./metering";
-import type { Director, DirectorRequest } from "./turn";
+import { SOLVERS, type Director, type DirectorRequest, type SolverFn } from "./turn";
 
 // A scripted stand-in for the professor model (docs/m2-plan.md slice 5). No provider, no key, no
 // network. It answers from the test-fixture shortlist (scene "fx-lever", simulation
@@ -9,8 +9,8 @@ import type { Director, DirectorRequest } from "./turn";
 
 // Cases (FAKE_CASES in @aili/schemas): valid (passes every check); invalid-id (a part not in the
 // scene); out-of-bounds (a setting outside its bounds); hard-coded-number (spec test 14);
-// pedagogy-violation (flattery); solver-failure (passes the validators, the solver refuses the
-// input); slow (valid, after `slowMs`, for interrupt tests).
+// pedagogy-violation (flattery); solver-failure (passes the validators; the solver refuses, through
+// fakeSolvers below, since a rating that the solver refused may no longer be supplied); slow (valid, after `slowMs`, for interrupt tests).
 export type { FakeCase };
 
 const CALC = { id: "c1", solver: "solver.fx-torque", simulation: "sim.fx-servo-load", inputs: { arm_length_m: 0.2, payload_kg: 0.3, arm_kg_per_m: 0.25, angle_deg: 0 } };
@@ -53,8 +53,8 @@ export function fakeResponse(c: FakeCase, req: DirectorRequest): unknown {
     case "pedagogy-violation":
       return { ...r, narration: [{ id: "n1", text: "Great question! Holding this arm level takes {{c1.torque_nm}} newton-metres." }] };
     case "solver-failure":
-      // A rating of zero is inside the manifest's 0–100 bounds but the solver refuses it.
-      return { ...r, calc_requests: [{ ...CALC, inputs: { ...CALC.inputs, rated_stall_torque_nm: 0 } }] };
+      // Valid inputs: the failure is scripted in the solver (fakeSolvers), not in the request.
+      return { ...r, calc_requests: [CALC] };
   }
 }
 
@@ -88,4 +88,18 @@ export function createFakeDirector(cases: FakeCase | FakeCase[], opts: { slowMs?
     },
   };
   return d;
+}
+
+/**
+ * The solvers a fake-director session runs: the real ones, except that the solver-failure case gets
+ * a solver that refuses (scripted, labelled as such), so the engine's solver-failure path is tested.
+ */
+export function fakeSolvers(cases: FakeCase | readonly FakeCase[]): Record<string, SolverFn> | undefined {
+  if (!(Array.isArray(cases) ? cases : [cases]).includes("solver-failure")) return undefined;
+  return {
+    ...SOLVERS,
+    "solver.fx-torque": () => {
+      throw new RangeError("the solver refused this input (scripted solver failure, fake director only)");
+    },
+  };
 }

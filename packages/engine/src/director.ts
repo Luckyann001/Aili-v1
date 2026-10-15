@@ -452,10 +452,11 @@ function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResp
       else if (value < b.min || (b.max !== null && value > b.max)) errors.push(`${at}.inputs.${name}: ${value} is outside ${b.min}–${b.max ?? "no limit"} ${b.unit}`);
     }
     for (const [name, b] of Object.entries(bounds)) if (!b.optional && !(name in c.inputs)) errors.push(`${at}.inputs.${name}: missing (required by ${owner})`);
-    const ratings = Object.keys(c.inputs).filter((k) => /^rated_.*_torque_nm$/.test(k));
-    if (ratings.length > 1) errors.push(`${at}.inputs: ${ratings.join(" and ")} — give one rating, not both`);
-    // A rating share exists only when a rating was supplied.
-    for (const o of outputs) if (o !== "share_of_rating" || ratings.length === 1) placeholders.push(`${c.id}.${o}`);
+    // A rated torque is the learner's own, from their datasheet: Aili never supplies or assumes one
+    // (Lucky's decision 2026-10-15), so a rating share is never available either.
+    for (const k of Object.keys(c.inputs).filter((x) => /^rated_.*_torque_nm$/.test(x)))
+      errors.push(`${at}.inputs.${k}: never supply a rated torque; it is the learner's, from their own datasheet. Leave it out and point the learner to the panel's margin`);
+    for (const o of outputs) if (o !== "share_of_rating") placeholders.push(`${c.id}.${o}`);
   });
 
   // Learner-facing text: numbers only through placeholders from this turn; questions only in prompt.

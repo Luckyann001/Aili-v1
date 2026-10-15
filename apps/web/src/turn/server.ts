@@ -1,4 +1,4 @@
-import { createFakeDirector, createFakeRouter, encodeEvent, reconcileShown, InMemoryLedger, InMemorySessionStore, killSwitchFromEnv, TurnSession, type SessionState, type TurnEvent } from "@aili/engine";
+import { createFakeDirector, createFakeRouter, fakeSolvers, encodeEvent, reconcileShown, InMemoryLedger, InMemorySessionStore, killSwitchFromEnv, TurnSession, type SessionState, type TurnEvent } from "@aili/engine";
 import { AiConfig, InterruptRequest, LevelQuestion, TurnRequest } from "@aili/schemas";
 import aiConfigJson from "../../../../config/ai.json";
 import levelQuestionJson from "../../../../content/level-question.json";
@@ -106,6 +106,7 @@ export async function handleTurn(request: Request): Promise<Response> {
     registry,
     levelQuestion: LEVEL_QUESTION,
     director: live ? live.director : createFakeDirector(req.case, { slowMs: SLOW_MS }),
+    ...(live ? {} : { solvers: fakeSolvers(req.case) }),
     router: live ? live.router : createFakeRouter(),
     state: start,
     concepts: live ? LIVE_CONCEPTS : ["mech.torque.static"],

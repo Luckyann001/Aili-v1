@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Action } from "@aili/schemas";
-import { analogyObjects, analogyWarnings, checkNarration, dropStrayActionFields, highlightErrors, refersToPart, segmentWarnings, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
+import { analogyObjects, analogyWarnings, assembleProfessorPrompt, checkNarration, dropStrayActionFields, highlightErrors, refersToPart, segmentWarnings, lenientCandidate, normalizeActionBinding, EMPTY_ANSWER, NARRATION_MAX_CHARS, splitLongNarration, substituteGuideQuestion, validateDirectorResponse, type Shortlist, type TurnContext } from "./index";
 import { fixtureRegistry, fixtureShortlist } from "./__fixtures__/registry";
 
 // Structural validator for the director's response (docs/m2-plan.md slice 3). The shortlist comes
@@ -106,7 +106,11 @@ describe("rule: values and calculation inputs within manifest bounds, under the 
     const e = errs({ calc_requests: [{ ...c, inputs: { ...rest, arm_length_cm: 20 } }] });
     expect(e.join()).toMatch(/calc_requests\[0\]\.inputs\.arm_length_cm: not an input of sim\.fx-servo-load/);
     expect(e).toContain("calc_requests[0].inputs.arm_length_m: missing (required by sim.fx-servo-load)");
-    expect(errs({ calc_requests: [{ ...c, inputs: { ...c.inputs, rated_stall_torque_nm: 2, rated_continuous_torque_nm: 2 } }] }).join()).toMatch(/give one rating, not both/);
+    // Aili never supplies a rating (Lucky's decision 2026-10-15): any rated torque input is rejected, with a plain repair message.
+    for (const k of ["rated_stall_torque_nm", "rated_continuous_torque_nm"])
+      expect(errs({ calc_requests: [{ ...c, inputs: { ...c.inputs, [k]: 2 } }] })).toContain(
+        `calc_requests[0].inputs.${k}: never supply a rated torque; it is the learner's, from their own datasheet. Leave it out and point the learner to the panel's margin`,
+      );
   });
 });
 
@@ -140,10 +144,10 @@ describe("rule: no digits where the learner reads, except {{placeholders}} from 
   it("every placeholder must be an output of a calculation requested in this turn", () => {
     expect(errs({ narration: [{ id: "n1", text: "It takes {{c2.torque_nm}}." }] }).join()).toMatch(/narration\[0\]\.text: unknown placeholder \{\{c2\.torque_nm\}\}/);
     expect(errs({ narration: [{ id: "n1", text: "It takes {{c1.force_n}}." }] }).join()).toMatch(/unknown placeholder \{\{c1\.force_n\}\}/);
-    // A rating share only exists when a rating was supplied.
+    // A rating share is never available: Aili never supplies a rating (Lucky's decision 2026-10-15).
     expect(errs({ narration: [{ id: "n1", text: "That is {{c1.share_of_rating}} of the rating." }] }).join()).toMatch(/unknown placeholder \{\{c1\.share_of_rating\}\}/);
-    const c = good().calc_requests[0]!;
-    expect(errs({ narration: [{ id: "n1", text: "That is {{c1.share_of_rating}} of the rating." }], calc_requests: [{ ...c, inputs: { ...c.inputs, rated_stall_torque_nm: 2 } }] })).toEqual([]);
+    // The force outputs are offered and accepted (slice B; the simulation lists them).
+    expect(errs({ narration: [{ id: "n1", text: "The load pulls with {{c1.payload_force_n}} and the arm weighs {{c1.arm_weight_n}}." }] })).toEqual([]);
   });
 });
 
@@ -743,5 +747,29 @@ describe("analogy honesty rule: a picture only when one exists (docs/m4-plan.md 
     const r = run({ ...good(), actions: undefined, analogy: "analogy.fx-shopping-bag", narration: [{ id: "n1", text: "Watch the bag: the bag is the payload and your shoulder the joint. It breaks down: a shoulder tires.", actions: [] }] });
     expect(r.errors).toEqual([]);
     expect(r.warnings.some((w) => w.startsWith("analogy not pictured"))).toBe(true);
+  });
+});
+
+describe("every placeholder the shortlist offers is accepted (Lucky's decision 2026-10-15, after a live repair on {{c1.payload_force_n}})", () => {
+  it("for each simulation and each solver in the professor's shortlist: a calculation with valid inputs accepts every output it lists, and nothing about a rating is offered", () => {
+    const shown = JSON.parse(
+      (() => {
+        const a = assembleProfessorPrompt({ template: "x", shortlist: SL, request: { request_id: "req_1", state_rev: 3, history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, learner_text: "hi" } });
+        return a.input.slice(a.input.indexOf("<shortlist>") + 12, a.input.indexOf("</shortlist>")).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      })(),
+    );
+    const minInputs = (inputs: Record<string, { min: number; optional?: boolean }>) => Object.fromEntries(Object.entries(inputs).filter(([, b]) => !b.optional).map(([k, b]) => [k, Math.max(b.min, 0.1)]));
+    const cases: Array<{ calc: object; outputs: string[] }> = [];
+    for (const sim of shown.simulations) cases.push({ calc: { id: "c1", solver: sim.solver, simulation: sim.id, inputs: minInputs(sim.inputs) }, outputs: sim.outputs });
+    for (const solver of shown.solvers) {
+      const inputs = typeof solver.inputs === "string" ? shown.simulations.find((x: { id: string }) => solver.inputs.endsWith(x.id)).inputs : solver.inputs;
+      cases.push({ calc: { id: "c1", solver: solver.id, inputs: minInputs(inputs) }, outputs: Object.keys(solver.outputs) });
+    }
+    expect(cases.length).toBeGreaterThan(1);
+    for (const { calc, outputs } of cases) {
+      expect(outputs.filter((o) => /rating/.test(o))).toEqual([]);
+      for (const o of outputs) expect(errs({ calc_requests: [calc], narration: [{ id: "n1", text: `It is {{c1.${o}}}.` }] }), `${JSON.stringify(calc)} ${o}`).toEqual([]);
+    }
+    for (const sim of shown.simulations) expect(Object.keys(sim.inputs).filter((k) => /^rated_/.test(k))).toEqual([]);
   });
 });

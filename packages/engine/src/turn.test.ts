@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admit, EXPLAIN_WITHOUT_CHECK, LEVEL_QUESTION_SUPPLIED, levelFromReply, QUESTION_MOVED_TO_PROMPT, supplyLevelQuestion, salvageProbeQuestion, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
+import { admit, fakeSolvers, EXPLAIN_WITHOUT_CHECK, LEVEL_QUESTION_SUPPLIED, levelFromReply, QUESTION_MOVED_TO_PROMPT, supplyLevelQuestion, salvageProbeQuestion, matchOpenChoice, reconcileShown, selectSceneForConcept, unsupportedAttributions, createFakeDirector, createFakeRouter, initialGate, InMemorySessionStore, TurnSession, type Director, type DirectorRequest, type RouterRequest, type FakeCase, type SessionState, type TurnEvent } from "./index";
 import { fixtureRegistry } from "./__fixtures__/registry";
 import validRecording from "./__recordings__/valid-explain.hand-written.json";
 import levelQuestionJson from "../../../content/level-question.json";
@@ -14,7 +14,7 @@ const registry = fixtureRegistry().registry;
 const start = (): SessionState => ({ history: { posture: "learning", learner_level: "some_knowledge", entries: [] }, activeScene: "fx-lever" });
 const session = (cases: FakeCase | FakeCase[], o: { slowMs?: number; timeoutMs?: number } = {}) => {
   const director = createFakeDirector(cases, { slowMs: o.slowMs });
-  return { director, s: new TurnSession({ registry, director, state: start(), concepts: ["mech.torque.static"], level: "L2", timeoutMs: o.timeoutMs }) };
+  return { director, s: new TurnSession({ registry, director, state: start(), concepts: ["mech.torque.static"], level: "L2", timeoutMs: o.timeoutMs, solvers: fakeSolvers(cases) }) };
 };
 const input = { text: "Why is it hard to hold?" };
 const collect = () => {
@@ -53,7 +53,7 @@ describe("failure keeps the last valid state and emits no partial actions", () =
     ["out-of-bounds", "validation", /actions\[1\]\.value: 0\.5 is outside weight_distance_m/],
     ["hard-coded-number", "validation", /narration\[0\]\.text: hard-coded number "2\.5"/],
     ["pedagogy-violation", "pedagogy", /rule no-flattery \(turn 1\)/],
-    ["solver-failure", "solver", /a supplied torque rating must be greater than 0/],
+    ["solver-failure", "solver", /the solver refused this input \(scripted solver failure, fake director only\)/],
   ];
   for (const [c, reason, detail] of cases)
     it(`${c}: turn.started then turn.error (${reason}), nothing else, state unchanged`, async () => {
