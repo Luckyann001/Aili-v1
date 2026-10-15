@@ -72,8 +72,8 @@ export interface SingleLinkInput {
   /** Optional extra point masses on the arm (a bracket, a second servo). */
   extra_masses?: readonly PointMass[];
   /**
-   * Gravity, m/s². Defaults to standard gravity (9.80665); a scene or a check that states another
-   * value (9.81, 9.80) passes it, inside the sanity range. Wherever results are shown, say which.
+   * Gravity, m/s². Standard gravity (9.80665) by default, and everywhere in the app (Lucky's decision
+   * 2026-10-15). Only textbook worked examples pass another value (9.80, 9.81), inside the sanity range.
    */
   g_m_per_s2?: number;
   /** A datasheet rating the learner supplies; never invented. Give at most one. */

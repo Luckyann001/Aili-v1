@@ -52,9 +52,9 @@ async function openDetails(page: Page) {
   await expect(panel(page).getByRole("button", { name: "Fewer details" })).toBeVisible();
 }
 
-/** The solver's answer for the values the page shows (arm level; arm mass as a uniform bar; g = 9.81 m/s², as the scene states). */
+/** The solver's answer for the values the page shows (arm level; arm mass as a uniform bar; standard gravity, as the scene states). */
 const solve = (p: { L: number; armKg: number; loadKg: number; d: number }, rating?: number) =>
-  staticTorqueSingleLink({ arm_length_m: p.L, payload_kg: 0, arm_kg_per_m: p.armKg / p.L, angle_deg: 0, extra_masses: [{ mass_kg: p.loadKg, distance_m: p.d }], g_m_per_s2: 9.81, ...(rating ? { rated_continuous_torque_nm: rating } : {}) });
+  staticTorqueSingleLink({ arm_length_m: p.L, payload_kg: 0, arm_kg_per_m: p.armKg / p.L, angle_deg: 0, extra_masses: [{ mass_kg: p.loadKg, distance_m: p.d }], ...(rating ? { rated_continuous_torque_nm: rating } : {}) });
 const shown = async (page: Page, key: string) => (await page.locator(`[data-solver-value="${key}"]`).textContent())!;
 const settingValue = async (page: Page, label: string) => Number((await inspector(page).locator("div", { has: page.getByText(label, { exact: true }) }).locator("output").first().textContent())!.split(" ")[0]);
 

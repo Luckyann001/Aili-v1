@@ -62,7 +62,7 @@ describe("assembly", () => {
     expect(Object.keys(sl.solvers[0].outputs)).toContain("torque_nm");
     // A solver run by a shortlisted simulation does not repeat it: inputs "as in", and only its own extra assumptions.
     expect(sl.solvers[0]).toMatchObject({ inputs: "as in sim.fx-servo-load", also_states: "the assumptions and exclusions of sim.fx-servo-load" });
-    expect(sl.solvers[0].assumptions).toEqual(["gravity is standard gravity, 9.80665 m/s², unless a scene or check states another value (the servo + arm scene states 9.81 m/s²)"]);
+    expect(sl.solvers[0].assumptions).toEqual(["gravity is standard gravity, 9.80665 m/s²; only textbook checks state another value"]);
     expect(sl.solvers[0].excludes).toBeUndefined();
     expect(sl.readings[0].guide.key_claims[0]).toBe("Moment is force times distance");
     // Each analogy says whether a picture of it exists (docs/m4-plan.md addendum A). The block groups items by kind + "s".

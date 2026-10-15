@@ -116,8 +116,7 @@
   "solver": {
     "id": "solver.static-torque-single-link",
     "constants": {
-      "angle_deg": 0,
-      "g_m_per_s2": 9.81
+      "angle_deg": 0
     }
   }
 }

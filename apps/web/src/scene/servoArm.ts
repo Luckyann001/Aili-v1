@@ -1,4 +1,4 @@
-import { staticTorqueSingleLink } from "@aili/solvers";
+import { STANDARD_GRAVITY_M_PER_S2, staticTorqueSingleLink } from "@aili/solvers";
 import scene from "../../../../content/robotics/scenes/servo-arm.json";
 import thresholds from "../../../../config/teaching-thresholds.json";
 import type { PartLayout } from "./layout";
@@ -94,8 +94,12 @@ export function marginStatus(margin: number, t: { fail_below: number; pass_at_or
   return margin >= t.pass_at_or_above ? "pass" : "warn";
 }
 
-/** Gravity the scene states (its manifest's solver constant), m/s²: shown with the numbers. */
-export const SCENE_G_M_PER_S2 = scene.solver.constants.g_m_per_s2;
+/**
+ * Gravity: standard gravity, as the engine's calculations use it (Lucky's decision 2026-10-15), so the
+ * stage and the narration always agree and kgf·cm stays exact. Shown wherever the numbers are.
+ */
+export const SCENE_G_M_PER_S2 = STANDARD_GRAVITY_M_PER_S2;
+export const GRAVITY_TEXT = `g = ${SCENE_G_M_PER_S2} m/s² (standard gravity)`;
 
 export interface ServoReadout {
   /** The forces behind the torque, N: the load's weight and the arm's own weight (at L/2). */
@@ -123,7 +127,6 @@ export function servoReadout(p: ServoParams, rating_nm: number | null): ServoRea
     payload_kg: 0,
     arm_kg_per_m: p.arm_mass_kg / p.arm_length_m,
     angle_deg: scene.solver.constants.angle_deg,
-    g_m_per_s2: SCENE_G_M_PER_S2,
     extra_masses: [{ mass_kg: p.load_mass_kg, distance_m: Math.min(p.arm_length_m, p.load_distance_m) }],
     ...(rating_nm !== null ? { rated_continuous_torque_nm: rating_nm } : {}),
   });

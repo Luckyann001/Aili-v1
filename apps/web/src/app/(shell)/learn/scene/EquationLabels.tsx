@@ -3,7 +3,7 @@
 import { useSyncExternalStore, type RefObject } from "react";
 import { StatusIcon } from "@/components/StatusIcon";
 import { useScene } from "@/scene/sceneStore";
-import { eqText, SCENE_G_M_PER_S2, servoReadout, type EqStep } from "@/scene/servoArm";
+import { eqText, GRAVITY_TEXT, servoReadout, type EqStep } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // τ = F × d built on the servo + arm (M4 slice B). Each step's label sits on the object (placed by
@@ -77,7 +77,7 @@ export function EquationList() {
           {eqText(step, r, d)}
         </li>
       ))}
-      <li className={styles.eqListNote}>g = {SCENE_G_M_PER_S2} m/s²</li>
+      <li className={styles.eqListNote}>{GRAVITY_TEXT}</li>
     </ol>
   );
 }

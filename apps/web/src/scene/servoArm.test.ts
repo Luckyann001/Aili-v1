@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import { createSceneSlice, type SceneState } from "./sceneStore";
-import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqText, MARGIN, SCENE_G_M_PER_S2, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
+import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqText, MARGIN, SCENE_G_M_PER_S2, GRAVITY_TEXT, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
 
 // Servo + arm scene (M4 slice 2a): every number from the solver, bounds enforced, bands from config.
 
@@ -10,7 +10,7 @@ describe("servo + arm: numbers come from the solver", () => {
   it("the readout is the solver's answer, the arm's own mass included, units declared by the solver", () => {
     const p = { arm_length_m: 0.2, arm_mass_kg: 0.05, load_mass_kg: 0.1, load_distance_m: 0.15 };
     const r = servoReadout(p, 1.2);
-    const s = staticTorqueSingleLink({ arm_length_m: 0.2, payload_kg: 0, arm_kg_per_m: 0.25, angle_deg: 0, extra_masses: [{ mass_kg: 0.1, distance_m: 0.15 }], rated_continuous_torque_nm: 1.2, g_m_per_s2: 9.81 });
+    const s = staticTorqueSingleLink({ arm_length_m: 0.2, payload_kg: 0, arm_kg_per_m: 0.25, angle_deg: 0, extra_masses: [{ mass_kg: 0.1, distance_m: 0.15 }], rated_continuous_torque_nm: 1.2 });
     expect(r.torque_nm).toBe(s.torque_nm);
     expect(r.torque_kgf_cm).toBe(s.torque_kgf_cm);
     expect(r.load_torque_nm).toBe(s.extra_torque_nm);
@@ -80,19 +80,19 @@ describe("servo + arm: settings and bounds", () => {
 
 describe("τ = F × d on the servo + arm (M4 slice B)", () => {
   const lucky = { arm_length_m: 0.3, arm_mass_kg: 0.2, load_mass_kg: 0.5, load_distance_m: 0.25 };
-  it("the scene states g = 9.81 m/s², and its readout gives Lucky's worked example (all inside the sliders' bounds)", () => {
-    expect(SCENE_G_M_PER_S2).toBe(9.81);
+  it("the scene uses standard gravity (Lucky's decision 2026-10-15), shown as such; Lucky's 9.81 example lives in the solver's tests", () => {
+    expect(SCENE_G_M_PER_S2).toBe(9.80665);
+    expect(GRAVITY_TEXT).toBe("g = 9.80665 m/s² (standard gravity)");
     const r = servoReadout(lucky, null);
-    expect(r.load_force_n).toBeCloseTo(4.905, 12);
-    expect(r.load_torque_nm).toBeCloseTo(1.22625, 12);
-    expect(r.arm_weight_n).toBeCloseTo(1.962, 12);
-    expect(r.arm_torque_nm).toBeCloseTo(0.2943, 12);
-    expect(r.torque_nm).toBeCloseTo(1.52055, 12);
+    const s = staticTorqueSingleLink({ arm_length_m: 0.3, payload_kg: 0, arm_kg_per_m: 0.2 / 0.3, angle_deg: 0, extra_masses: [{ mass_kg: 0.5, distance_m: 0.25 }] });
+    expect([r.load_force_n, r.load_torque_nm, r.arm_weight_n, r.arm_torque_nm, r.torque_nm]).toEqual([s.extra_force_n, s.extra_torque_nm, s.arm_weight_n, s.arm_torque_nm, s.torque_nm]);
+    expect(r.load_force_n).toBeCloseTo(0.5 * 9.80665, 12); // 4.903325 N
+    expect(r.torque_nm).toBeCloseTo(9.80665 * (0.5 * 0.25 + 0.2 * 0.15), 12); // 1.52003075 N·m
   });
   it("each step's label text, numbers from the readout with units; the margin asks for a rating until one is entered", () => {
     const r = servoReadout(lucky, null);
     expect(EQ_STEPS.map((s) => eqText(s, r, 0.25))).toEqual([
-      "F = m × g = 4.91 N, the load's weight",
+      "F = m × g = 4.90 N, the load's weight",
       "d = 0.25 m from the joint",
       "τ = F × d = 1.23 N·m",
       "+ the arm's own weight (1.96 N at mid-arm): 0.294 N·m",

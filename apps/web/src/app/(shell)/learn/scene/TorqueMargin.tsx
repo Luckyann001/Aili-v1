@@ -3,7 +3,7 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { StatusIcon } from "@/components/StatusIcon";
 import { useScene } from "@/scene/sceneStore";
-import { MARGIN, SCENE_G_M_PER_S2, servoReadout, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
+import { GRAVITY_TEXT, MARGIN, servoReadout, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // Servo + arm (M4 slice 2a): the torque the joint needs, from the solver, split by cause, and the
@@ -104,7 +104,7 @@ export function TorqueMargin() {
           </p>
         )}
         <p className={styles.marginNote}>
-          {MARGIN.label}: {bands}. Simulation only; hardware untested. Level arm, holding still: no acceleration, friction or gear play. g = {SCENE_G_M_PER_S2} m/s².
+          {MARGIN.label}: {bands}. Simulation only; hardware untested. Level arm, holding still: no acceleration, friction or gear play. {GRAVITY_TEXT}.
         </p>
       </div>
     </section>
