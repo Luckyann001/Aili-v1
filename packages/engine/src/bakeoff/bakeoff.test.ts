@@ -105,8 +105,8 @@ describe("runner (recorded mode)", () => {
     const t = r.records[0]!.turns[0]!;
     expect(t.outcome).toBe("done");
     expect(t.warnings).toHaveLength(1);
-    expect(transcriptMarkdown(r.records[0]!, "recorded")).toContain("WARNING (for review, not a rejection): analogy:");
-    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/\| Warnings \(semantic, for review; never a rejection\) \| 1 \(analogy 1\) \|/);
+    expect(transcriptMarkdown(r.records[0]!, "recorded")).toContain("WARNING (for review, not a rejection): analogy tag dropped: not described:");
+    expect(summaryMarkdown(r, { mode: "recorded", started: "now", models: "recorded" })).toMatch(/\| Warnings \(semantic, for review; never a rejection\) \| 1 \(analogy tag dropped 1\) \|/);
   });
 
   it("the hard cap stops the run before a turn whose worst case would pass it; nothing is called", async () => {

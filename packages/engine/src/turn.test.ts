@@ -1022,7 +1022,9 @@ describe("the level question is supplied by the engine when a first probe asks n
 describe("turn.done names the analogy and whether it is words only (docs/m4-plan.md addendum A)", () => {
   const VALID = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
   const done = async (analogy?: string) => {
-    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(analogy ? { analogy } : {}) } }; } };
+    // Narration that tells both analogies (a tag the narration does not tell is dropped).
+    const told = [{ id: "n1", text: "Hold a bag out, or a ruler: your hand or shoulder is the servo's joint." }, { id: "n2", text: "Where it breaks down: a hand tires, a servo heats up." }];
+    const director: Director = { async respond(req) { return { response: { ...VALID, request_id: req.request_id, state_rev: req.state_rev, ...(analogy ? { analogy, narration: told, calc_requests: [], actions: [] } : {}) } }; } };
     const s = new TurnSession({ registry, director, router: createFakeRouter(), state: start(), concepts: ["mech.torque.static"], level: "L2" });
     const events: TurnEvent[] = [];
     await s.run(input, (e) => events.push(e));

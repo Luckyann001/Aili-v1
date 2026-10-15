@@ -1,4 +1,4 @@
-import { EMPTY_ANSWER, EXPLAIN_WITHOUT_CHECK, GUIDE_QUESTION_SUBSTITUTED, LEVEL_QUESTION_SUPPLIED, NARRATION_SPLIT, QUESTION_MOVED_TO_PROMPT, STRAY_ACTION_FIELD_DROPPED } from "../director";
+import { ANALOGY_TAG_DROPPED, EMPTY_ANSWER, EXPLAIN_WITHOUT_CHECK, GUIDE_QUESTION_SUBSTITUTED, LEVEL_QUESTION_SUPPLIED, NARRATION_SPLIT, QUESTION_MOVED_TO_PROMPT, STRAY_ACTION_FIELD_DROPPED } from "../director";
 import { OPEN_QUESTION_REOFFERED, SCENE_SELECTED_BY_ENGINE, READING_FILLED_IN, UNSUPPORTED_ATTRIBUTION } from "../teaching";
 import type { RunResult, ScenarioRecord, TurnRecord } from "./runner";
 
@@ -73,6 +73,7 @@ export interface Metrics {
   stray_fields_dropped: number;
   question_moved: number;
   level_question_supplied: number;
+  analogy_tag_dropped: number;
   explain_without_check: number;
   /** Turns where the engine split a long narration segment at sentence boundaries. */
   narration_split: number;
@@ -137,8 +138,8 @@ export function metrics(turns: TurnRecord[]): Metrics {
             ? "explanation without a check"
             : w.startsWith(UNSUPPORTED_ATTRIBUTION)
             ? "unsupported attribution"
-            : w.startsWith("analogy:")
-              ? "analogy"
+            : w.startsWith(ANALOGY_TAG_DROPPED)
+              ? "analogy tag dropped"
               : /mild praise/.test(w)
                 ? "mild praise"
                 : /characters \(over/.test(w)
@@ -164,6 +165,7 @@ export function metrics(turns: TurnRecord[]): Metrics {
     stray_fields_dropped: turns.filter((t) => t.warnings.some((w) => w.startsWith(STRAY_ACTION_FIELD_DROPPED))).length,
     question_moved: turns.filter((t) => t.warnings.some((w) => w.startsWith(QUESTION_MOVED_TO_PROMPT))).length,
     level_question_supplied: turns.filter((t) => t.warnings.some((w) => w.startsWith(LEVEL_QUESTION_SUPPLIED))).length,
+    analogy_tag_dropped: turns.filter((t) => t.warnings.some((w) => w.startsWith(ANALOGY_TAG_DROPPED))).length,
     explain_without_check: turns.filter((t) => t.warnings.some((w) => w.startsWith(EXPLAIN_WITHOUT_CHECK))).length,
   };
 }
@@ -210,6 +212,7 @@ export function summaryMarkdown(result: RunResult, meta: { mode: "recorded" | "l
     `| Stray action fields dropped (a field from another action type) | ${m.stray_fields_dropped} |`,
     `| Probe questions moved from narration to prompt | ${m.question_moved} |`,
     `| Level questions supplied by the engine | ${m.level_question_supplied} |`,
+    `| Analogy tags dropped (not described in the narration) | ${m.analogy_tag_dropped} |`,
     `| Explanations without a check (warning only) | ${m.explain_without_check} |`,
     `| Narration segments split (engine, at sentence ends) | ${m.narration_split} |`,
     `| Empty or action-only first answers (no narration, no prompt) | ${m.empty_first} |`,

@@ -283,17 +283,24 @@ describe("an analogy's mapping and breakdown in the narration: a WARNING, never 
     expect([r.errors, r.warnings]).toEqual([[], []]);
   });
 
-  it("a tag the narration never explains is ACCEPTED with a warning that gives the mapping and breakdown", () => {
+  it("a tag the narration never explains is DROPPED, with a warning that gives the mapping and breakdown (Lucky's decision 2026-10-15)", () => {
     const r = said(bag, "Try the stage: the ruler is the arm and your hand is the servo.");
     expect(r.errors).toEqual([]);
     expect(r.response).not.toBeNull();
-    expect(r.warnings.join("\n")).toMatch(/analogy: "analogy.fx-shopping-bag" is set, but the narration may not say what maps to what \(the bag → the payload; .*\) or where it breaks down/);
+    expect(r.response!.analogy).toBeUndefined(); // so no "Analogy in words only" label for an untold analogy
+    expect(r.warnings.join("\n")).toMatch(/^analogy tag dropped: not described: "analogy.fx-shopping-bag": the narration does not say what maps to what \(the bag → the payload; .*\) or where it breaks down/m);
+  });
+  it("a tag the narration does tell is kept", () => {
+    const r = said(bag, "Hold a bag out: the bag is the load and your shoulder the servo. Where it breaks down: a shoulder tires.");
+    expect(r.response!.analogy).toBe("analogy.fx-shopping-bag");
+    expect(r.warnings.filter((w) => w.startsWith("analogy tag dropped"))).toEqual([]);
   });
 
-  it("a mapping without a breakdown, or a breakdown without the mapping, warns (and is still accepted)", () => {
+  it("a mapping without a breakdown, or a breakdown without the mapping, drops the tag (and the answer is still accepted)", () => {
     for (const r of [said(bag, "The bag is the load and your shoulder is the servo."), said(bag, "This picture breaks down for a real motor.")]) {
       expect(r.errors).toEqual([]);
       expect(r.warnings).toHaveLength(1);
+      expect(r.response!.analogy).toBeUndefined();
     }
   });
 });
@@ -726,8 +733,27 @@ describe("analogy honesty rule: a picture only when one exists (docs/m4-plan.md 
     expect(warn({ analogy: "analogy.fx-shopping-bag", narration: [seg("n1", "Watch the arm swing out.")], actions: [] }, "fx-servo-arm")).toEqual([]);
     expect(warn({ narration: [seg("n1", "Watch the bag.")], actions: [{ type: "play_animation", animation: "slide-weight-out", at: "n1" }] })).toEqual([]);
   });
+  it("the live turn of 15 Oct, verbatim: the bag tagged while the servo equation was built; the tag is dropped, so no analogy warning or label", () => {
+    const n = (id: string, text: string, actions: object[]) => ({ id, text, actions });
+    const r = run({
+      ...good(),
+      actions: undefined,
+      calc_requests: [],
+      evidence: [],
+      analogy: "analogy.fx-shopping-bag",
+      narration: [
+        n("n1", "Let's build it on a servo arm. Torque is a force times the distance it acts from the pivot. First, the force: the load's weight pulling down.", [{ type: "select_scene", scene: "fx-servo-arm" }, { type: "play_animation", animation: "eq-force" }]),
+        n("n2", "Next, the distance: how far the load sits from the servo's horn, which is the pivot. Farther out means more twist.", [{ type: "play_animation", animation: "eq-distance" }]),
+        n("n3", "Multiply them to get torque. The arm's own weight counts too, acting at its middle, so it adds its own share.", [{ type: "play_animation", animation: "eq-torque" }, { type: "play_animation", animation: "eq-arm-share" }]),
+        n("n4", "Last, compare that total with the servo's rated torque from its datasheet. The gap is your margin. This is a static hold only, level, with no motion.", [{ type: "play_animation", animation: "eq-margin" }]),
+      ],
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.response!.analogy).toBeUndefined();
+    expect(r.warnings.filter((w) => w.startsWith("analogy"))).toEqual([expect.stringMatching(/^analogy tag dropped: not described: "analogy.fx-shopping-bag"/)]);
+  });
   it("the validator reports them as warnings, never rejections", () => {
-    const r = run({ ...good(), actions: undefined, analogy: "analogy.fx-shopping-bag", narration: [{ id: "n1", text: "Watch the bag: the bag is the payload and your shoulder the joint; a shoulder tires gradually, a servo has a fixed rated torque.", actions: [] }] });
+    const r = run({ ...good(), actions: undefined, analogy: "analogy.fx-shopping-bag", narration: [{ id: "n1", text: "Watch the bag: the bag is the payload and your shoulder the joint. It breaks down: a shoulder tires.", actions: [] }] });
     expect(r.errors).toEqual([]);
     expect(r.warnings.some((w) => w.startsWith("analogy not pictured"))).toBe(true);
   });

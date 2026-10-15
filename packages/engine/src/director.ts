@@ -154,6 +154,9 @@ export function segmentWarnings(r: Pick<DirectorResponse, "narration" | "actions
   return [...new Set(out)];
 }
 
+/** The warning when an analogy tag is dropped because the narration does not tell it (Lucky's decision 2026-10-15). */
+export const ANALOGY_TAG_DROPPED = "analogy tag dropped: not described";
+
 /** Warnings when narration treats an analogy as pictured though no picture of it is on stage (Lucky's decision 2026-10-15). */
 export const ANALOGY_NOT_PICTURED = "analogy not pictured";
 
@@ -358,9 +361,19 @@ function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResp
     }
     return { response: null, errors, warnings: [], ...(candidate ? { candidate } : {}) };
   }
-  const r = parsed.data;
+  let r = parsed.data;
   const errors: string[] = [];
   const warnings: string[] = [];
+  // An analogy tag the narration does not describe is dropped before any other check (Lucky's
+  // decision 2026-10-15, after a live turn tagged the bag while explaining the servo): the page's
+  // "Analogy in words only" label and the analogy warnings then cannot appear for an untold analogy.
+  const tagged = r.analogy ? sl.analogies.find((a) => a.id === r.analogy) : undefined;
+  if (tagged && !analogyExplained(r.narration.map((n) => n.text).join(" "), tagged)) {
+    warnings.push(
+      `${ANALOGY_TAG_DROPPED}: "${tagged.id}": the narration does not say what maps to what (${tagged.mapping.map((m) => `${m.source} → ${m.target}`).join("; ")}) or where it breaks down ("${tagged.breaks_down}")`,
+    );
+    r = { ...r, analogy: undefined };
+  }
   const notInShortlist = (field: string, id: string) => errors.push(`${field}: "${id}" is not in this turn's shortlist`);
 
   if (ctx.expected) {
@@ -489,14 +502,7 @@ function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResp
     }
     if (r.move !== "assign" && r.move !== "teach_back") errors.push(`reading: set only with move "assign" or "teach_back", not "${r.move}"`);
   }
-  if (r.analogy) {
-    const an = sl.analogies.find((a) => a.id === r.analogy);
-    if (!an) notInShortlist("analogy", r.analogy);
-    else if (!analogyExplained(r.narration.map((n) => n.text).join(" "), an))
-      warnings.push(
-        `analogy: "${an.id}" is set, but the narration may not say what maps to what (${an.mapping.map((m) => `${m.source} → ${m.target}`).join("; ")}) or where it breaks down ("${an.breaks_down}")`,
-      );
-  }
+  if (r.analogy && !sl.analogies.some((a) => a.id === r.analogy)) notInShortlist("analogy", r.analogy);
 
   // A teach-back is graded ONLY against the reading's human-written guide (spec A8).
   if (r.teach_back_check) {
