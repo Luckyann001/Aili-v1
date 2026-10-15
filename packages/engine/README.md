@@ -179,7 +179,7 @@ request as if config held those values; config is not changed.
   unused solvers, simulations. Never dropped: the scene on stage and any item with safety notes;
   kept items keep their bounds. The model is told what was left out. `overBudget` is reported if
   even that is not enough.
-  **Typical prompt: 4,868 of 5,000** estimated tokens (15 Oct 2026, after slice B), nothing dropped.
+  **Typical prompt: 4,939 of 5,000** estimated tokens (15 Oct 2026, after the check-question line), nothing dropped.
 - **No repetition**: a solver that a shortlisted simulation runs says `inputs: "as in <simulation>"`
   when they match, and lists only the assumptions and exclusions the simulation does not already
   state (`also_states` names it). This made room for slice B without raising the budget.
