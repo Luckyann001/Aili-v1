@@ -55,7 +55,10 @@
     "torque_kgf_cm",
     "payload_torque_nm",
     "arm_torque_nm",
-    "share_of_rating"
+    "share_of_rating",
+    "payload_force_n",
+    "arm_weight_n",
+    "extra_force_n"
   ],
   "assumptions": [
     "static hold only",
