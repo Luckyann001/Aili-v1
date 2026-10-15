@@ -1427,3 +1427,25 @@
   color: var(--aili-text-muted);
   font-size: 0.75rem;
 }
+
+/* "The professor's numbers use the settings from its last turn." In the caption overlay (no layout
+   shift), caption-sized text, icon + words (not colour alone). */
+.settingsNote {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+  width: fit-content;
+  max-width: min(100%, 640px);
+  margin: var(--aili-space-1) auto 0;
+  padding: var(--aili-space-1) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.settingsNote svg {
+  flex: none;
+}

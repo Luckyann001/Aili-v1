@@ -98,6 +98,13 @@ describe("recorded live path (test builds only)", () => {
     const t7 = await readAll(await handleTurn(post(body(7, "The arm itself", sid))));
     expect(t7.at(-1)!.type, JSON.stringify(t7.at(-1))).toBe("turn.done");
     expect(acts(t7)).toEqual([{ type: "play_animation", animation: "eq-arm-share", at: "n1" }, { type: "play_animation", animation: "eq-margin", at: "n2" }]);
+    // Turns 7 and 8 give numbers about the scene on stage, from its settings (the page's note resets).
+    expect(t7.at(-1)).toMatchObject({ stage_numbers: true });
+    const t8 = await readAll(await handleTurn(post(body(8, "A shorter arm", sid))));
+    expect(t8.at(-1), JSON.stringify(t8.at(-1))).toMatchObject({ type: "turn.done", stage_numbers: true });
+    // The stage's defaults (arm 0.15 m, arm 0.04 kg, load 0.1 kg at 0.08 m), not the professor's load-at-the-tip inputs.
+    const total = t8.filter((e) => e.type === "narration").flatMap((e) => (e as { parts: Array<{ value?: string }> }).parts).find((p) => p.value)!.value;
+    expect(total).toBe(String(Number((9.80665 * (0.1 * 0.08 + 0.04 * 0.075)).toPrecision(3))));
   });
 
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {

@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { paramsFor } from "@/scene/layout";
 import { partNameIn } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
+import { useStageContent } from "@/turn/stageContent";
 import { RATING_DEF, SERVO_PARAMS, SERVO_PARAMS_BY_PART, isServoParam, servoReadout, type ServoParamId } from "@/scene/servoArm";
 import { MarginLine } from "./TorqueMargin";
 import styles from "../learn.module.css";
@@ -77,7 +78,15 @@ export function Inspector({ onClosed }: { onClosed: () => void }) {
           {servoDefs.length === 0 && <p className={styles.inspectorNote}>No settings for this part.</p>}
           {servoDefs.map((d) =>
             isServoParam(d.id) ? (
-              <Setting key={d.id} def={d} value={servo[d.id]} onChange={(v) => setServoParam(d.id as ServoParamId, v)} />
+              <Setting
+                key={d.id}
+                def={d}
+                value={servo[d.id]}
+                onChange={(v) => {
+                  setServoParam(d.id as ServoParamId, v);
+                  useStageContent.getState().learnerChangedSettings();
+                }}
+              />
             ) : (
               <RatingSetting key={d.id} />
             ),

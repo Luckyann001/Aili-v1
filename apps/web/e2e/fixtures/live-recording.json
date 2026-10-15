@@ -1,5 +1,5 @@
 {
-  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Turns 6 and 7 (the equation built on the servo + arm) added for M4 slice B. Test builds only.",
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Turns 6 and 7 (the equation built on the servo + arm) added for M4 slice B. Turn 7 given a calculation and turn 8 added (numbers from the stage's settings, the settings note) on 15 Oct. Test builds only.",
   "router": {
     "source": "hand-written",
     "steps": [
@@ -54,6 +54,24 @@
             "wants_direct_answer": false
           },
           "input_tokens": 1600,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
           "output_tokens": 92
         }
       },
@@ -514,7 +532,19 @@
                 ]
               }
             ],
-            "calc_requests": [],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.15,
+                  "payload_kg": 0.1,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
             "evidence": [],
             "prompt": {
               "kind": "question",
@@ -534,6 +564,63 @@
             ]
           },
           "input_tokens": 8100,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_8",
+            "state_rev": 8,
+            "move": "explain",
+            "concepts": [
+              "mech.torque.static",
+              "mech.moment-arm"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, a shorter arm brings the load closer to the joint, so its twist shrinks.",
+                "actions": []
+              },
+              {
+                "id": "n2",
+                "text": "For the settings on stage, the servo now holds {{c1.torque_nm}} newton-metres in total.",
+                "actions": []
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.15,
+                  "payload_kg": 0.1,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What would a heavier load do to that total?",
+              "chips": [
+                "Raise it",
+                "Lower it",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8200,
           "output_tokens": 300
         }
       }

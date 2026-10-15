@@ -27,6 +27,8 @@ export interface TurnClientState<Snapshot> {
   explanation: TurnExplanation | null;
   /** The analogy the turn used, if any, and whether it is words only (no picture exists). */
   analogy?: { id: string; title: string; words_only: boolean } | null;
+  /** The turn gave numbers about the scene on stage (from the stage's settings). */
+  stageNumbers?: boolean;
   /** One plain line: the error, "Stopped." or the dropped connection. */
   message: string | null;
 }
@@ -66,7 +68,7 @@ export function turnClientReducer<S>(s: TurnClientState<S>, a: TurnClientAction<
         case "prompt":
           return { ...t, prompt: { text: e.text, parts: e.parts, chips: e.chips } };
         case "turn.done":
-          return { ...t, status: "done", snapshot: null, explanation: e.explanation, analogy: e.analogy ?? null };
+          return { ...t, status: "done", snapshot: null, explanation: e.explanation, analogy: e.analogy ?? null, stageNumbers: e.stage_numbers === true };
         case "turn.error":
           return { ...t, ...cleared(), status: "error", restoreTo: t.snapshot, snapshot: null, message: e.message };
       }

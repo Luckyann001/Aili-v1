@@ -7,12 +7,22 @@ import { create } from "zustand";
 // `scenePicked`: in live mode the stage stays dimmed and unbadged until a turn puts a scene on it.
 // `wordsOnlyAnalogy`: while a turn that tells an analogy with no picture plays, its title; the page
 // then says so beside the caption, whatever the narration says (docs/m4-plan.md addendum A).
+// `settingsNote`: the learner moved a slider since the professor's last turn that gave numbers about
+// the scene; those numbers used the settings of that turn (the page sends only text), so the page
+// says so until the next such turn (Lucky's decision 2026-10-15).
 export const useStageContent = create<{
   fixture: boolean;
   live: boolean;
   scenePicked: boolean;
   wordsOnlyAnalogy: string | null;
   setWordsOnlyAnalogy: (title: string | null) => void;
+  /** A professor turn gave numbers about the scene on stage (and none since the learner's changes). */
+  stageNumbersGiven: boolean;
+  settingsNote: boolean;
+  /** A turn with numbers about the scene: the note goes. */
+  stageNumbersTurn: () => void;
+  /** The learner moved a slider: the note shows if an earlier turn gave numbers about the scene. */
+  learnerChangedSettings: () => void;
   setFixture: (on: boolean, live?: boolean) => void;
   setScenePicked: (on: boolean) => void;
 }>()((set) => ({
@@ -21,6 +31,10 @@ export const useStageContent = create<{
   scenePicked: false,
   wordsOnlyAnalogy: null,
   setWordsOnlyAnalogy: (wordsOnlyAnalogy) => set({ wordsOnlyAnalogy }),
+  stageNumbersGiven: false,
+  settingsNote: false,
+  stageNumbersTurn: () => set({ stageNumbersGiven: true, settingsNote: false }),
+  learnerChangedSettings: () => set((s) => ({ settingsNote: s.stageNumbersGiven })),
   setFixture: (fixture, live = false) => set({ fixture, live: fixture && live }),
   setScenePicked: (scenePicked) => set({ scenePicked }),
 }));

@@ -172,4 +172,45 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
         }
     expect(problems).toEqual([]);
   });
+
+  // Option A (Lucky's decision 2026-10-15): after a turn that gave numbers about the scene, moving a
+  // slider shows "The professor's numbers use the settings from its last turn."; the next such turn clears it.
+  test("a slider moved after the professor's numbers shows the settings note; the next turn with numbers clears it", async ({ page }, info) => {
+    test.setTimeout(240_000);
+    await toTurn6(page);
+    await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 30_000 });
+    await send(page, "The arm itself");
+    await expect(caption(page)).toHaveText(/^What could you change on the arm/, { timeout: 30_000 });
+    const note = page.locator("[data-settings-note]");
+    await expect(note).toHaveCount(0); // the numbers match the stage
+
+    await page.getByRole("button", { name: /^Parts/ }).click();
+    await page.getByRole("option", { name: "Load" }).click();
+    const slider = page.getByRole("region", { name: /^Inspector:/ }).getByRole("slider", { name: "Load mass" });
+    await slider.focus();
+    await page.keyboard.press("End");
+    await page.getByRole("button", { name: "Close inspector" }).click();
+    await expect(note).toHaveText("The professor's numbers use the settings from its last turn.");
+    await expect(note).toHaveAttribute("role", "status");
+    await expect(note.locator("svg")).toHaveCount(1); // icon + words, not colour alone
+    expect(await note.evaluate((el) => getComputedStyle(el).fontSize)).toBe(await caption(page).evaluate((el) => getComputedStyle(el).fontSize));
+    if (info.project.name === "desktop") {
+      const boxes = await page.evaluate(() => {
+        const r = (el: Element) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height }; };
+        const vis = (el: Element) => getComputedStyle(el).visibility !== "hidden" && (el as HTMLElement).offsetWidth > 0;
+        return {
+          note: r(document.querySelector("[data-settings-note]")!),
+          others: [...document.querySelectorAll("span[data-eq-label], span[data-part-id], section[aria-label='Torque at the joint']")].filter(vis).map(r),
+        };
+      });
+      const hit = (a: typeof boxes.note, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+      expect(boxes.others.filter((o) => hit(boxes.note, o))).toEqual([]);
+    }
+    expect(await axe(page)).toEqual([]);
+
+    // Turn 8 gives numbers about the scene again: the note goes.
+    await send(page, "A shorter arm");
+    await expect(caption(page)).toHaveText(/^Yes, a shorter arm/, { timeout: 30_000 });
+    await expect(note).toHaveCount(0);
+  });
 });

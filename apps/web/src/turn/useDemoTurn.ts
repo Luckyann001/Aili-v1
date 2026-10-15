@@ -219,6 +219,8 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
                 useStageContent.getState().setFixture(true, live);
                 // An analogy with no picture is said to be words only, as its lines start.
                 useStageContent.getState().setWordsOnlyAnalogy(after.analogy?.words_only ? after.analogy.title : null);
+                // Numbers about the scene from the stage's settings: the "last turn's settings" note goes.
+                if (after.stageNumbers) useStageContent.getState().stageNumbersTurn();
               }
               for (const a of byLine[seq] ?? []) applyAction(a, live, rev);
             },

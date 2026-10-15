@@ -1,3 +1,4 @@
+import { applyStageSetting, type StageScene } from "@aili/engine/stage";
 import { STANDARD_GRAVITY_M_PER_S2, staticTorqueSingleLink } from "@aili/solvers";
 import scene from "../../../../content/robotics/scenes/servo-arm.json";
 import thresholds from "../../../../config/teaching-thresholds.json";
@@ -39,21 +40,12 @@ export const SERVO_PARAMS_BY_PART: Record<string, Array<ServoParamDef["id"]>> = 
 
 export const isServoParam = (id: string): id is ServoParamId => id in DEFAULT_SERVO_PARAMS;
 
-/** Keeps a value inside its bounds and on its step (no floating-point dust). */
-export function clampTo(d: Pick<ServoParamDef, "min" | "max" | "step">, value: number): number {
-  const stepped = Math.round((Math.min(d.max, Math.max(d.min, value)) - d.min) / d.step) * d.step + d.min;
-  return Number(Math.min(d.max, stepped).toFixed(4));
-}
-
 /**
- * One setting changed, the others kept consistent: the load always sits on the arm, so its
- * distance never exceeds the arm's length (shortening the arm brings the load in with it).
+ * One setting changed, the others kept consistent (the load stays on the arm): the shared stage
+ * function the engine also uses, so the page's settings and the professor's calculations agree.
  */
 export function setServoParam(p: ServoParams, id: ServoParamId, value: number): ServoParams {
-  if (!Number.isFinite(value)) return p;
-  const next = { ...p, [id]: clampTo(def(id), value) };
-  if (next.load_distance_m > next.arm_length_m) next.load_distance_m = next.arm_length_m;
-  return next;
+  return applyStageSetting(scene as StageScene, p, id, value) as ServoParams;
 }
 
 /** A rating the learner typed: inside its bounds, or rejected (null) so nothing is guessed. */

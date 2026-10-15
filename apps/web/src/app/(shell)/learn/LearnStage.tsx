@@ -103,6 +103,7 @@ export function LearnStage() {
   const [welcomeGone, setWelcomeGone] = useState(false);
   const scenePicked = useStageContent((s) => s.scenePicked);
   const wordsOnlyAnalogy = useStageContent((s) => s.wordsOnlyAnalogy);
+  const settingsNote = useStageContent((s) => s.settingsNote);
   const showWelcome = live === true && !welcomeGone;
   // The bottom input takes over once the welcome has gone. Both boxes share inputRef, so this runs
   // after React has committed the swap (a frame callback could still find the welcome's input).
@@ -263,6 +264,17 @@ export function LearnStage() {
               )}
               <p aria-live={captionLive}>{caption.parts ? <CaptionText parts={caption.parts} /> : caption.text}</p>
             </div>
+          )}
+          {/* The learner moved a slider since the professor's last numbers about the scene (polite status). */}
+          {settingsNote && (
+            <p className={styles.settingsNote} role="status" data-settings-note="">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7" />
+                <circle cx="10.5" cy="4.5" r="1.6" />
+                <circle cx="5.5" cy="11.5" r="1.6" />
+              </svg>
+              The professor&apos;s numbers use the settings from its last turn.
+            </p>
           )}
           {/* Shown whether or not captions are on: the stage is not a picture of this analogy. */}
           {wordsOnlyAnalogy && (
