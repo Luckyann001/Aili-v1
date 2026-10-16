@@ -1,6 +1,7 @@
 import { cssDurationMs } from "@/design/duration";
 import { LEVER_LENGTH_M } from "./layout";
-import { useScene } from "./sceneStore";
+import type { AssetView } from "./assetPose";
+import { useScene, type Actor } from "./sceneStore";
 import { EQ_STEPS, type EqStep } from "./servoArm";
 
 // Scene animations shared by the prepared lesson and live turns (M4 slice 1: one implementation, so
@@ -25,6 +26,7 @@ export function slideWeightOut(isCurrent: () => boolean): Promise<void> {
  * reduced motion, three still steps.
  */
 export function slideLoadOut(isCurrent: () => boolean): Promise<void> {
+  wholeSceneForTorque();
   const from = useScene.getState().servo.load_distance_m;
   const to = useScene.getState().servo.arm_length_m;
   const at = (k: number) => () => useScene.getState().setServoParam("load_distance_m", from + (to - from) * k);
@@ -37,10 +39,40 @@ export function slideLoadOut(isCurrent: () => boolean): Promise<void> {
  */
 export const showEqStep = (step: EqStep) => (isCurrent: () => boolean) => {
   if (useScene.getState().activeScene !== "servo-arm") return Promise.resolve();
+  wholeSceneForTorque();
   useScene.getState().showEqStep(step);
   // Its segment has started, so an interrupt leaves the step fully drawn rather than half grown.
   return tween(isCurrent, (k) => useScene.getState().setEqGrow(k), [() => useScene.getState().setEqGrow(1)], 1).then(() => useScene.getState().setEqGrow(1));
 };
+
+/**
+ * The servo goes to `view` (explode, open, assemble), read generically from the asset's manifest, over
+ * one spatial duration (600 ms), eased; under reduced motion it snaps to the end state. The camera
+ * moves with it (anatomy view for open and exploded, the whole scene for assembled).
+ *
+ * In flight: when `isCurrent` turns false (the learner interrupted, or the turn is no longer the one
+ * playing), the servo is settled at once at `view`, the end state of the segment that had already
+ * started, the same rule as the equation steps; actions queued for later segments never run. A newer
+ * change (a learner's button, the next action) replaces this one: this tween then stops writing.
+ */
+export const servoTo = (view: AssetView, by: Actor = "professor") => (isCurrent: () => boolean) => {
+  if (useScene.getState().activeScene !== "servo-arm") return Promise.resolve();
+  const snap = spatialMs() <= 0;
+  useScene.getState().setServoView(view, by, { snap });
+  const seq = useScene.getState().servoSeq;
+  if (snap) return Promise.resolve();
+  const mine = () => isCurrent() && useScene.getState().servoSeq === seq;
+  return tween(mine, (k) => useScene.getState().setServoMotion(seq, k), [() => useScene.getState().setServoMotion(seq, 1)], 1).then(() =>
+    useScene.getState().setServoMotion(seq, 1),
+  );
+};
+
+/** The torque steps are about the whole scene: the servo goes back together and the camera follows. */
+function wholeSceneForTorque() {
+  const s = useScene.getState();
+  if (s.servoView !== "assembled") void servoTo("assembled", s.servoBy ?? "professor")(() => true);
+  else if (s.cameraView !== "scene") s.setCameraView("scene");
+}
 
 /** Eases `apply` from 0 to 1 over `spans` spatial durations, or, under reduced motion, runs the `still` steps 450 ms apart. */
 function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Array<() => void>, spans = 2.5): Promise<void> {
@@ -76,4 +108,7 @@ export const ANIMATIONS: Record<string, (isCurrent: () => boolean) => Promise<vo
   "slide-weight-out": slideWeightOut,
   "slide-load-out": slideLoadOut,
   ...Object.fromEntries(EQ_STEPS.map((step) => [step, showEqStep(step)])),
+  "servo-explode": servoTo("exploded"),
+  "servo-open": servoTo("open"),
+  "servo-assemble": servoTo("assembled"),
 };

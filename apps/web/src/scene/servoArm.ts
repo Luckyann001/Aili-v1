@@ -3,6 +3,7 @@ import { STANDARD_GRAVITY_M_PER_S2, staticTorqueSingleLink } from "@aili/solvers
 import scene from "../../../../content/robotics/scenes/servo-arm.json";
 import servoAsset from "../../../../content/robotics/capabilities/asset.servo-generic-anatomy.json";
 import thresholds from "../../../../config/teaching-thresholds.json";
+import { partOffsetGltf, SETTLED, type AssetPose, type PoseManifest } from "./assetPose";
 import type { PartLayout } from "./layout";
 
 // Servo + arm scene (M4 slice 2a; content/robotics/scenes/servo-arm.json): the generic micro servo
@@ -67,6 +68,9 @@ export const SERVO_GLB_URL = `/assets/${servoAsset.file.split("/").at(-1)}`;
  * fields; a test checks). `bounds` is the assembled box in glTF axes, so the page frames and labels
  * the servo before the GLB has loaded.
  */
+/** The servo asset's pose data (explode directions and distances, open parts), for the generic pose code. */
+export const SERVO_POSE_MANIFEST = servoAsset as PoseManifest;
+
 export const SERVO_PARTS = servoAsset.parts.map((p) => ({ id: p.id, name: p.name, node: p.node, bounds: p.bounds_gltf_m as { min: Vec3; max: Vec3 } }));
 
 /**
@@ -95,27 +99,37 @@ export const JOINT: Vec3 = [0, SERVO_ORIGIN[1], SERVO_ORIGIN[2] + hornBounds.max
 const ARM_T = 0.006;
 const LOAD_S = 0.024;
 
-/** A servo part's box on stage (assembled), from its glTF bounds; the horn turned with its shaft. */
-function servoPartLayout(part: (typeof SERVO_PARTS)[number]): PartLayout {
+/** The horn's quarter-turn about glTF +Y (x' = z, z' = −x); other parts are not turned. */
+const turn = (id: string, [x, y, z]: Vec3): Vec3 => (id === "horn" ? [z, y, -x] : [x, y, z]);
+
+/** A part's offset at a pose, in scene axes (what the 3D view moves it by). */
+export const servoPartOffset = (id: string, pose: AssetPose): Vec3 => gltfToScene(turn(id, partOffsetGltf(SERVO_POSE_MANIFEST, id, pose)));
+
+/** A servo part's box on stage, from its glTF bounds, the horn turned with its shaft, moved by the pose. */
+function servoPartLayout(part: (typeof SERVO_PARTS)[number], pose: AssetPose): PartLayout {
   const { min, max } = part.bounds;
   // The horn's quarter-turn about glTF +Y: x' = z, z' = −x.
   const [lo, hi]: [Vec3, Vec3] = part.id === "horn" ? [[min[2], min[1], -max[0]], [max[2], max[1], -min[0]]] : [min, max];
   const a = gltfToScene(lo);
   const b = gltfToScene(hi);
-  const l = a.map((v, i) => Math.min(v, b[i]!) + SERVO_ORIGIN[i]!) as Vec3;
-  const h = a.map((v, i) => Math.max(v, b[i]!) + SERVO_ORIGIN[i]!) as Vec3;
+  const off = servoPartOffset(part.id, pose);
+  const l = a.map((v, i) => Math.min(v, b[i]!) + SERVO_ORIGIN[i]! + off[i]!) as Vec3;
+  const h = a.map((v, i) => Math.max(v, b[i]!) + SERVO_ORIGIN[i]! + off[i]!) as Vec3;
   const size = l.map((v, i) => h[i]! - v) as Vec3;
   const position = l.map((v, i) => (v + h[i]!) / 2) as Vec3;
   return { kind: "asset", node: part.node, size, position, labelAnchor: [position[0], h[1], h[2]] };
 }
 
-export function layoutServoArm(p: ServoParams): Record<string, PartLayout> {
+/** The servo's own parts only, at a pose (the anatomy camera frames these). */
+export const layoutServoParts = (pose: AssetPose): Record<string, PartLayout> => Object.fromEntries(SERVO_PARTS.map((part) => [part.id, servoPartLayout(part, pose)]));
+
+export function layoutServoArm(p: ServoParams, pose: AssetPose = SETTLED): Record<string, PartLayout> {
   const [, jy, jz] = JOINT;
   const L = p.arm_length_m;
   const d = Math.min(L, p.load_distance_m);
   return {
     base: { kind: "box", size: [0.05, BASE_TOP, 0.04], position: [0, BASE_TOP / 2, 0], labelAnchor: [-0.025, BASE_TOP / 2, 0] },
-    ...Object.fromEntries(SERVO_PARTS.map((part) => [part.id, servoPartLayout(part)])),
+    ...layoutServoParts(pose),
     // The arm lies against the horn's outer face; the load rests on the arm.
     "arm-link": { kind: "box", size: [L, ARM_T, 0.004], position: [L / 2, jy, jz + 0.002], labelAnchor: [L * 0.6, jy + ARM_T / 2, jz + 0.002] },
     load: { kind: "box", size: [LOAD_S, LOAD_S, LOAD_S], position: [d, jy + ARM_T / 2 + LOAD_S / 2, jz + 0.002], labelAnchor: [d, jy + ARM_T / 2 + LOAD_S, jz + 0.002] },

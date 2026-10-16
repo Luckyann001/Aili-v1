@@ -5,7 +5,8 @@ import { create } from "zustand";
 import { createSseParser, type TurnEvent } from "@aili/engine";
 import type { FakeCase } from "@aili/schemas";
 import { MODELS, type SceneId } from "@/scene/models";
-import { useScene } from "@/scene/sceneStore";
+import type { AssetView } from "@/scene/assetPose";
+import { useScene, type Actor } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
 import { ANIMATIONS } from "@/scene/animations";
@@ -28,6 +29,9 @@ export interface StageSnapshot {
   servo: ServoParams;
   /** The equation steps on stage (servo + arm). */
   equation: EqStep[];
+  /** The micro servo's settled view (never a half state: a change in flight is kept as its end state). */
+  servoView: AssetView;
+  servoBy: Actor | null;
   /** Whether fixture content (from an earlier, completed turn) was already on stage. */
   fixture: boolean;
   /** Whether that earlier turn was a live one. */
@@ -56,7 +60,7 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, equation: s.equation, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, equation: s.equation, servoView: s.servoView, servoBy: s.servoBy, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
 };
 
 function restoreStage(snap: StageSnapshot) {
@@ -65,6 +69,7 @@ function restoreStage(snap: StageSnapshot) {
   s.setLeverDistance(snap.leverDistance_m);
   useScene.setState({ servo: snap.servo });
   s.setEquation(snap.equation);
+  if (useScene.getState().servoView !== snap.servoView) useScene.getState().setServoView(snap.servoView, snap.servoBy, { snap: true });
   s.highlight(snap.selectedId);
   useStageContent.getState().setFixture(snap.fixture, snap.live);
   useStageContent.getState().setScenePicked(snap.scenePicked);

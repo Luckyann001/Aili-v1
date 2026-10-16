@@ -1,5 +1,6 @@
 import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import servoArmManifest from "../../../../content/robotics/scenes/servo-arm.json";
+import type { AssetPose } from "./assetPose";
 import { LEVER_LENGTH_M, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
 import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams } from "./servoArm";
@@ -13,6 +14,8 @@ export interface ModelState {
   params: Params;
   leverDistance_m: number;
   servo: ServoParams;
+  /** The servo + arm's servo view (settled, or on its way): the parts move with it. */
+  servoPose?: AssetPose;
 }
 
 export interface SceneModel {
@@ -78,7 +81,7 @@ export const MODELS: Record<SceneId, SceneModel> = {
     ],
     note: `${contentLabel(servoArmManifest as LabelledItem).label}. Generic micro servo at its true size (illustrative, not measured; not a specific product); the arm, load and base are simple shapes.`,
     explodable: false,
-    layout: (s) => layoutServoArm(s.servo),
+    layout: (s) => layoutServoArm(s.servo, s.servoPose),
     framing: () => servoFraming(),
     extraAnchors: (s) => eqAnchors(s.servo),
   },

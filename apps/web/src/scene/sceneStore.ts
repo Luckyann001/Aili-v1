@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
+import type { AssetPose, AssetView } from "./assetPose";
 import { MODELS, type SceneId } from "./models";
 import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type EqStep, type ServoParamId, type ServoParams } from "./servoArm";
+
+/** Who changed the stage: Aili (a turn's action) or the learner (a control). Shown, never colour alone. */
+export type Actor = "professor" | "learner";
+/** The camera's framing: the whole scene, or the servo's parts close up (anatomy). */
+export type CameraView = "scene" | "anatomy";
 
 /** loading: 3D code still downloading · ready: rendering · fallback: still picture (no WebGL or it failed). */
 export type ViewerStatus = "loading" | "ready" | "fallback";
@@ -30,6 +36,30 @@ export interface SceneState {
   setEqGrow: (k: number) => void;
   /** Put back as a snapshot had it (a failed or interrupted turn). */
   setEquation: (steps: EqStep[]) => void;
+  /**
+   * The servo + arm's micro servo: always settled in exactly one view (servoView). A change animates
+   * from servoFrom (servoMotion 0 → 1); servoMotion is transient, never part of a snapshot. Each change
+   * bumps servoSeq, so a tween for an earlier change stops writing.
+   */
+  servoView: AssetView;
+  servoFrom: AssetView;
+  servoMotion: number;
+  servoSeq: number;
+  servoBy: Actor | null;
+  /**
+   * A new view. A change still in flight is first settled at its own end state (servoFrom is always
+   * the last settled view). `snap`: no animation (reduced motion, a restored snapshot). The camera
+   * frames the servo for open and exploded, the whole scene for assembled.
+   */
+  setServoView: (view: AssetView, by: Actor | null, opts?: { snap?: boolean }) => void;
+  /** A tween's progress, ignored unless `seq` is the current change. */
+  setServoMotion: (seq: number, k: number) => void;
+  cameraView: CameraView;
+  /** Increments whenever the camera should move to cameraView. */
+  cameraToken: number;
+  setCameraView: (v: CameraView) => void;
+  /** Who picked the selected part: the learner (parts list, click) or Aili (highlight_part). */
+  selectedBy: Actor | null;
   viewer: ViewerStatus;
   setViewer: (v: ViewerStatus) => void;
   selectedId: string | null;
@@ -54,7 +84,12 @@ export interface SceneState {
 
 export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState>) => void): SceneState => ({
   activeScene: "base-joint-arm",
-  setScene: (id) => set((s) => (s.activeScene === id ? {} : { activeScene: id, selectedId: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1 })),
+  setScene: (id) =>
+    set((s) =>
+      s.activeScene === id
+        ? {}
+        : { activeScene: id, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene" },
+    ),
   leverDistance_m: 0.05,
   setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
   servo: DEFAULT_SERVO_PARAMS,
@@ -71,6 +106,26 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   showEqStep: (step) => set((s) => ({ equation: [...s.equation.filter((x) => x !== step), step], eqGrow: 0 })),
   setEqGrow: (k) => set(() => ({ eqGrow: Math.min(1, Math.max(0, k)) })),
   setEquation: (steps) => set(() => ({ equation: steps, eqGrow: 1 })),
+  servoView: "assembled",
+  servoFrom: "assembled",
+  servoMotion: 1,
+  servoSeq: 0,
+  servoBy: null,
+  setServoView: (view, by, opts = {}) =>
+    set((s) => ({
+      servoFrom: s.servoView,
+      servoView: view,
+      servoMotion: opts.snap || view === s.servoView ? 1 : 0,
+      servoSeq: s.servoSeq + 1,
+      servoBy: by,
+      cameraView: view === "assembled" ? "scene" : "anatomy",
+      cameraToken: s.cameraToken + 1,
+    })),
+  setServoMotion: (seq, k) => set((s) => (s.servoSeq === seq ? { servoMotion: Math.min(1, Math.max(0, k)) } : {})),
+  cameraView: "scene",
+  cameraToken: 0,
+  setCameraView: (v) => set((s) => (s.cameraView === v ? {} : { cameraView: v, cameraToken: s.cameraToken + 1 })),
+  selectedBy: null,
   viewer: "loading",
   setViewer: (viewer) => set(() => ({ viewer })),
   selectedId: null,
@@ -81,10 +136,10 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   params: DEFAULT_PARAMS,
   // Unknown IDs are ignored, so a stale or mistyped selection can never point at nothing.
   select: (id) =>
-    set((s) => (id === null || MODELS[s.activeScene].parts.some((p) => p.id === id) ? { selectedId: id, inspectorOpen: id !== null } : {})),
+    set((s) => (id === null || MODELS[s.activeScene].parts.some((p) => p.id === id) ? { selectedId: id, selectedBy: id === null ? null : "learner", inspectorOpen: id !== null } : {})),
   toggleExploded: () => set((s) => ({ exploded: !s.exploded })),
   closeInspector: () => set(() => ({ inspectorOpen: false })),
-  highlight: (id) => set((s) => (id === null || MODELS[s.activeScene].parts.some((p) => p.id === id) ? { selectedId: id, inspectorOpen: false } : {})),
+  highlight: (id) => set((s) => (id === null || MODELS[s.activeScene].parts.some((p) => p.id === id) ? { selectedId: id, selectedBy: id === null ? null : "professor", inspectorOpen: false } : {})),
   // Values are always kept inside their bounds and on their step.
   setParam: (id, value) =>
     set((s) => {
@@ -92,10 +147,13 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
       return def ? { params: { ...s.params, [id]: clampParam(def, value) } } : {};
     }),
   toggleLabels: () => set((s) => ({ labelsOn: !s.labelsOn })),
-  resetView: () => set((s) => ({ resetToken: s.resetToken + 1 })),
+  resetView: () => set((s) => ({ resetToken: s.resetToken + 1, cameraView: "scene" })),
 });
 
 export const useScene = create<SceneState>()((set) => createSceneSlice(set));
+
+/** The servo's pose now (the 3D view, labels and framing read it). */
+export const servoPoseOf = (s: Pick<SceneState, "servoFrom" | "servoView" | "servoMotion">): AssetPose => ({ from: s.servoFrom, to: s.servoView, k: s.servoMotion });
 
 /** Next part in list order for arrow keys; wraps at both ends. */
 export function stepPart(ids: readonly string[], current: string | null, delta: 1 | -1): string {
