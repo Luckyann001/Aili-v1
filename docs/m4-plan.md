@@ -147,9 +147,10 @@ The real entries are written fresh, with each "where it breaks down" line review
 ## 3. The servo + arm scene and the inside-the-servo scene
 
 ### 3a. Servo + arm (Lab 1)
-- **Model:** a **generic hobby-style servo** built from primitives, never a named product.
-  - Named parts: base, servo case, output horn, arm link, payload, mounting screws (simplified).
-  - Label: "Generic servo, simplified. Not a specific product."
+- **Model:** a **generic hobby-style servo**, never a named product.
+  - **Updated 16 Oct 2026 (slice 2 of the anatomy integration):** the servo is the scripted generic micro servo asset (`asset.servo-generic-anatomy`, Blender, illustrative, not measured) at its true size: about 23 mm of body (32.5 mm with the mounting ears), 12.2 mm wide. It stands on the base with its output shaft pointing at the viewer (+z), the case hanging below the shaft, and the horn turned along the arm. The joint is the shaft axis at the horn's outer face; all distances are measured from it. The arm, load and base are code primitives.
+  - Named parts: base, output horn, servo case, gear train, motor and position sensor, control board and cover (the asset's nodes), arm link, load.
+  - Label: from `contentLabel` (scene provenance "authored", fidelity simplified teaching): "Simplified teaching model". The scene note adds "Generic micro servo at its true size (illustrative, not measured; not a specific product)".
   - The existing base-joint-arm placeholder becomes this scene.
 - **Sliders** (units and bounds from the manifest): arm length, payload mass, arm mass per length, arm angle,
   and the **servo's rated torque**, which the learner reads from their own datasheet.

@@ -28,6 +28,7 @@ Read with: `CLAUDE.md`, `docs/aili-architecture.md` (§4 registry, §5 per-turn 
      - labelled **"Test fixture"** in the UI;
      - **refused by the production loader**, with a test proving it.
    - **Never fabricate a human reviewer name.** Fixtures are "published" only as test fixtures, never with a review record.
+     **One exception (Lucky, 16 Oct 2026):** a fixture may carry a founder review (`role: "founder"`) whose reviewer is named as a fixture ("Test fixture: founder review"); it is labelled "Prepared · reviewed by the founder, not an expert reviewer".
 6. **The registry stays a validated JSON bundle in M2.** The database sync moves to the deferred stage.
    - "Last stage" means after M6, before M7, and before any public deployment or real AI key.
 7. **The billing doc's daily limits, rate limits and spike alerts stay in M7.**

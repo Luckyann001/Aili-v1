@@ -80,7 +80,7 @@ Stage/viewport on Deep canvas (#EBE4DA), panels on Surface (#FFFDFA), Ink text, 
 Measured on a production build; enforced by `apps/web/e2e/scene.spec.ts` (the test fails if exceeded).
 | Item | Budget | Measured (slice 4a) |
 |---|---|---|
-| 3D code loaded after the page (three.js, React Three Fiber, drei orbit controls, scene components) | **≤ 300 KB gzip** | 244.8 KB gzip (920 KB raw), 2 chunks |
+| 3D code loaded after the page (three.js, React Three Fiber, drei orbit controls, glTF loader, scene components) | **≤ 300 KB gzip** | 264.8 KB gzip (985 KB raw), 3 chunks (16 Oct 2026, with the glTF loader; was 251.6 KB) |
 | Placeholder scene geometry | **≤ 2,000 triangles** | 132 |
 | 3D asset files | none yet (the placeholder is built in code); real assets get a per-asset size budget in M4 | 0 |
 - The 3D code is lazy-loaded: the rest of the stage (text box, voice, panels) works while it downloads (tested).
