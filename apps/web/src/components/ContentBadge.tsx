@@ -1,3 +1,4 @@
+import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import styles from "./ContentBadge.module.css";
 
 /** Prepared vs live vs AI-composed content must always be visibly labelled (CLAUDE.md, honesty rules). */
@@ -6,7 +7,7 @@ export type ContentKind = "prepared" | "live" | "illustrative" | "fixture" | "fi
 const LABEL: Record<ContentKind, string> = {
   prepared: "Prepared",
   live: "Live AI",
-  illustrative: "Illustrative (AI-composed)",
+  illustrative: "Illustrative",
   fixture: "Test fixture",
   "fixture-content": "Test fixture content",
 };
@@ -14,17 +15,24 @@ const LABEL: Record<ContentKind, string> = {
 const DESCRIPTION: Record<ContentKind, string> = {
   prepared: "Prepared content, written in advance. Not a live AI response.",
   live: "Live response from a real AI model. It can be wrong; its numbers come from Aili's calculators.",
-  illustrative: "Illustrative, composed by AI from library parts. No verified model.",
+  illustrative: "Illustrative. No verified model.",
   fixture: "Test fixture: a scripted fake-director turn for testing. Not a live AI response.",
   "fixture-content": "Uses test-fixture content made for testing, not expert-reviewed library content.",
 };
 
-export function ContentBadge({ kind }: { kind: ContentKind }) {
+/**
+ * `item` is required for "illustrative": its text then comes from the item's own fidelity,
+ * provenance and review record (contentLabel), never a fixed "AI-composed".
+ */
+export function ContentBadge({ kind, item }: { kind: ContentKind; item?: LabelledItem }) {
+  const derived = kind === "illustrative" && item ? contentLabel(item) : null;
+  const label = derived?.label ?? LABEL[kind];
+  const description = derived?.detail ?? DESCRIPTION[kind];
   return (
-    <span className={`${styles.badge} ${styles[kind] ?? ""}`} title={DESCRIPTION[kind]}>
+    <span className={`${styles.badge} ${styles[kind] ?? ""}`} title={description}>
       <BadgeIcon kind={kind} />
-      <span>{LABEL[kind]}</span>
-      <span className={styles.srOnly}>: {DESCRIPTION[kind]}</span>
+      <span>{label}</span>
+      <span className={styles.srOnly}>: {description}</span>
     </span>
   );
 }

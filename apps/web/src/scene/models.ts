@@ -1,3 +1,5 @@
+import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
+import servoArmManifest from "../../../../content/robotics/scenes/servo-arm.json";
 import { LEVER_LENGTH_M, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
 import { eqAnchors, layoutServoArm, servoFraming, type ServoParams } from "./servoArm";
@@ -64,7 +66,7 @@ export const MODELS: Record<SceneId, SceneModel> = {
       { id: "arm-link", name: "Arm link", fill: "discovery" },
       { id: "load", name: "Load", fill: "expressive" },
     ],
-    note: "Illustrative (AI-composed). Generic servo, simplified teaching model: not a specific product.",
+    note: `${contentLabel(servoArmManifest as LabelledItem).label}. Generic servo, simplified teaching model: not a specific product.`,
     explodable: false,
     layout: (s) => layoutServoArm(s.servo),
     framing: () => servoFraming(),

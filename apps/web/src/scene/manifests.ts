@@ -1,4 +1,4 @@
-import { REVIEW_LABEL, type ReviewStatusName } from "@aili/schemas/labels";
+import { contentLabel, REVIEW_LABEL, type LabelledItem, type ReviewStatusName } from "@aili/schemas/labels";
 import arm from "../../../../content/robotics/scenes/base-joint-arm.json";
 import lever from "../../../../content/robotics/scenes/lever-analogy.json";
 import servoArm from "../../../../content/robotics/scenes/servo-arm.json";
@@ -13,6 +13,8 @@ export const MANIFESTS = { "base-joint-arm": arm, "lever-analogy": lever, "servo
 export const reviewStatusOf = (id: SceneId) => MANIFESTS[id].review_status as ReviewStatusName;
 export const reviewLabelOf = (id: SceneId) => REVIEW_LABEL[reviewStatusOf(id)];
 export const isDraft = (id: SceneId) => reviewStatusOf(id) === "draft";
+/** The scene's visible label, from its fidelity, provenance and review record. */
+export const contentLabelOf = (id: SceneId) => contentLabel(MANIFESTS[id] as LabelledItem);
 
 /** Fixed solver inputs for the lever scene (SI). Used only to compute the illustrative gauge. */
 export const LEVER_SOLVER = lever.solver.constants;

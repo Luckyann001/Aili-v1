@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
 import { StatusIcon } from "@/components/StatusIcon";
+import { contentLabelOf } from "@/scene/manifests";
 import type { SceneId } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { useStageContent } from "@/turn/stageContent";
@@ -267,6 +268,7 @@ export function ExplanationSpace() {
   }, [ratingRequest]);
   // While the inspector is open it takes the same place (it shows the margin line itself).
   if (!blocks || inspectorOpen) return null;
+  const tag = contentLabelOf(scene);
   const content = blocks.map((b) => b.render());
 
   if (wide)
@@ -274,7 +276,7 @@ export function ExplanationSpace() {
       <section className={styles.space} data-reserve="auto" aria-label="Explanation space" data-space="column">
         <div className={styles.spaceHead}>
           <span>Torque at the joint</span>
-          <span className={styles.gaugeTag}>Illustrative (AI-composed)</span>
+          <span className={styles.gaugeTag} title={tag.detail}>{tag.label}</span>
         </div>
         {content}
       </section>
@@ -305,7 +307,7 @@ export function ExplanationSpace() {
       <div id={sheetId} className={styles.spaceSheet} hidden={!open}>
         <div className={styles.spaceHead}>
           <span>Torque at the joint</span>
-          <span className={styles.gaugeTag}>Illustrative (AI-composed)</span>
+          <span className={styles.gaugeTag} title={tag.detail}>{tag.label}</span>
         </div>
         {content}
       </div>
