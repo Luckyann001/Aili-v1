@@ -17,19 +17,32 @@
   "fidelity": "simplified_teaching",
   "version": "0.1.0",
   "review_status": "draft",
-  "provenance": "ai_composed",
+  "provenance": "authored",
+  "asset": "asset.servo-generic-anatomy",
   "parts": [
     {
       "id": "base",
       "name": "Base"
     },
     {
-      "id": "servo-case",
-      "name": "Servo (generic)"
-    },
-    {
       "id": "horn",
       "name": "Output horn"
+    },
+    {
+      "id": "upper-case",
+      "name": "Servo case"
+    },
+    {
+      "id": "gear-train",
+      "name": "Gear train"
+    },
+    {
+      "id": "motor-and-sensor",
+      "name": "Motor and position sensor"
+    },
+    {
+      "id": "board-and-cover",
+      "name": "Control board and cover"
     },
     {
       "id": "arm-link",

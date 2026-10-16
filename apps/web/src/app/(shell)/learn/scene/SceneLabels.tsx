@@ -30,7 +30,7 @@ export function SceneLabels({ labels }: { labels: RefObject<Map<string, HTMLElem
             }}
             className={selected ? styles.partLabelSelected : styles.partLabel}
             data-part-id={p.id}
-            hidden={!labelsOn && !selected && !always.includes(p.id)}
+            hidden={(!labelsOn || p.inside) && !selected && !always.includes(p.id)}
             style={{ visibility: "hidden" }}
           >
             {selected && <CheckIcon />}

@@ -2,7 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { staticTorqueSingleLink } from "@aili/solvers";
+import servoAsset from "../../../content/robotics/capabilities/asset.servo-generic-anatomy.json";
 import { installVoiceFakes } from "./voiceFakes";
+
+/** Triangles: the micro servo asset's own budget (its manifest), plus the old 2,000 for the primitives (base, arm, load, arrows). */
+const PRIMITIVES_TRIANGLE_BUDGET = 2000;
 
 // Servo + arm scene (M4 slice 2a), reached through the live path with the RECORDED provider (turn 3
 // of e2e/fixtures/live-recording.json): the scene, highlight and load slide each follow their
@@ -54,7 +58,7 @@ async function openDetails(page: Page) {
 
 /** The rating field, reached from the servo's inspector ("Enter rating"), which focuses it. */
 async function ratingField(page: Page) {
-  await pickPart(page, "Servo (generic)");
+  await pickPart(page, "Servo case");
   await inspector(page).getByRole("button", { name: "Enter rating" }).click();
   const field = panel(page).getByRole("spinbutton", { name: /Servo rated torque/ });
   await expect(field).toBeFocused();
@@ -108,10 +112,13 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     const host = page.locator("[data-viewer]");
     if ((await host.getAttribute("data-viewer")) === "ready") {
       await expect(host).toHaveAttribute("data-triangles-scene", "servo-arm", { timeout: 15_000 });
+      await expect(host).toHaveAttribute("data-asset", "loaded", { timeout: 15_000 });
+      // The count is reported again once the GLB has replaced the placeholder box.
+      await expect.poll(async () => Number(await host.getAttribute("data-triangles")), { timeout: 5_000 }).toBeGreaterThanOrEqual(servoAsset.triangles);
       const tri = Number(await host.getAttribute("data-triangles"));
-      console.log(`servo-arm triangles: ${tri}`);
-      expect(tri).toBeGreaterThan(0);
-      expect(tri).toBeLessThanOrEqual(2000);
+      console.log(`servo-arm triangles: ${tri} (asset ${servoAsset.triangles}, budget ${servoAsset.budget.triangles} + ${PRIMITIVES_TRIANGLE_BUDGET} for primitives)`);
+      expect(servoAsset.triangles).toBeLessThanOrEqual(servoAsset.budget.triangles);
+      expect(tri - servoAsset.triangles).toBeLessThanOrEqual(PRIMITIVES_TRIANGLE_BUDGET);
     }
 
     // Read the settings back from the inspector, then compare every shown number with the solver.
@@ -133,7 +140,8 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
     expect(await shown(page, "arm_torque_nm")).toBe(`${s.arm_torque_nm.toPrecision(3)} N·m`);
     await expect(panel(page)).toContainText("Teaching thresholds, not a design standard: Fail below 1.0×, Warn 1.0× up to 2.0×, Pass at 2.0× and above");
     await expect(panel(page)).toContainText("Simulation only; hardware untested");
-    await expect(panel(page)).toContainText("Illustrative (AI-composed)");
+    await expect(panel(page)).toContainText("Simplified teaching model"); // the scene's label: authored, not AI-composed
+    await expect(panel(page)).not.toContainText("AI-composed");
     await expect(panel(page)).toContainText("Enter your servo's rated torque to see the margin.");
     await expect(panel(page)).toContainText("g = 9.80665 m/s² (standard gravity)"); // the inputs line
     await expect(panel(page)).toContainText("Total the servo must hold");
@@ -231,25 +239,70 @@ test.describe("servo + arm scene (M4 slice 2a), recorded live path", () => {
       } as typeof original;
     });
     await onServoStage(page);
-    await expect(page.getByRole("img", { name: /Still side view of the generic servo and arm: base, servo \(generic\), output horn, arm link, load/ })).toBeVisible();
+    await expect(page.getByRole("img", { name: /Still side view of the generic servo and arm: base, output horn, servo case, gear train, motor and position sensor, control board and cover, arm link, load/ })).toBeVisible();
+    await expect(page.getByText("Servo, enlarged 4×")).toBeVisible();
+    mkdirSync("screenshots/servo-arm", { recursive: true });
+    await page.locator('[data-fallback="no-webgl"] svg').screenshot({ path: `screenshots/servo-arm/still-no-webgl-${test.info().project.name}.png` });
     await expect(panel(page).locator('[data-solver-value="torque_nm"]')).toHaveText(/ N·m$/);
   });
 
-  // Screenshots for Lucky (git-ignored apps/web/screenshots/servo-arm): desktop and phone, light and dark.
-  test("screenshots of the servo + arm scene", async ({ page }, info) => {
+  test("the micro servo loads lazily; if its file fails, the placeholder box stays and the stage keeps working", async ({ page }) => {
+    await page.route("**/assets/servo-generic.glb", (route) => route.fulfill({ status: 404, body: "" }));
+    await onServoStage(page);
+    const host = page.locator("[data-viewer]");
+    test.skip((await host.getAttribute("data-viewer")) !== "ready", "3D view only");
+    await expect(host).toHaveAttribute("data-asset", "failed", { timeout: 10_000 });
+    expect((await host.getAttribute("data-model-box"))!.split(",").every((n) => Number.isFinite(Number(n)))).toBe(true);
+    await expect(panel(page).locator('[data-solver-value="torque_nm"]')).toHaveText(/ N·m$/);
+    await pickPart(page, "Servo case"); // still selectable from the parts list
+    await expect(inspector(page).getByRole("button", { name: "Enter rating" })).toBeVisible();
+  });
+
+  // Screenshots for Lucky (git-ignored apps/web/screenshots/servo-arm): desktop and phone, light and dark;
+  // then, in light, the arm at its shortest and longest, each with a close crop of the micro servo.
+  test("screenshots of the servo + arm scene", async ({ browser, baseURL }, info) => {
     test.skip(info.project.name !== "desktop", "taken once");
+    test.setTimeout(300_000);
     const dir = "screenshots/servo-arm";
     mkdirSync(dir, { recursive: true });
     for (const [width, height, name] of [[1280, 800, "desktop"], [412, 915, "phone"]] as const)
       for (const scheme of ["light", "dark"] as const) {
-        await page.setViewportSize({ width, height });
-        await page.emulateMedia({ colorScheme: scheme });
+        const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, colorScheme: scheme });
+        await context.addCookies([{ name: "aili-e2e-live", value: "1", url: baseURL! }]);
+        const page = await context.newPage();
         await onServoStage(page);
         await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20_000 });
+        await expect(page.locator("[data-viewer]")).toHaveAttribute("data-asset", "loaded", { timeout: 20_000 });
         await page.mouse.move(0, 0);
         await page.screenshot({ path: `${dir}/${name}-${scheme}-1-scene.png` });
         await (await ratingField(page)).fill("0.25");
         await page.screenshot({ path: `${dir}/${name}-${scheme}-2-margin.png` });
+        // On phones the rating step opened the explanation sheet over the stage: close it first.
+        const closeSheet = panel(page).getByRole("button", { name: "Close the explanation space" });
+        if (await closeSheet.isVisible()) await closeSheet.click();
+        if (scheme === "light")
+          for (const [key, end] of [["shortest", "Home"], ["longest", "End"]] as const) {
+            await pickPart(page, "Arm link");
+            await inspector(page).getByRole("slider", { name: "Arm length" }).focus();
+            await page.keyboard.press(end);
+            await page.getByRole("button", { name: "Close inspector" }).click();
+            await partsButton(page).click();
+            await page.getByRole("button", { name: "Clear selection" }).click(); // no outline over the servo
+            await page.keyboard.press("Escape");
+            await page.mouse.move(0, 0);
+            await page.waitForTimeout(800); // the framing settles
+            await page.screenshot({ path: `${dir}/${name}-${scheme}-3-arm-${key}.png` });
+            // A close crop round the servo case's label anchor (canvas pixels), for judging its materials.
+            const canvas = (await page.locator("[data-viewer] canvas").boundingBox())!;
+            const label = page.locator('span[data-part-id="upper-case"]');
+            const cx = canvas.x + Number(await label.getAttribute("data-x"));
+            const cy = canvas.y + Number(await label.getAttribute("data-y"));
+            const half = 90;
+            const x = Math.max(0, Math.min(width - 2 * half, cx - half));
+            const y = Math.max(0, Math.min(height - 2 * half, cy - half / 2));
+            await page.screenshot({ path: `${dir}/${name}-${scheme}-4-servo-close-${key}.png`, clip: { x, y, width: 2 * half, height: 2 * half } });
+          }
+        await context.close();
       }
   });
 });

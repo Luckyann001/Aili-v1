@@ -2,7 +2,7 @@ import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import servoArmManifest from "../../../../content/robotics/scenes/servo-arm.json";
 import { LEVER_LENGTH_M, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
-import { eqAnchors, layoutServoArm, servoFraming, type ServoParams } from "./servoArm";
+import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams } from "./servoArm";
 
 // The scenes the Learn stage can show (manifests: content/robotics/scenes/*.json). Each model lays
 // out its parts from the scene state; the 3D view, labels, framing and fallback all use this.
@@ -18,7 +18,11 @@ export interface ModelState {
 export interface SceneModel {
   id: SceneId;
   title: string;
-  parts: Array<{ id: string; name: string; fill: FillRole }>;
+  /**
+   * `inside`: hidden inside the assembled model (the servo's gear train and motor), so it gets no
+   * floating label unless selected; it stays in the parts list.
+   */
+  parts: Array<{ id: string; name: string; fill: FillRole; inside?: true }>;
   /** Visible honesty note for the placeholder art. */
   note: string;
   explodable: boolean;
@@ -31,6 +35,12 @@ export interface SceneModel {
   /** Labels that are not parts (the servo + arm's equation steps): where each points, metres. */
   extraAnchors?: (s: ModelState) => Record<string, [number, number, number]>;
 }
+
+/** The servo parts' fills in the still picture and the loading placeholder (the 3D view uses the GLB's own materials). */
+const SERVO_FILL: Record<string, FillRole> = { horn: "expressive", "upper-case": "technical", "gear-train": "discovery", "motor-and-sensor": "explore", "board-and-cover": "technical" };
+const SERVO_INSIDE = new Set(["gear-train", "motor-and-sensor"]);
+/** The servo parts' names on stage: short ones from the scene manifest (the asset manifest's are longer). */
+const sceneName = (id: string) => servoArmManifest.parts.find((p) => p.id === id)!.name;
 
 export const MODELS: Record<SceneId, SceneModel> = {
   "base-joint-arm": {
@@ -61,12 +71,12 @@ export const MODELS: Record<SceneId, SceneModel> = {
     title: "Generic servo and arm",
     parts: [
       { id: "base", name: "Base", fill: "explore" },
-      { id: "servo-case", name: "Servo (generic)", fill: "technical" },
-      { id: "horn", name: "Output horn", fill: "expressive" },
+      // The micro servo's parts, named as in its asset manifest.
+      ...SERVO_PARTS.map(({ id }) => ({ id, name: sceneName(id), fill: SERVO_FILL[id]!, ...(SERVO_INSIDE.has(id) ? { inside: true as const } : {}) })),
       { id: "arm-link", name: "Arm link", fill: "discovery" },
       { id: "load", name: "Load", fill: "expressive" },
     ],
-    note: `${contentLabel(servoArmManifest as LabelledItem).label}. Generic servo, simplified teaching model: not a specific product.`,
+    note: `${contentLabel(servoArmManifest as LabelledItem).label}. Generic micro servo at its true size (illustrative, not measured; not a specific product); the arm, load and base are simple shapes.`,
     explodable: false,
     layout: (s) => layoutServoArm(s.servo),
     framing: () => servoFraming(),

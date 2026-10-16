@@ -53,6 +53,12 @@
   padding: var(--aili-space-3);
 }
 
+/* Above the caption overlay (z-index 2, later in the page): the Parts list, eight parts long on the
+   servo + arm, reaches down past the captions on a laptop screen and must stay clickable. */
+.stageTop {
+  z-index: 3;
+}
+
 .stageTop,
 .stageTop *,
 .stageBottom,
@@ -580,6 +586,14 @@
 
 .fill_expressive {
   fill: var(--aili-fill-expressive);
+}
+
+.fallbackSvg line {
+  stroke: var(--aili-text);
+}
+
+.fallbackLeader {
+  stroke: var(--aili-text);
 }
 
 .fallbackText {

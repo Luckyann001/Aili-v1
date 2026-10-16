@@ -4,6 +4,7 @@ import solver from "../../../../content/robotics/capabilities/solver.static-torq
 import sim from "../../../../content/robotics/capabilities/sim.servo-static-load.json";
 import srcUp1 from "../../../../content/robotics/capabilities/src.openstax-university-physics-1.json";
 import srcCp2 from "../../../../content/robotics/capabilities/src.openstax-college-physics-2e.json";
+import servoAsset from "../../../../content/robotics/capabilities/asset.servo-generic-anatomy.json";
 import arm from "../../../../content/robotics/scenes/base-joint-arm.json";
 import lever from "../../../../content/robotics/scenes/lever-analogy.json";
 import servoArm from "../../../../content/robotics/scenes/servo-arm.json";
@@ -18,6 +19,7 @@ import fxLeverBasics from "../../../../content/robotics/test-fixtures/read.fx-le
 import fxWrench from "../../../../content/robotics/test-fixtures/analogy.fx-long-wrench.json";
 import fxBag from "../../../../content/robotics/test-fixtures/analogy.fx-shopping-bag.json";
 import fxRuler from "../../../../content/robotics/test-fixtures/analogy.fx-ruler-held-out.json";
+import fxServoAsset from "../../../../content/robotics/test-fixtures/asset.fx-servo-generic-anatomy.json";
 
 // The dev-only registry for the fake director and live dev turns: real content (all draft) plus
 // every test fixture (the same files as the bake-off's registry).
@@ -34,7 +36,7 @@ export function fixtureTurnRegistry() {
         { file: "test-fixtures/scene.fx-lever.json", data: fxScene },
         { file: "test-fixtures/scene.fx-servo-arm.json", data: fxServoArm },
       ],
-      capabilities: [solver, sim, srcUp1, srcCp2, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
+      capabilities: [solver, sim, srcUp1, srcCp2, servoAsset, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler, fxServoAsset].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
     },
     { allowTestFixtures: true },
   );

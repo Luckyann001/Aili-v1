@@ -38,8 +38,11 @@ export const EXPLODE_GAP_M = 0.04;
 
 type Vec3 = [number, number, number];
 export interface PartLayout {
-  kind: "box" | "cylinder";
-  /** box: [w, h, d]; cylinder: [radius, height, radius]. Metres. */
+  /** "asset": a node of a GLB asset, drawn from the file; size and position give its assembled box. */
+  kind: "box" | "cylinder" | "asset";
+  /** The GLB node, for kind "asset". */
+  node?: string;
+  /** box and asset: [w, h, d]; cylinder: [radius, height, radius]. Metres. */
   size: Vec3;
   position: Vec3;
   labelAnchor: Vec3;

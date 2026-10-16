@@ -4,9 +4,10 @@
 // first. Renders on demand only (no continuous frames), to spare low-end phones.
 
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
-import { BackSide, PerspectiveCamera, Vector3, type Camera, type Mesh } from "three";
+import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { BackSide, Euler, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3, type Camera, type Object3D } from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
 import { cornersOf, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
@@ -14,7 +15,7 @@ import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
 import { useScene } from "@/scene/sceneStore";
-import { JOINT, arrowSweep, servoReadout, type EqStep } from "@/scene/servoArm";
+import { HORN_TURN_RAD, JOINT, SERVO_GLB_URL, SERVO_ORIGIN, SERVO_PARTS, SERVO_ROTATION, SERVO_ROTATION_ORDER, arrowSweep, servoReadout, type EqStep } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
 export interface SceneCanvasProps {
@@ -43,6 +44,15 @@ function framingCorners(explode: number) {
 
 export default function SceneCanvas(props: SceneCanvasProps) {
   const activeScene = useScene((s) => s.activeScene);
+  // Parts drawn from a GLB asset (the servo + arm's micro servo) load lazily; the rest are primitives.
+  const kinds = MODELS[activeScene].layout(useScene.getState(), 0);
+  const parts = MODELS[activeScene].parts;
+  const assetParts = parts.filter((p) => kinds[p.id]!.kind === "asset");
+  // Which scene's asset has loaded (the triangle count is reported again once it has).
+  const [assetFor, setAssetFor] = useState<string | null>(null);
+  const assetState = assetParts.length === 0 ? "none" : assetFor === activeScene ? "loaded" : "loading";
+  // For tests: none, loading, loaded (or failed, written by the boundary).
+  useEffect(() => writeData(props.host, "asset", assetState), [assetState, props.host]);
   return (
     <Canvas
       frameloop="demand"
@@ -71,9 +81,19 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       <ambientLight intensity={0.7} />
       <directionalLight position={[0.6, 1, 0.8]} intensity={1.5} />
       <directionalLight position={[-0.6, 0.4, -0.5]} intensity={0.4} />
-      {MODELS[activeScene].parts.map((p) => (
-        <PartMesh key={`${activeScene}:${p.id}`} id={p.id} fill={p.fill} colors={props.colors} />
-      ))}
+      {parts
+        .filter((p) => kinds[p.id]!.kind !== "asset")
+        .map((p) => (
+          <PartMesh key={`${activeScene}:${p.id}`} id={p.id} fill={p.fill} colors={props.colors} />
+        ))}
+      {assetParts.length > 0 && (
+        // While the GLB loads, or if it fails, the servo is the plain box it used to be: never a blank stage.
+        <AssetBoundary key={activeScene} fallback={<ServoPlaceholder colors={props.colors} />} onError={() => writeData(props.host, "asset", "failed")}>
+          <Suspense fallback={<ServoPlaceholder colors={props.colors} />}>
+            <ServoAsset colors={props.colors} onLoaded={() => setAssetFor(activeScene)} />
+          </Suspense>
+        </AssetBoundary>
+      )}
       {activeScene === "servo-arm" && <TorqueArrow colors={props.colors} />}
       {activeScene === "servo-arm" && <EquationMarks colors={props.colors} />}
       <OrbitControls
@@ -92,12 +112,13 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       <ExplodeDriver spatialMs={props.spatialMs} host={props.host} />
       <CameraRig spatialMs={props.spatialMs} host={props.host} />
       {/* Re-mounted per scene, so each scene's triangle count is reported (and budget-tested). */}
-      <ReadyProbe key={activeScene} onReady={props.onReady} />
+      <ReadyProbe key={`${activeScene}:${assetState}`} onReady={props.onReady} />
     </Canvas>
   );
 }
 
 const OUTLINE_M = 0.003;
+const ASSET_OUTLINE_M = 0.0008;
 
 /** Animated state shared by the parts, labels and camera: 0 = assembled, 1 = fully exploded. */
 const anim = { explode: 0 };
@@ -132,15 +153,7 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
       ref={ref}
       position={layoutAt(anim.explode).position}
       name={id}
-      onClick={(e) => {
-        e.stopPropagation();
-        select(id);
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setCursor(e.nativeEvent.target, "pointer");
-      }}
-      onPointerOut={(e) => setCursor(e.nativeEvent.target, "")}
+      {...partEvents(id, select)}
     >
       {geometry(0)}
       <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} />
@@ -152,6 +165,117 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
         </mesh>
       )}
     </mesh>
+  );
+}
+
+/** Click and hover handlers shared by every selectable part. */
+function partEvents(id: string, select: (id: string) => void) {
+  return {
+    onClick: (e: ThreeEvent<MouseEvent>) => {
+      e.stopPropagation();
+      select(id);
+    },
+    onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
+      setCursor(e.nativeEvent.target, "pointer");
+    },
+    onPointerOut: (e: ThreeEvent<PointerEvent>) => setCursor(e.nativeEvent.target, ""),
+  };
+}
+
+/** Keeps the last valid state when an asset fails to load: its fallback (the placeholder) stays. */
+class AssetBoundary extends Component<{ fallback: ReactNode; onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+const servoEuler = new Euler(...SERVO_ROTATION, SERVO_ROTATION_ORDER);
+
+/** The box the servo was before the asset: its assembled extent, plain, not selectable. */
+function ServoPlaceholder({ colors }: { colors: SceneColors }) {
+  const servo = useScene((s) => s.servo);
+  const box = useMemo(() => {
+    const l = MODELS["servo-arm"].layout({ ...useScene.getState(), servo }, 0);
+    const lo = [0, 1, 2].map((i) => Math.min(...SERVO_PARTS.map((p) => l[p.id]!.position[i]! - l[p.id]!.size[i]! / 2)));
+    const hi = [0, 1, 2].map((i) => Math.max(...SERVO_PARTS.map((p) => l[p.id]!.position[i]! + l[p.id]!.size[i]! / 2)));
+    return { size: hi.map((h, i) => h - lo[i]!) as [number, number, number], position: hi.map((h, i) => (h + lo[i]!) / 2) as [number, number, number] };
+  }, [servo]);
+  return (
+    <mesh position={box.position} name="servo-placeholder" raycast={() => null}>
+      <boxGeometry args={box.size} />
+      <meshStandardMaterial color={colors.fills.technical} roughness={0.7} metalness={0.05} />
+    </mesh>
+  );
+}
+
+/**
+ * The generic micro servo (asset.servo-generic-anatomy): one GLB, loaded on first use, each node a
+ * selectable part with the GLB's own materials. Posed by SERVO_ORIGIN / SERVO_ROTATION; the horn is
+ * turned about the shaft so the arm lies along it.
+ */
+function ServoAsset({ colors, onLoaded }: { colors: SceneColors; onLoaded: () => void }) {
+  const gltf = useLoader(GLTFLoader, SERVO_GLB_URL);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    onLoaded();
+    invalidate();
+  }, [onLoaded, invalidate]);
+  return (
+    <group position={SERVO_ORIGIN} rotation={servoEuler} name="servo-asset">
+      {SERVO_PARTS.map((p) => (
+        <group key={p.id} rotation={[0, p.id === "horn" ? HORN_TURN_RAD : 0, 0]}>
+          <AssetNode id={p.id} node={gltf.scene.getObjectByName(p.node)!} bounds={p.bounds} colors={colors} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** One GLB node as a part: a clone (the loaded scene stays untouched), plus an outline shell when selected. */
+function AssetNode({ id, node, bounds, colors }: { id: string; node: Object3D; bounds: { min: [number, number, number]; max: [number, number, number] }; colors: SceneColors }) {
+  const selected = useScene((s) => s.selectedId === id);
+  const select = useScene((s) => s.select);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [selected, colors, invalidate]);
+  const object = useMemo(() => {
+    const o = node.clone();
+    o.name = id;
+    return o;
+  }, [node, id]);
+  // Outline: the same shape drawn from inside, scaled about its centre to be ASSET_OUTLINE_M larger on
+  // each side (thinner than the primitives' outline: the servo is only millimetres across).
+  const outline = useMemo(() => {
+    const o = node.clone();
+    const material = new MeshBasicMaterial({ color: colors.outline, side: BackSide, toneMapped: false });
+    o.traverse((c) => {
+      if (c instanceof Mesh) {
+        c.material = material;
+        c.raycast = () => null;
+      }
+    });
+    const center = bounds.min.map((v, i) => (v + bounds.max[i]!) / 2) as [number, number, number];
+    const scale = bounds.min.map((v, i) => 1 + (2 * ASSET_OUTLINE_M) / Math.max(bounds.max[i]! - v, 1e-4)) as [number, number, number];
+    return { o, center, scale };
+  }, [node, colors.outline, bounds]);
+  return (
+    <>
+      <primitive object={object} {...partEvents(id, select)} />
+      {selected && (
+        <group position={outline.center} scale={outline.scale}>
+          <group position={outline.center.map((v) => -v) as [number, number, number]}>
+            <primitive object={outline.o} />
+          </group>
+        </group>
+      )}
+    </>
   );
 }
 

@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 import { staticTorqueSingleLink } from "@aili/solvers";
 import { createSceneSlice, type SceneState } from "./sceneStore";
-import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqLine, eqText, MARGIN, SCENE_G_M_PER_S2, GRAVITY_TEXT, SERVO_PARAMS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
+import sceneJson from "../../../../content/robotics/scenes/servo-arm.json";
+import servoAsset from "../../../../content/robotics/capabilities/asset.servo-generic-anatomy.json";
+import { contentLabelOf } from "./manifests";
+import { MODELS } from "./models";
+import { DEFAULT_SERVO_PARAMS, EQ_STEPS, eqLine, eqText, JOINT, MARGIN, SCENE_G_M_PER_S2, GRAVITY_TEXT, SERVO_GLB_URL, SERVO_PARAMS, SERVO_PARAMS_BY_PART, SERVO_PARTS, arrowSweep, layoutServoArm, marginStatus, servoReadout, setServoParam } from "./servoArm";
 
 // Servo + arm scene (M4 slice 2a): every number from the solver, bounds enforced, bands from config.
 
@@ -74,7 +78,41 @@ describe("servo + arm: settings and bounds", () => {
     expect(l["arm-link"]!.size[0]).toBe(0.2);
     expect(l["arm-link"]!.position[0]).toBeCloseTo(0.1, 12);
     expect(l.load!.position[0]).toBe(0.12);
-    expect(Object.keys(l)).toEqual(["base", "servo-case", "horn", "arm-link", "load"]);
+    expect(Object.keys(l)).toEqual(["base", "horn", "upper-case", "gear-train", "motor-and-sensor", "board-and-cover", "arm-link", "load"]);
+    expect(l["arm-link"]!.position[0] - l["arm-link"]!.size[0] / 2).toBeCloseTo(JOINT[0], 12); // distances are from the shaft axis
+  });
+
+  it("the micro servo asset at true size: shaft at the joint pointing at the viewer, horn along the arm, standing on the base", () => {
+    const l = layoutServoArm(DEFAULT_SERVO_PARAMS);
+    const servoIds = ["horn", "upper-case", "gear-train", "motor-and-sensor", "board-and-cover"];
+    for (const id of servoIds) expect(l[id]).toMatchObject({ kind: "asset", node: id });
+    const horn = l.horn!;
+    expect(horn.position[0]).toBeCloseTo(JOINT[0], 12);
+    expect(horn.position[1]).toBeCloseTo(JOINT[1], 12);
+    expect(horn.position[2] + horn.size[2] / 2).toBeCloseTo(JOINT[2], 12); // the joint is at the horn's outer face
+    expect(horn.size[0]).toBeCloseTo(0.016, 6); // the horn lies along the arm (x)
+    expect(horn.size[1]).toBeCloseTo(0.005, 6);
+    // The case hangs below the shaft: about 23 mm of body (32.5 mm with the mounting ears), 12.2 mm wide.
+    const c = l["upper-case"]!;
+    expect(c.size[1]).toBeCloseTo(0.0325, 6);
+    expect(c.size[0]).toBeCloseTo(0.0122, 6);
+    expect(c.size[2]).toBeCloseTo(0.0233, 6); // depth along the shaft
+    const bottom = Math.min(...servoIds.map((id) => l[id]!.position[1] - l[id]!.size[1] / 2));
+    expect(bottom).toBeCloseTo(l.base!.position[1] + l.base!.size[1] / 2, 12);
+    expect(SERVO_PARAMS_BY_PART["upper-case"]).toEqual(["rated_torque_nm"]);
+  });
+
+  it("the servo parts are the asset's nodes, and the scene manifest lists the same parts", () => {
+    expect(SERVO_PARTS.map((p) => p.node).sort()).toEqual([...servoAsset.nodes].sort());
+    expect(sceneJson.parts.map((p) => p.id)).toEqual(Object.keys(layoutServoArm(DEFAULT_SERVO_PARAMS)));
+    expect(sceneJson.asset).toBe("asset.servo-generic-anatomy");
+    expect(SERVO_GLB_URL).toBe("/assets/servo-generic.glb");
+  });
+
+  it("the label never claims runtime AI composition: the servo is a scripted asset, the arm and load are code shapes", () => {
+    expect(sceneJson.provenance).toBe("authored");
+    expect(contentLabelOf("servo-arm").label).toBe("Simplified teaching model");
+    expect(MODELS["servo-arm"].note).not.toMatch(/AI/);
   });
 });
 

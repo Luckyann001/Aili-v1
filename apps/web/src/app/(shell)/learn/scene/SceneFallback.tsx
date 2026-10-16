@@ -3,11 +3,23 @@
 import { LEVER_LENGTH_M } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
-import type { ServoParams } from "@/scene/servoArm";
+import { JOINT, layoutServoArm, SERVO_PARTS, type ServoParams } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // Still side views used when WebGL is unavailable or fails. Same parts, same selection.
-type Shape = { x: number; y: number; w: number; h: number; label: [number, number] };
+type Shape = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: [number, number];
+  /** Label text alignment (default: centred on the label point). */
+  anchor?: "start" | "middle";
+  /** A leader line from the label to the part. */
+  leader?: [number, number, number, number];
+  /** Hidden inside the assembled model: drawn as a dashed outline. */
+  inside?: boolean;
+};
 
 const ARM: Record<string, Shape> = {
   base: { x: 20, y: 150, w: 120, h: 20, label: [80, 190] },
@@ -25,18 +37,61 @@ function lever(distance_m: number): Record<string, Shape> {
   };
 }
 
-/** Servo + arm, side view: the joint at (80, 96), 650 px per metre along the arm. */
+// Servo + arm, front view. The main drawing is to true scale (520 px per metre, joint at MAIN): the
+// micro servo is only a few pixels across there, so its parts are labelled in an inset enlarged 4×.
+const MAIN = { x: 150, y: 64, scale: 520 };
+const INSET = { x: 36, y: 132, scale: 520 * 4, frame: { x: 8, y: 104, w: 304, h: 92 } };
+
 function servoArm(p: ServoParams): Record<string, Shape> {
-  const px = (m: number) => m * 650;
-  const lx = 80 + px(Math.min(p.arm_length_m, p.load_distance_m));
-  return {
-    base: { x: 30, y: 150, w: 100, h: 14, label: [80, 184] },
-    "servo-case": { x: 62, y: 96, w: 36, h: 54, label: [80, 140] },
-    horn: { x: 70, y: 86, w: 20, h: 20, label: [52, 80] },
-    "arm-link": { x: 80, y: 92, w: px(p.arm_length_m), h: 8, label: [80 + px(p.arm_length_m) * 0.6, 118] },
-    load: { x: lx - 12, y: 68, w: 24, h: 24, label: [lx, 60] },
+  const l = layoutServoArm(p);
+  const box = (id: string, v: { x: number; y: number; scale: number }) => {
+    const { size, position } = l[id]!;
+    const w = Math.max(size[0] * v.scale, 1);
+    const h = Math.max(size[1] * v.scale, 3);
+    return { x: v.x + (position[0] - JOINT[0]) * v.scale - w / 2, y: v.y - (position[1] - JOINT[1]) * v.scale - h / 2, w, h };
   };
+  const arm = box("arm-link", MAIN);
+  const load = box("load", MAIN);
+  const base = box("base", MAIN);
+  const shapes: Record<string, Shape> = {
+    base: { ...base, label: [base.x + base.w / 2, base.y + base.h + 14] },
+    "arm-link": { ...arm, label: [arm.x + arm.w * 0.6, arm.y + arm.h + 14] },
+    load: { ...load, label: [load.x + load.w / 2, load.y - 6] },
+  };
+  // The inset: one row per part, the label to the right with a leader line to the part.
+  SERVO_PARTS.forEach((part, i) => {
+    const b = box(part.id, INSET);
+    const ly = INSET.frame.y + 22 + i * 15;
+    shapes[part.id] = { ...b, label: [72, ly], anchor: "start", leader: [70, ly - 4, b.x + b.w / 2, b.y + b.h / 2], inside: part.id === "gear-train" || part.id === "motor-and-sensor" };
+  });
+  return shapes;
 }
+
+/** The servo at true scale in the main drawing (not a part: its parts are in the inset), and the inset's frame. */
+function ServoDecor({ servo }: { servo: ServoParams }) {
+  const l = layoutServoArm(servo);
+  const at = (id: string) => {
+    const { size, position } = l[id]!;
+    return { x: MAIN.x + (position[0] - JOINT[0]) * MAIN.scale - (size[0] * MAIN.scale) / 2, y: MAIN.y - (position[1] - JOINT[1]) * MAIN.scale - (size[1] * MAIN.scale) / 2, w: size[0] * MAIN.scale, h: size[1] * MAIN.scale };
+  };
+  const c = at("upper-case");
+  const h = at("horn");
+  const f = INSET.frame;
+  return (
+    <g aria-hidden="true">
+      <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={1} className={styles.fill_technical} strokeWidth={0.6} />
+      <rect x={h.x} y={h.y} width={h.w} height={h.h} className={styles.fill_expressive} strokeWidth={0.6} />
+      <rect x={f.x} y={f.y} width={f.w} height={f.h} rx={4} fill="none" strokeDasharray="3 3" strokeWidth={0.8} />
+      <text x={f.x + f.w - 6} y={f.y + 12} textAnchor="end" className={styles.fallbackText}>
+        Servo, enlarged 4×
+      </text>
+      <line x1={c.x + c.w / 2} y1={c.y + c.h} x2={f.x + 40} y2={f.y} strokeDasharray="2 2" strokeWidth={0.6} className={styles.fallbackLeader} />
+    </g>
+  );
+}
+
+/** Drawing order for the servo + arm: what is behind first, the horn and arm on top. */
+const SERVO_ORDER = ["base", "board-and-cover", "upper-case", "gear-train", "motor-and-sensor", "horn", "arm-link", "load"];
 
 /** `loading`: shown while the 3D code downloads, then replaced by the 3D view in the same place. */
 export function SceneFallback({ loading = false }: { loading?: boolean }) {
@@ -47,6 +102,7 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
   const model = MODELS[activeScene];
   const shapes = activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : ARM;
   const names = model.parts.map((p) => p.name.toLowerCase()).join(", ");
+  const parts = activeScene === "servo-arm" ? SERVO_ORDER.map((id) => model.parts.find((p) => p.id === id)!) : model.parts;
   return (
     <div className={styles.fallback} data-fallback={loading ? "loading" : "no-webgl"}>
       <p className={styles.fallbackNote}>
@@ -55,13 +111,25 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
           : "3D view isn't available on this device, so here is a still picture of the parts."}
       </p>
       <svg viewBox="0 0 320 200" className={styles.fallbackSvg} role="img" aria-label={`Still side view of the ${model.title.toLowerCase()}: ${names}.`}>
-        {model.parts.map(({ id, name, fill }) => {
+        {activeScene === "servo-arm" && <ServoDecor servo={servo} />}
+        {parts.map(({ id, name, fill }) => {
           const s = shapes[id]!;
           const selected = selectedId === id;
           return (
             <g key={id} data-part-id={id}>
-              <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={3} className={styles[`fill_${fill}`]} strokeWidth={selected ? 4 : 1} />
-              <text x={s.label[0]} y={s.label[1]} textAnchor="middle" className={styles.fallbackText} fontWeight={selected ? 700 : 400}>
+              <rect
+                x={s.x}
+                y={s.y}
+                width={s.w}
+                height={s.h}
+                rx={Math.min(3, s.w / 4)}
+                className={s.inside ? undefined : styles[`fill_${fill}`]}
+                fill={s.inside ? "none" : undefined}
+                strokeDasharray={s.inside ? "2 1.5" : undefined}
+                strokeWidth={selected ? 3 : 1}
+              />
+              {s.leader && <line x1={s.leader[0]} y1={s.leader[1]} x2={s.leader[2]} y2={s.leader[3]} className={styles.fallbackLeader} strokeWidth={selected ? 1.5 : 0.75} />}
+              <text x={s.label[0]} y={s.label[1]} textAnchor={s.anchor ?? "middle"} className={styles.fallbackText} fontWeight={selected ? 700 : 400}>
                 {selected ? `Selected: ${name}` : name}
               </text>
             </g>
