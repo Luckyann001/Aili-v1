@@ -27,6 +27,12 @@ describe("AssetManifest", () => {
     expect(fixture()).toMatchObject({ test_fixture: true, review_status: "published", review: { role: "founder", by: "Test fixture: founder review" } });
   });
 
+  it("the fixture copy matches the real manifest apart from its fixture fields, and every part has its bounds", () => {
+    const strip = ({ id: _i, title: _t, review_status: _r, review: _v, test_fixture: _f, ...rest }: Record<string, unknown>) => rest;
+    expect(strip(fixture())).toEqual(strip(real()));
+    for (const p of AssetManifest.parse(real()).parts) expect(p.bounds_gltf_m, p.id).toBeDefined();
+  });
+
   it("rejects a missing budget, an unknown node and triangles over budget", () => {
     const { budget: _, ...noBudget } = real();
     expect(issues(noBudget)).toMatch(/budget/);

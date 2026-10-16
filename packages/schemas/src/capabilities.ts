@@ -215,6 +215,12 @@ const AssetPart = z
     /** The GLB node that draws this part. */
     node: z.string().min(1),
     explode: z.object({ direction_gltf: z.tuple([z.number(), z.number(), z.number()]), distance_m: z.number().min(0) }).strict(),
+    /** Assembled bounding box in glTF axes (Y up), metres: lets a page frame and label the part before the GLB loads. */
+    bounds_gltf_m: z
+      .object({ min: z.tuple([z.number(), z.number(), z.number()]), max: z.tuple([z.number(), z.number(), z.number()]) })
+      .strict()
+      .refine((b) => b.min.every((v, i) => v <= b.max[i]!), "bounds: min must not exceed max")
+      .optional(),
   })
   .strict();
 export const AssetManifest = z

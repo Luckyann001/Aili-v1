@@ -62,7 +62,9 @@ COLOURS = {
     "board": ("#83957E", 0.0, 0.6),  # Sage
     "sensor": ("#917383", 0.0, 0.5),  # Plum
     "horn": ("#F5F1EB", 0.0, 0.5),  # Canvas: light neutral
-    "motor": ("#B8BCC2", 0.6, 0.35),  # silver: the one exception to the palette
+    # Silver: the one exception to the palette. Low metalness: the page lights the model with ambient and
+    # directional lights only (no environment map), under which a metallic surface renders nearly black.
+    "motor": ("#B8BCC2", 0.2, 0.4),
 }
 
 PARTS = [
@@ -95,6 +97,15 @@ def hex_rgba(h):
     srgb = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
     lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in srgb]
     return (*lin, 1.0)
+
+
+def bounds_gltf(ob):
+    """The part's assembled bounding box in glTF axes (Y up; x, y, z = Blender x, z, -y), metres, 0.01 mm steps.
+    The page frames the camera and places labels from it before the GLB has loaded."""
+    vs = [ob.matrix_world @ v.co for v in ob.data.vertices]
+    pts = [(v.x, v.z, -v.y) for v in vs]
+    r = lambda x: round(x, 5) + 0.0  # + 0.0 turns -0.0 into 0.0
+    return {"min": [r(min(p[i] for p in pts)) for i in range(3)], "max": [r(max(p[i] for p in pts)) for i in range(3)]}
 
 
 def material(key):
@@ -543,7 +554,7 @@ def main():
         "units": "metres",
         "shaft_axis": {"blender": "+Z (Blender is Z-up)", "gltf": "+Y (the glTF exporter converts to Y-up)", "origin": "every part's origin lies on the output-shaft axis (x = 0, z = 0 in glTF), at the part's lowest point"},
         "parts": [
-            {"id": pid, "name": name, "role": role, "node": pid, "explode": {"direction_gltf": [0, 1 if EXPLODE[pid] >= 0 else -1, 0], "distance_m": abs(EXPLODE[pid])}}
+            {"id": pid, "name": name, "role": role, "node": pid, "explode": {"direction_gltf": [0, 1 if EXPLODE[pid] >= 0 else -1, 0], "distance_m": abs(EXPLODE[pid])}, "bounds_gltf_m": bounds_gltf(parts[pid])}
             for pid, name, role in PARTS
         ],
         "materials": {
