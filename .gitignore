@@ -32,3 +32,6 @@ live-sessions/
 authoring/local.json
 authoring/**/stills/
 !authoring/servo-anatomy/out/
+
+# 3D assets copied into the web app by apps/web/scripts/copy-assets.mjs (generated)
+apps/web/public/assets/
