@@ -40,4 +40,22 @@ describe("label collision avoidance", () => {
       for (let j = i + 1; j < vis.length; j++) expect(touch(rect(vis[i]!, ls[0]!), rect(vis[j]!, ls[0]!))).toBe(false);
     expect(out.find((p) => p.id === "l2")).toMatchObject({ x: 70, y: 96, hidden: false });
   });
+
+  it("a label never covers the part it names: from its wanted spot it moves beside or below the part", () => {
+    const area = { w: 400, h: 300 };
+    const part = { x: 100, y: 100, w: 80, h: 60 };
+    // Wanted on top of its own part (e.g. clamped at the area's edge): moved off it.
+    const [p] = placeLabels([{ id: "case", x: 110, y: 110, w: 60, h: 20, priority: 0, avoid: part }], area, 6);
+    const hit = (a: { x: number; y: number; w: number; h: number }, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(p!.hidden).toBe(false);
+    expect(hit({ x: p!.x, y: p!.y, w: 60, h: 20 }, part)).toBe(false);
+    // Already clear of its part: left where it is.
+    expect(placeLabels([{ id: "case", x: 110, y: 60, w: 60, h: 20, priority: 0, avoid: part }], area, 6)[0]).toMatchObject({ x: 110, y: 60, hidden: false });
+  });
+
+  it("the pointed-at part's label is never hidden, even with nowhere better to go", () => {
+    const tiny = { w: 70, h: 30 };
+    const [p] = placeLabels([{ id: "gear-train", x: 6, y: 6, w: 60, h: 20, priority: 10, avoid: { x: 0, y: 0, w: 70, h: 30 } }], tiny, 6);
+    expect(p!.hidden).toBe(false);
+  });
 });
