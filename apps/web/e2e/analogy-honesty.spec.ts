@@ -26,7 +26,7 @@ test.describe("analogy honesty rule (addendum A), recorded live path", () => {
   });
 
   test("a words-only analogy is labelled as such; one with its picture on stage is not", async ({ page }) => {
-    await installVoiceFakes(page, { speakMs: 150 });
+    await installVoiceFakes(page, { speakMs: 1500 }); // long enough that each caption can be read under load (150 ms flaked 8 in 30)
     await page.goto("/learn");
     await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
     await welcomeBox(page).fill("teach me robotics");
