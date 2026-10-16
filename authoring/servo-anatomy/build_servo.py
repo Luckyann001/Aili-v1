@@ -25,6 +25,9 @@ from mathutils import Vector
 # ── Parameters (metres) ───────────────────────────────────────────────────────────────────────
 HERE = os.path.dirname(os.path.abspath(__file__))
 GEARS_FILE = os.path.join(HERE, "gears.json")
+REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
+# The asset's registry entry (the capability registry reads content/robotics/capabilities/*.json).
+MANIFEST_FILE = os.path.join(REPO, "content", "robotics", "capabilities", "asset.servo-generic-anatomy.json")
 BUDGET_TRIANGLES = 8000  # provisional (Lucky, 16 Oct 2026): re-check on the real Android phone
 BUDGET_GLB_KB = 300
 
@@ -527,11 +530,13 @@ def main():
         "title": "Generic micro servo: anatomy",
         "label": "Generic micro servo, illustrative, not measured, not a named product",
         "fidelity": "illustrative",
-        "provenance": "scripted in Blender 5.2.2, generic, not measured",
+        "provenance": "authored",
+        "provenance_note": "scripted in Blender 5.2.2, generic, not measured",
         "license": "own work",
         "review_status": "draft",
         "format": "glb",
-        "file": "servo-generic.glb",
+        "file": os.path.relpath(glb, REPO).replace(os.sep, "/"),
+        "nodes": sorted(parts.keys()),
         "size_kb": round(size_kb, 1),
         "triangles": tris,
         "budget": {"triangles": BUDGET_TRIANGLES, "glb_kb": BUDGET_GLB_KB, "status": "provisional: re-check on the real Android phone before page integration (Lucky, 16 Oct 2026)"},
@@ -562,9 +567,9 @@ def main():
             "ratio_note": "derived by code from the tooth counts (driven ÷ driver per mesh); never typed by hand",
             "accuracy": "involute flanks approximated with a few points; no backlash, profile shift or tolerance; for looks only",
         },
-        "teaches": ["act.servo-parts", "act.servo-what-it-is"],
-        "teaches_proposed": ["act.gear-ratio", "act.torque-speed-tradeoff", "sense.position-sensor", "act.motor-basics"],
-        "teaches_note": "teaches lists concept IDs in content/robotics/concepts.json; teaches_proposed are in the M4 concept graph plan, not yet in concepts.json",
+        "teaches": ["act.servo-parts", "act.servo-what-it-is", "act.gear-ratio", "act.torque-speed-tradeoff", "sense.position-sensor", "act.motor-basics"],
+        "teaches_proposed": [],
+        "teaches_note": "all in content/robotics/concepts.json (the four gear, motor and sensor concepts approved as drafts, Lucky 16 Oct 2026)",
     }
 
     over = []
@@ -576,7 +581,7 @@ def main():
     report = stills(parts, a["stills"])
     # Render times vary per run, so they are printed, never written: the manifest is deterministic.
     manifest["stills"] = [{"file": os.path.basename(r["still"]), "engine": r.get("engine")} for r in report]
-    with open(os.path.join(a["out"], "servo-generic.manifest.json"), "w", encoding="utf8") as f:
+    with open(MANIFEST_FILE, "w", encoding="utf8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")
     print("[servo] stills " + json.dumps(report))

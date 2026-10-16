@@ -27,7 +27,7 @@ describe("gear train ratio from tooth counts", () => {
     expect(gears.label).toBe("illustrative example values, not measured");
     const { ratio } = gearTrainRatio(gears);
     expect(ratio).toBeCloseTo((40 / 10) * (36 / 10) * (32 / 10), 12); // the file's counts, checked by hand
-    const manifest = new URL("out/servo-generic.manifest.json", root);
+    const manifest = new URL("../../content/robotics/capabilities/asset.servo-generic-anatomy.json", root);
     if (existsSync(manifest)) expect(JSON.parse(readFileSync(manifest, "utf8")).gear_train.ratio).toBeCloseTo(ratio, 9);
   });
   it("rejects a broken train plainly", () => {
