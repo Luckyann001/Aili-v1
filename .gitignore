@@ -31,3 +31,4 @@ live-sessions/
 # offline authoring: the local Blender path and review stills (not committed)
 authoring/local.json
 authoring/**/stills/
+!authoring/servo-anatomy/out/

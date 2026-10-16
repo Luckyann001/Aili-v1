@@ -1,0 +1,160 @@
+{
+  "id": "asset.servo-generic-anatomy",
+  "type": "asset",
+  "version": "0.1.0",
+  "title": "Generic micro servo: anatomy",
+  "label": "Generic micro servo, illustrative, not measured, not a named product",
+  "fidelity": "illustrative",
+  "provenance": "scripted in Blender 5.2.2, generic, not measured",
+  "license": "own work",
+  "review_status": "draft",
+  "format": "glb",
+  "file": "servo-generic.glb",
+  "size_kb": 216.4,
+  "triangles": 5032,
+  "budget": {
+    "triangles": 8000,
+    "glb_kb": 300,
+    "status": "provisional: re-check on the real Android phone before page integration (Lucky, 16 Oct 2026)"
+  },
+  "units": "metres",
+  "shaft_axis": {
+    "blender": "+Z (Blender is Z-up)",
+    "gltf": "+Y (the glTF exporter converts to Y-up)",
+    "origin": "every part's origin lies on the output-shaft axis (x = 0, z = 0 in glTF), at the part's lowest point"
+  },
+  "parts": [
+    {
+      "id": "horn",
+      "name": "Output horn and screw",
+      "role": "Carries the load: the arm or linkage bolts to it; the screw holds it on the splined shaft.",
+      "node": "horn",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.06
+      }
+    },
+    {
+      "id": "upper-case",
+      "name": "Upper case",
+      "role": "Holds the gear train; the mounting ears bolt the servo down; the boss guides the output shaft.",
+      "node": "upper-case",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.044
+      }
+    },
+    {
+      "id": "gear-train",
+      "name": "Gear train",
+      "role": "Trades speed for torque: a small motor pinion drives larger gears, stage by stage, to the splined output shaft.",
+      "node": "gear-train",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.02
+      }
+    },
+    {
+      "id": "motor-and-sensor",
+      "name": "Motor and position sensor",
+      "role": "The motor turns fast with little torque; the potentiometer on the output shaft tells the board the angle.",
+      "node": "motor-and-sensor",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.0
+      }
+    },
+    {
+      "id": "board-and-cover",
+      "name": "Control board and bottom cover",
+      "role": "The board compares the commanded angle with the sensor and drives the motor; the cover closes the case.",
+      "node": "board-and-cover",
+      "explode": {
+        "direction_gltf": [
+          0,
+          -1,
+          0
+        ],
+        "distance_m": 0.012
+      }
+    }
+  ],
+  "materials": {
+    "palette": {
+      "case": "Ink #282724",
+      "gears": "Gold #C99A56",
+      "board": "Sage #83957E",
+      "sensor": "Plum #917383",
+      "horn": "Canvas #F5F1EB"
+    },
+    "exceptions": [
+      {
+        "part": "motor-and-sensor",
+        "colour": "silver #B8BCC2",
+        "why": "a motor can reads as metal; approved exception to the palette (Lucky, 16 Oct 2026)"
+      }
+    ]
+  },
+  "gear_train": {
+    "source": "gears.json",
+    "label": "illustrative example values, not measured",
+    "module_m": 0.0002,
+    "meshes": [
+      "10 → 40",
+      "10 → 36",
+      "10 → 32"
+    ],
+    "ratio": 46.080000000000005,
+    "ratio_note": "derived by code from the tooth counts (driven ÷ driver per mesh); never typed by hand",
+    "accuracy": "involute flanks approximated with a few points; no backlash, profile shift or tolerance; for looks only"
+  },
+  "teaches": [
+    "act.servo-parts",
+    "act.servo-what-it-is"
+  ],
+  "teaches_proposed": [
+    "act.gear-ratio",
+    "act.torque-speed-tradeoff",
+    "sense.position-sensor",
+    "act.motor-basics"
+  ],
+  "teaches_note": "teaches lists concept IDs in content/robotics/concepts.json; teaches_proposed are in the M4 concept graph plan, not yet in concepts.json",
+  "stills": [
+    {
+      "file": "servo-assembled.png",
+      "engine": "BLENDER_WORKBENCH",
+      "seconds": 1.0
+    },
+    {
+      "file": "servo-exploded.png",
+      "engine": "BLENDER_WORKBENCH",
+      "seconds": 0.42
+    },
+    {
+      "file": "servo-gear-train.png",
+      "engine": "BLENDER_WORKBENCH",
+      "seconds": 0.45
+    },
+    {
+      "file": "servo-top.png",
+      "engine": "BLENDER_WORKBENCH",
+      "seconds": 0.49
+    }
+  ]
+}
