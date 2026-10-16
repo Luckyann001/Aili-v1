@@ -232,6 +232,13 @@ test.describe("selection", () => {
     await openScene(page);
     const c = await rect(canvas(page));
     const arm = label(page, "arm");
+    // Tap where the arm is once the view has settled (under load the first frames can still move it).
+    const at = async () => `${await arm.getAttribute("data-x")},${await arm.getAttribute("data-y")}`;
+    await expect.poll(async () => {
+      const a = await at();
+      await page.waitForTimeout(300);
+      return a === (await at());
+    }, { timeout: 10_000 }).toBe(true);
     const x = Number(await arm.getAttribute("data-x"));
     const y = Number(await arm.getAttribute("data-y"));
     if (page.viewportSize()!.width >= 900) await page.mouse.click(c.x + x, c.y + y + 3);

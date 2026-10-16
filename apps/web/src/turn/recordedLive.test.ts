@@ -107,6 +107,23 @@ describe("recorded live path (test builds only)", () => {
     expect(total).toBe(String(Number((9.80665 * (0.1 * 0.08 + 0.04 * 0.075)).toPrecision(3))));
   });
 
+  it("turn 9 takes the servo apart and points at two parts inside it, each action bound to its segment (anatomy slice 3)", async () => {
+    const { handleTurn } = await load();
+    const sid = "recorded-test-0010";
+    const texts = ["teach me robotics", "It gets harder", "show me a real servo", "the rated torque", "Yes", "Longer lever", "The arm itself", "A shorter arm"];
+    for (const [i, text] of texts.entries()) {
+      const t = await readAll(await handleTurn(post(body(i + 1, text, sid))));
+      expect(t.at(-1)!.type, `turn ${i + 1}: ${JSON.stringify(t.at(-1))}`).toBe("turn.done");
+    }
+    const t9 = await readAll(await handleTurn(post(body(9, "What is inside the servo?", sid))));
+    expect(t9.at(-1)!.type, JSON.stringify(t9.at(-1))).toBe("turn.done");
+    expect(t9.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([
+      { type: "play_animation", animation: "servo-explode", at: "n1" },
+      { type: "highlight_part", part: "gear-train", at: "n2" },
+      { type: "highlight_part", part: "motor-and-sensor", at: "n3" },
+    ]);
+  });
+
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
     const { handleTurn, sessions } = await load();
     // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,

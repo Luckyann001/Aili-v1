@@ -1,5 +1,5 @@
 {
-  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Turns 6 and 7 (the equation built on the servo + arm) added for M4 slice B. Turn 7 given a calculation and turn 8 added (numbers from the stage's settings, the settings note) on 15 Oct. Test builds only.",
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Turns 6 and 7 (the equation built on the servo + arm) added for M4 slice B. Turn 7 given a calculation and turn 8 added (numbers from the stage's settings, the settings note) on 15 Oct. Turn 9 (the servo taken apart: explode, then two parts pointed at, each bound to its segment) added for the anatomy slice 3 on 16 Oct. Test builds only.",
   "router": {
     "source": "hand-written",
     "steps": [
@@ -133,6 +133,24 @@
         "ok": {
           "json": {
             "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
             "pushback": false,
             "new_evidence": false,
             "frustrated": false,
@@ -618,6 +636,69 @@
             ],
             "limitations": [
               "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8200,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_9",
+            "state_rev": 9,
+            "move": "explain",
+            "concepts": [
+              "act.servo-parts"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Let's take the servo apart so you can see what sits inside its case.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "servo-explode"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "This is the gear train: a small pinion on the motor drives larger gears, trading speed for turning force.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "gear-train"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Behind it sits the motor, with the position sensor that tells the board which angle the output shaft is at.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "motor-and-sensor"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Which part do you think decides how much turning force reaches the arm?",
+              "chips": [
+                "The gear train",
+                "The motor",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a generic micro servo, not a specific product"
+            ],
+            "limitations": [
+              "illustrative parts, not measured"
             ]
           },
           "input_tokens": 8200,
