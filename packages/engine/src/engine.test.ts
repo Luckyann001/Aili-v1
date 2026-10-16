@@ -74,7 +74,8 @@ describe("servo + arm scene (M4 slice 2a)", () => {
   it("is a draft, simplified-teaching, AI-composed scene that teaches the demo path, with a learner-supplied rating", () => {
     const s = validateRegistry([{ file: "servo-arm.json", data: servo() }], concepts()).scenes[0]!;
     expect(s).toMatchObject({ review_status: "draft", fidelity: "simplified_teaching", provenance: "ai_composed" });
-    expect(s.teaches).toEqual(concepts().map((c: { id: string }) => c.id));
+    // The first ten concepts; the four gear, motor and sensor drafts (16 Oct 2026) are the anatomy asset's, not this scene's.
+    expect(s.teaches).toEqual(concepts().slice(0, 10).map((c: { id: string }) => c.id));
     expect(s.params.find((p) => p.id === "rated_torque_nm")).toMatchObject({ unit: "N·m", learner_supplied: true });
     expect(s.params.find((p) => p.id === "rated_torque_nm")!.default).toBeUndefined();
   });

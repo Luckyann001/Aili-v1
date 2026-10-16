@@ -8,5 +8,9 @@
   { "id": "act.servo-what-it-is", "title": "A motor that holds a position", "review_status": "draft" },
   { "id": "act.servo-parts", "title": "Motor, gears, position sensor, control board, horn", "review_status": "draft" },
   { "id": "act.rated-vs-stall", "title": "Use the rated figure, not the stall figure", "review_status": "draft" },
-  { "id": "mech.torque-margin", "title": "Rated torque versus needed torque", "review_status": "draft" }
+  { "id": "mech.torque-margin", "title": "Rated torque versus needed torque", "review_status": "draft" },
+  { "id": "act.motor-basics", "title": "A motor turns electricity into turning", "review_status": "draft" },
+  { "id": "act.gear-ratio", "title": "Teeth counts set the ratio", "review_status": "draft", "prerequisites": ["act.servo-parts"] },
+  { "id": "act.torque-speed-tradeoff", "title": "More torque, less speed", "review_status": "draft", "prerequisites": ["act.gear-ratio"] },
+  { "id": "sense.position-sensor", "title": "The servo knows its angle", "review_status": "draft", "prerequisites": ["act.servo-parts"] }
 ]
