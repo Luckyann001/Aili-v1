@@ -27,3 +27,7 @@ screenshots/
 
 # local live-session logs (laptop only; npm run live-sessions:delete removes them)
 live-sessions/
+
+# offline authoring: the local Blender path and review stills (not committed)
+authoring/local.json
+authoring/**/stills/

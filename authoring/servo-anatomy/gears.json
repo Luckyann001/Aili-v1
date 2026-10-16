@@ -1,0 +1,19 @@
+{
+  "_about": "Gear train of the generic micro servo anatomy (offline authoring, M4). The single source of truth: the Blender script builds the gears from it and code derives the reduction ratio from it (packages/solvers/src/gearRatio.ts), so the ratio is never typed by hand. Not a named product.",
+  "label": "illustrative example values, not measured",
+  "module_m": 0.0002,
+  "pressure_angle_deg": 20,
+  "gears": [
+    { "id": "motor-pinion", "teeth": 10, "shaft": "motor", "face_width_m": 0.0022 },
+    { "id": "stage-1-gear", "teeth": 40, "shaft": "stage-1", "face_width_m": 0.0008 },
+    { "id": "stage-1-pinion", "teeth": 10, "shaft": "stage-1", "face_width_m": 0.0016 },
+    { "id": "stage-2-gear", "teeth": 36, "shaft": "stage-2", "face_width_m": 0.0008 },
+    { "id": "stage-2-pinion", "teeth": 10, "shaft": "stage-2", "face_width_m": 0.0016 },
+    { "id": "output-gear", "teeth": 32, "shaft": "output", "face_width_m": 0.0012 }
+  ],
+  "meshes": [
+    { "driver": "motor-pinion", "driven": "stage-1-gear" },
+    { "driver": "stage-1-pinion", "driven": "stage-2-gear" },
+    { "driver": "stage-2-pinion", "driven": "output-gear" }
+  ]
+}
