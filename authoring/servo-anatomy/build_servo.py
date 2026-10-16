@@ -51,7 +51,12 @@ FLANK_POINTS = 3  # points per tooth flank (involute approximation): low poly
 SEGMENTS = 16  # round parts
 
 # Explode along the shaft axis (+Z in Blender), metres; the housing must clear the gears.
-EXPLODE = {"horn": 0.060, "upper-case": 0.044, "gear-train": 0.020, "motor-and-sensor": 0.0, "board-and-cover": -0.012}
+# Explode offsets along the shaft, metres: illustrative spacing for teaching, not an assembly sequence.
+# Shortened 16 Oct 2026 (Lucky: the spread was long next to a 23 mm body): about 60 mm in all, ~2x the
+# servo's 28.5 mm along the shaft. The case lifts just clear of the gears and of the horn (it does the
+# same in "open"), and the horn sits just above the lifted case.
+EXPLODE = {"horn": 0.030, "upper-case": 0.028, "gear-train": 0.001, "motor-and-sensor": 0.0, "board-and-cover": -0.002}
+EXPLODE_NOTE = "illustrative spacing for teaching, about 2x the servo's height along the shaft; not an assembly sequence, not measured"
 
 # Flat PBR colours: brand palette, plus silver for the motor (an approved exception, Lucky 16 Oct 2026).
 COLOURS = {
@@ -588,6 +593,7 @@ def main():
         "units": "metres",
         "shaft_axis": {"blender": "+Z (Blender is Z-up)", "gltf": "+Y (the glTF exporter converts to Y-up)", "origin": "every part's origin lies on the output-shaft axis (x = 0, z = 0 in glTF), at the part's lowest point"},
         "open_parts": ["upper-case"],  # open: the upper case lifts away, as in the servo-open still
+        "explode_note": EXPLODE_NOTE,
         "parts": [
             {"id": pid, "name": name, "role": role, "node": pid, "explode": {"direction_gltf": [0, 1 if EXPLODE[pid] >= 0 else -1, 0], "distance_m": abs(EXPLODE[pid])}, "bounds_gltf_m": bounds_gltf(parts[pid])}
             for pid, name, role in PARTS

@@ -276,6 +276,8 @@ export const AssetManifest = z
       .optional(),
     /** "Open": these parts move away along their explode direction and distance; the rest stay assembled. */
     open_parts: z.array(KebabId).default([]),
+    /** What the explode offsets are: illustrative spacing, never an assembly sequence or a measurement. */
+    explode_note: z.string().min(1).optional(),
     teaches: z.array(ConceptId).min(1),
     /** Concepts the asset would teach that are not in the concept graph yet (never validated as existing). */
     teaches_proposed: z.array(ConceptId).default([]),

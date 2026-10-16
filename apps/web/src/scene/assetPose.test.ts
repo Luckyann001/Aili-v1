@@ -37,8 +37,26 @@ describe("asset pose from the manifest (any asset)", () => {
   it("the real servo: open lifts only the upper case, as its manifest says", () => {
     const m = servoAsset as PoseManifest;
     expect(m.open_parts).toEqual(["upper-case"]);
-    expect(partOffsetGltf(m, "upper-case", settled("open"))[1]).toBeCloseTo(0.044, 12);
+    const dist = (id: string) => servoAsset.parts.find((p) => p.id === id)!.explode.distance_m;
+    expect(partOffsetGltf(m, "upper-case", settled("open"))[1]).toBeCloseTo(dist("upper-case"), 12);
     for (const id of ["horn", "gear-train", "motor-and-sensor", "board-and-cover"]) expect(partOffsetGltf(m, id, settled("open"))).toEqual([0, 0, 0]);
-    expect(partOffsetGltf(m, "board-and-cover", settled("exploded"))[1]).toBeCloseTo(-0.012, 12);
+    expect(partOffsetGltf(m, "board-and-cover", settled("exploded"))[1]).toBeCloseTo(-dist("board-and-cover"), 12);
+  });
+
+  it("the real servo's spacing (16 Oct 2026): exploded, parts clear of each other, the stack about twice the servo's height", () => {
+    const b = Object.fromEntries(servoAsset.parts.map((p) => [p.id, p]));
+    const at = (id: string, view: "open" | "exploded") => {
+      const y = partOffsetGltf(servoAsset as PoseManifest, id, settled(view))[1];
+      return { lo: b[id]!.bounds_gltf_m.min[1] + y, hi: b[id]!.bounds_gltf_m.max[1] + y };
+    };
+    for (const view of ["open", "exploded"] as const) expect(at("upper-case", view).lo, `${view}: the case clears the gears`).toBeGreaterThan(at("gear-train", view).hi);
+    expect(at("upper-case", "open").lo, "open: the lifted case clears the horn, which stays in place").toBeGreaterThan(at("horn", "open").hi);
+    expect(at("horn", "exploded").lo).toBeGreaterThan(at("upper-case", "exploded").hi); // the horn sits above the lifted case
+    const ids = servoAsset.parts.map((p) => p.id);
+    const height = Math.max(...ids.map((id) => b[id]!.bounds_gltf_m.max[1])) - Math.min(...ids.map((id) => b[id]!.bounds_gltf_m.min[1]));
+    const spread = Math.max(...ids.map((id) => at(id, "exploded").hi)) - Math.min(...ids.map((id) => at(id, "exploded").lo));
+    expect(spread / height).toBeGreaterThanOrEqual(1.5);
+    expect(spread / height).toBeLessThanOrEqual(2.2);
+    expect(servoAsset.explode_note).toMatch(/illustrative/);
   });
 });

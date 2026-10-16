@@ -34,6 +34,7 @@
   "open_parts": [
     "upper-case"
   ],
+  "explode_note": "illustrative spacing for teaching, about 2x the servo's height along the shaft; not an assembly sequence, not measured",
   "parts": [
     {
       "id": "horn",
@@ -46,7 +47,7 @@
           1,
           0
         ],
-        "distance_m": 0.06
+        "distance_m": 0.03
       },
       "bounds_gltf_m": {
         "min": [
@@ -72,7 +73,7 @@
           1,
           0
         ],
-        "distance_m": 0.044
+        "distance_m": 0.028
       },
       "bounds_gltf_m": {
         "min": [
@@ -98,7 +99,7 @@
           1,
           0
         ],
-        "distance_m": 0.02
+        "distance_m": 0.001
       },
       "bounds_gltf_m": {
         "min": [
@@ -150,7 +151,7 @@
           -1,
           0
         ],
-        "distance_m": 0.012
+        "distance_m": 0.002
       },
       "bounds_gltf_m": {
         "min": [
