@@ -251,6 +251,26 @@ describe("shortlist: published items only, by concept and level", () => {
     expect(loadRegistry(real(), PROD).registry.assets.map((a) => a.review_status)).toEqual(["draft"]);
   });
 
+  it("the servo's explode, open and assemble are offered only with a published asset: the fixture's, never the real draft's", async () => {
+    const { fixtureRegistry, readJson } = await import("./__fixtures__/registry");
+    const ASSET_ANIMS = ["servo-explode", "servo-open", "servo-assemble"];
+    const r = fixtureRegistry().registry;
+    const offered = (reg: typeof r) => shortlist(reg, { concepts: [C], level: "L2" }).scenes.find((s) => s.id === "fx-servo-arm")!.animations.map((a) => a.id);
+    expect(offered(r)).toEqual(expect.arrayContaining(ASSET_ANIMS)); // asset.fx-servo-generic-anatomy is published
+    expect(offered(r)).toContain("slide-load-out");
+    // The same published fixture scene pointing at the real, draft asset: the three are left out, the rest stay.
+    const onDraft = { ...readJson("test-fixtures/scene.fx-servo-arm.json"), asset: "asset.servo-generic-anatomy" };
+    const r2 = withItems([]).registry;
+    const reg2 = { ...fixtureRegistry().registry, scenes: [...r.scenes.filter((s) => s.id !== "fx-servo-arm"), ...validateRegistry([{ file: "x.json", data: onDraft }], readJson("concepts.json"), DEV).scenes] };
+    expect(r2.assets.map((a) => a.review_status)).toEqual(["draft"]);
+    const left = offered(reg2);
+    for (const id of ASSET_ANIMS) expect(left).not.toContain(id);
+    expect(left).toContain("slide-load-out");
+    // An asset animation on a scene with no asset is refused.
+    const { asset: _a, ...noAsset } = readJson("scenes/servo-arm.json");
+    expect(loadRegistry({ ...real(), scenes: [...dir("scenes").filter((f) => f.file !== "servo-arm.json"), { file: "servo-arm.json", data: noAsset }] }, PROD).errors.join("\n")).toMatch(/uses an asset, but names no asset/);
+  });
+
   it("a concept's prerequisites must exist", () => {
     const concepts = [...readJson("concepts.json"), { id: "act.fx-orphan", title: "Orphan", review_status: "draft", prerequisites: ["mech.force"] }];
     expect(loadRegistry({ ...real(), concepts }, PROD).errors.join("\n")).toMatch(/act\.fx-orphan has unknown prerequisite "mech\.force"/);

@@ -98,7 +98,10 @@ export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registr
     else if (fixtures.has(toId) && !fromFixture) errors.push(`${file}: ${fromId} refers to test fixture "${toId}"`);
   };
   const teaching = [...reg.scenes, ...reg.solvers, ...reg.simulations, ...reg.analogies, ...reg.readings, ...reg.assets];
-  for (const s of reg.scenes) if (s.asset) ref(s.id, !!s.test_fixture, s.asset, "asset");
+  for (const s of reg.scenes) {
+    if (s.asset) ref(s.id, !!s.test_fixture, s.asset, "asset");
+    else if (s.animations.some((a) => a.uses_asset)) errors.push(`${where.get(s.id)}: ${s.id} has an animation that uses an asset, but names no asset`);
+  }
   for (const item of teaching)
     for (const c of item.teaches) if (!conceptIds.has(c)) errors.push(`${where.get(item.id)}: ${item.id} teaches unknown concept "${c}"`);
 
@@ -162,7 +165,11 @@ export function shortlist(reg: Registry, q: { concepts: readonly ConceptId[]; le
   const published = <T extends { review_status: string }>(x: T) => x.review_status === "published";
   const about = (x: { teaches: readonly string[] }) => x.teaches.some((c) => q.concepts.includes(c));
 
-  const scenes = reg.scenes.filter((s) => published(s) && about(s) && s.level === q.level);
+  // An animation that plays on the scene's asset is offered only when that asset is published.
+  const assetPublished = (id?: string) => !!id && reg.assets.some((a) => a.id === id && published(a));
+  const scenes = reg.scenes
+    .filter((s) => published(s) && about(s) && s.level === q.level)
+    .map((s) => (s.animations.some((a) => a.uses_asset) && !assetPublished(s.asset) ? { ...s, animations: s.animations.filter((a) => !a.uses_asset) } : s));
   const simulations = reg.simulations.filter((s) => published(s) && about(s) && s.levels.includes(q.level));
   const analogies = reg.analogies.filter((a) => published(a) && about(a) && a.levels.includes(q.level));
   const readings = reg.readings.filter((r) => published(r) && about(r) && r.level === q.level);

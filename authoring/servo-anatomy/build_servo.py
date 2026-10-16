@@ -556,6 +556,7 @@ def main():
         "budget": {"triangles": BUDGET_TRIANGLES, "glb_kb": BUDGET_GLB_KB, "status": "provisional: re-check on the real Android phone before page integration (Lucky, 16 Oct 2026)"},
         "units": "metres",
         "shaft_axis": {"blender": "+Z (Blender is Z-up)", "gltf": "+Y (the glTF exporter converts to Y-up)", "origin": "every part's origin lies on the output-shaft axis (x = 0, z = 0 in glTF), at the part's lowest point"},
+        "open_parts": ["upper-case"],  # open: the upper case lifts away, as in the servo-open still
         "parts": [
             {"id": pid, "name": name, "role": role, "node": pid, "explode": {"direction_gltf": [0, 1 if EXPLODE[pid] >= 0 else -1, 0], "distance_m": abs(EXPLODE[pid])}, "bounds_gltf_m": bounds_gltf(parts[pid])}
             for pid, name, role in PARTS

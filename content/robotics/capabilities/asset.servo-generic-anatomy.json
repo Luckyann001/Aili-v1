@@ -31,6 +31,9 @@
     "gltf": "+Y (the glTF exporter converts to Y-up)",
     "origin": "every part's origin lies on the output-shaft axis (x = 0, z = 0 in glTF), at the part's lowest point"
   },
+  "open_parts": [
+    "upper-case"
+  ],
   "parts": [
     {
       "id": "horn",

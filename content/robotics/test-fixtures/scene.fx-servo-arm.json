@@ -124,6 +124,21 @@
     {
       "id": "eq-margin",
       "description": "Equation step 5: the total torque against the servo's rated torque, the margin gauge."
+    },
+    {
+      "id": "servo-explode",
+      "description": "The servo's parts move apart along the shaft so each one can be seen.",
+      "uses_asset": true
+    },
+    {
+      "id": "servo-open",
+      "description": "The servo case lifts away; the gears, motor and board stay in place.",
+      "uses_asset": true
+    },
+    {
+      "id": "servo-assemble",
+      "description": "The servo's parts go back together.",
+      "uses_asset": true
     }
   ],
   "solver": {

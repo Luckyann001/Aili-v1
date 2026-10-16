@@ -257,6 +257,8 @@ export const AssetManifest = z
       .object({ source: z.string().min(1), label: z.string().min(1), module_m: z.number().positive(), meshes: z.array(z.string()).min(1), ratio: z.number().positive(), ratio_note: z.string().min(1), accuracy: z.string().min(1) })
       .strict()
       .optional(),
+    /** "Open": these parts move away along their explode direction and distance; the rest stay assembled. */
+    open_parts: z.array(KebabId).default([]),
     teaches: z.array(ConceptId).min(1),
     /** Concepts the asset would teach that are not in the concept graph yet (never validated as existing). */
     teaches_proposed: z.array(ConceptId).default([]),
@@ -273,6 +275,7 @@ export const AssetManifest = z
     const ids = a.parts.map((p) => p.id);
     const dup = ids.find((id, i) => ids.indexOf(id) !== i);
     if (dup) ctx.addIssue({ code: "custom", message: `${a.id}: duplicate part "${dup}"` });
+    for (const p of a.open_parts) if (!ids.includes(p)) ctx.addIssue({ code: "custom", message: `${a.id}: open_parts names unknown part "${p}"` });
     for (const e of a.materials.exceptions) if (!ids.includes(e.part)) ctx.addIssue({ code: "custom", message: `${a.id}: a colour exception names unknown part "${e.part}"` });
   });
 export type AssetManifest = z.infer<typeof AssetManifest>;

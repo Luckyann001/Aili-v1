@@ -40,7 +40,14 @@ export const SceneParam = z
     if (!p.id.endsWith(PARAM_UNIT_SUFFIX[p.unit])) ctx.addIssue({ code: "custom", message: `${p.id}: unit "${p.unit}" does not match the ID` });
   });
 
-export const SceneAnimation = z.object({ id: KebabId, description: z.string().min(1) }).strict();
+export const SceneAnimation = z
+  .object({
+    id: KebabId,
+    description: z.string().min(1),
+    /** Plays on the scene's 3D asset (explode, open, assemble): offered to the professor only when that asset is published. */
+    uses_asset: z.literal(true).optional(),
+  })
+  .strict();
 
 /**
  * Who reviewed an item, when, and in what role. "founder": the founder's review for the demo, a
