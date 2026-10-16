@@ -14,6 +14,7 @@ The gear train comes from gears.json (the single source of truth); the ratio is 
 import json
 import math
 import os
+import struct
 import sys
 import time
 
@@ -51,7 +52,9 @@ EXPLODE = {"horn": 0.060, "upper-case": 0.044, "gear-train": 0.020, "motor-and-s
 
 # Flat PBR colours: brand palette, plus silver for the motor (an approved exception, Lucky 16 Oct 2026).
 COLOURS = {
-    "case": ("#282724", 0.0, 0.55),  # Ink: dark neutral
+    "case": ("#5E5952", 0.0, 0.55),  # mid-dark warm neutral from the Ink family (lighter than Ink, darker than Canvas)
+    "seam": ("#282724", 0.0, 0.6),  # Ink: the seam line and the cable sleeve
+    "label": ("#7A746C", 0.0, 0.6),  # a lighter warm neutral: the blank label panel
     "gear": ("#C99A56", 0.1, 0.45),  # Gold
     "board": ("#83957E", 0.0, 0.6),  # Sage
     "sensor": ("#917383", 0.0, 0.5),  # Plum
@@ -68,6 +71,10 @@ PARTS = [
 ]
 
 RENDER = {"width": 1280, "height": 960, "cycles_samples": 24}
+EXPLODED_RENDER = (900, 1200)  # portrait: the exploded column fills about 85 % of the height
+LABEL_PANEL = {"inset_m": 0.0003, "margin_x_m": 0.003, "z": (0.0050, 0.0140)}  # blank, no text
+EAR_HOLE_RADIUS = 0.0010
+CABLE = {"length_m": 0.006, "width_m": 0.003, "z": (0.0003, 0.0010)}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────────────────────
@@ -179,6 +186,21 @@ def gear_outline(teeth, module, pressure_deg, phase=0.0):
     return [(rr * math.cos(t), rr * math.sin(t)) for rr, t in pts]
 
 
+def subtract(target, cutter):
+    """Cut `cutter` out of `target` (exact boolean, applied), then delete the cutter."""
+    mod = target.modifiers.new("cut", "BOOLEAN")
+    mod.operation = "DIFFERENCE"
+    mod.object = cutter
+    if hasattr(mod, "solver"):
+        mod.solver = "EXACT"
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    bpy.context.view_layer.objects.active = target
+    target.select_set(True)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
+
 def join(name, objs):
     for o in bpy.context.selected_objects:
         o.select_set(False)
@@ -264,9 +286,12 @@ def build(g, gears):
     parts["motor-and-sensor"] = join("motor-and-sensor", objs)
 
     # 5. Control board and bottom cover.
+    out = 0.00003  # the seam band stands just proud of the case faces, so it reads as a line
     objs = [
         box("bottom-cover", CASE_X, CASE_Y, BOTTOM_Z, "case"),
         box("control-board", (CASE_X[0] + WALL, CASE_X[1] - WALL), (CASE_Y[0] + WALL, CASE_Y[1] - WALL), BOARD_Z, "board"),
+        box("seam", (CASE_X[0] - out, CASE_X[1] + out), (CASE_Y[0] - out, CASE_Y[1] + out), (BOTTOM_Z[1] - 0.0001, BOTTOM_Z[1] + 0.0001), "seam"),
+        box("cable-stub", (CASE_X[1], CASE_X[1] + CABLE["length_m"]), (-CABLE["width_m"] / 2, CABLE["width_m"] / 2), CABLE["z"], "seam"),
     ]
     parts["board-and-cover"] = join("board-and-cover", objs)
 
@@ -275,13 +300,23 @@ def build(g, gears):
     y0, y1 = CASE_Y
     z0, z1 = HOUSING_Z
     ear_x = ((x0 + x1) / 2 - EARS["length"] / 2, (x0 + x1) / 2 + EARS["length"] / 2)
+    lx = (x0 + LABEL_PANEL["margin_x_m"], x1 - LABEL_PANEL["margin_x_m"])
+    lz = LABEL_PANEL["z"]
+    ears = box("ears", ear_x, (y0, y1), EARS["z"], "case")
+    for hx in (ear_x[0] + 0.0018, ear_x[1] - 0.0018):  # one mounting hole through each ear
+        subtract(ears, prism("ear-hole", circle(EAR_HOLE_RADIUS, 12), (EARS["z"][0] - 0.001, EARS["z"][1] + 0.001), "case", (hx, 0.0)))
     objs = [
-        box("wall-front", (x0, x1), (y0, y0 + WALL), (z0, z1), "case"),
+        # The front (broad) wall as a frame around a blank label panel set back by the inset.
+        box("wall-front-low", (x0, x1), (y0, y0 + WALL), (z0, lz[0]), "case"),
+        box("wall-front-high", (x0, x1), (y0, y0 + WALL), (lz[1], z1), "case"),
+        box("wall-front-left", (x0, lx[0]), (y0, y0 + WALL), lz, "case"),
+        box("wall-front-right", (lx[1], x1), (y0, y0 + WALL), lz, "case"),
+        box("label-panel", lx, (y0 + LABEL_PANEL["inset_m"], y0 + WALL), lz, "label"),
         box("wall-back", (x0, x1), (y1 - WALL, y1), (z0, z1), "case"),
         box("wall-left", (x0, x0 + WALL), (y0, y1), (z0, z1), "case"),
         box("wall-right", (x1 - WALL, x1), (y0, y1), (z0, z1), "case"),
         box("top", (x0, x1), (y0, y1), (z1 - WALL, z1), "case"),
-        box("ears", ear_x, (y0, y1), EARS["z"], "case"),
+        ears,
         prism("shaft-boss", circle(BOSS["radius"]), BOSS["z"], "case"),
     ]
     parts["upper-case"] = join("upper-case", objs)
@@ -300,6 +335,38 @@ def build(g, gears):
         zs = [v.co.z for v in ob.data.vertices]
         origin_on_axis(ob, min(zs))
     return parts, pos
+
+
+def canonical_indices(glb_path):
+    """Rewrite every triangle index list of the GLB in a canonical order, in place, so the file is
+    identical run to run (the exporter writes the same triangles in a varying order). Each triangle is
+    rotated to start at its smallest index (its winding, and so its facing, is kept), then sorted."""
+    with open(glb_path, "rb") as f:
+        data = bytearray(f.read())
+    json_len = struct.unpack_from("<I", data, 12)[0]
+    doc = json.loads(bytes(data[20 : 20 + json_len]))
+    bin_start = 20 + json_len + 8
+    fmt = {5121: "B", 5123: "H", 5125: "I"}
+    for mesh in doc["meshes"]:
+        for prim in mesh["primitives"]:
+            if prim.get("mode", 4) != 4 or "indices" not in prim:
+                continue
+            acc = doc["accessors"][prim["indices"]]
+            view = doc["bufferViews"][acc["bufferView"]]
+            code = fmt[acc["componentType"]]
+            size = struct.calcsize(code)
+            start = bin_start + view.get("byteOffset", 0) + acc.get("byteOffset", 0)
+            idx = list(struct.unpack_from(f"<{acc['count']}{code}", data, start))
+            tris = []
+            for i in range(0, len(idx), 3):
+                t = idx[i : i + 3]
+                k = t.index(min(t))
+                tris.append(tuple(t[k:] + t[:k]))
+            tris.sort()
+            struct.pack_into(f"<{acc['count']}{code}", data, start, *[v for t in tris for v in t])
+            assert size * acc["count"] <= view["byteLength"]
+    with open(glb_path, "wb") as f:
+        f.write(bytes(data))
 
 
 def triangles(objs):
@@ -330,7 +397,7 @@ def setup_lights_and_camera():
     return co
 
 
-def frame(cam, objs, direction, margin=1.25):
+def frame(cam, objs, direction, margin=1.25, size_px=(RENDER["width"], RENDER["height"])):
     """Point an orthographic camera along `direction` at the objects' bounding box."""
     bpy.context.view_layer.update()  # moved parts: refresh their world matrices before framing
     pts = [ob.matrix_world @ Vector(c) for ob in objs for c in ob.bound_box]
@@ -347,18 +414,18 @@ def frame(cam, objs, direction, margin=1.25):
     local = [inv @ p for p in pts]
     w = max(p.x for p in local) - min(p.x for p in local)
     h = max(p.y for p in local) - min(p.y for p in local)
-    aspect = RENDER["width"] / RENDER["height"]
-    cam.data.ortho_scale = max(w, h * aspect) * margin
+    aspect = size_px[0] / size_px[1]
+    # Blender's ortho_scale spans the larger side of the frame: the width when landscape, the height when portrait.
+    cam.data.ortho_scale = (max(w, h * aspect) if aspect >= 1 else max(w / aspect, h)) * margin
     # Centre on the projected extent (the bounding-box centre is not the picture's centre at an angle).
     mid = Vector(((max(p.x for p in local) + min(p.x for p in local)) / 2, (max(p.y for p in local) + min(p.y for p in local)) / 2, 0.0))
     cam.location = cam.matrix_world @ mid
 
 
-def render_still(path, engine):
+def render_still(path, engine, size):
     scene = bpy.context.scene
     scene.render.engine = engine
-    scene.render.resolution_x = RENDER["width"]
-    scene.render.resolution_y = RENDER["height"]
+    scene.render.resolution_x, scene.render.resolution_y = size
     scene.render.image_settings.file_format = "PNG"
     scene.render.filepath = path
     if engine == "BLENDER_WORKBENCH":
@@ -384,6 +451,7 @@ def stills(parts, out_dir):
     views = []
     iso = (1.0, -1.3, 0.9)
     views.append(("assembled", all_parts, iso, None))
+    views.append(("open", [p for n, p in parts.items() if n != "upper-case"], iso, "open"))  # what's inside
     views.append(("exploded", all_parts, (1.0, -1.6, 0.35), "explode"))
     views.append(("gear-train", [parts["gear-train"]], (0.7, -1.0, 1.2), "gears-only"))
     views.append(("top", all_parts, (0.0, 0.0, 1.0), None))  # the output shaft points at the viewer
@@ -395,18 +463,20 @@ def stills(parts, out_dir):
         if mode == "explode":
             for n, ob in parts.items():
                 ob.location.z += EXPLODE[n]
-        if mode == "gears-only":
+        if mode in ("gears-only", "open"):
             for n, ob in parts.items():
-                if n != "gear-train":
+                if (mode == "gears-only" and n != "gear-train") or (mode == "open" and n == "upper-case"):
                     ob.hide_render = True
                     hidden.append(ob)
-        frame(cam, objs, direction, margin=1.15 if mode != "explode" else 1.1)
+        size = EXPLODED_RENDER if mode == "explode" else (RENDER["width"], RENDER["height"])
+        # Exploded: the column fills about 85 % of the frame height (1 / 0.85 margin).
+        frame(cam, objs, direction, margin=1.0 / 0.85 if mode == "explode" else 1.15, size_px=size)
         path = os.path.join(out_dir, f"servo-{name}.png")
         tried = [engine] if engine else ["BLENDER_WORKBENCH", "CYCLES"]
         err = None
         for e in tried:
             try:
-                seconds = render_still(path, e)
+                seconds = render_still(path, e, size)
                 engine = e
                 report.append({"still": path, "engine": e, "seconds": round(seconds, 2)})
                 err = None
@@ -432,12 +502,21 @@ def main():
     g, gears, ratio = load_gears()
     parts, pos = build(g, gears)
 
+    # Triangulate here, with fixed methods, so the exported GLB is identical run to run (the exporter's
+    # own split of concave faces, like the gear outlines, was not deterministic).
+    for ob in parts.values():
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method="FIXED", ngon_method="EAR_CLIP")
+        bm.to_mesh(ob.data)
+        bm.free()
     tris = triangles(parts.values())
     os.makedirs(a["out"], exist_ok=True)
     glb = os.path.join(a["out"], "servo-generic.glb")
     for ob in bpy.context.selected_objects:
         ob.select_set(False)
     bpy.ops.export_scene.gltf(filepath=glb, export_format="GLB", export_yup=True, export_apply=True, export_cameras=False, export_lights=False)
+    canonical_indices(glb)
     size_kb = os.path.getsize(glb) / 1024
     print(f"[servo] triangles {tris} (budget {BUDGET_TRIANGLES}), GLB {size_kb:.1f} KB (budget {BUDGET_GLB_KB} KB), ratio {ratio:.4f}")
 
@@ -463,7 +542,15 @@ def main():
             for pid, name, role in PARTS
         ],
         "materials": {
-            "palette": {"case": "Ink #282724", "gears": "Gold #C99A56", "board": "Sage #83957E", "sensor": "Plum #917383", "horn": "Canvas #F5F1EB"},
+            "palette": {
+                "case": "#5E5952, a mid-dark warm neutral from the Ink family (lighter than Ink #282724, clearly darker than Canvas)",
+                "label_panel": "#7A746C, a lighter warm neutral (blank, no text)",
+                "seam_and_cable": "Ink #282724",
+                "gears": "Gold #C99A56",
+                "board": "Sage #83957E",
+                "sensor": "Plum #917383",
+                "horn": "Canvas #F5F1EB",
+            },
             "exceptions": [{"part": "motor-and-sensor", "colour": "silver #B8BCC2", "why": "a motor can reads as metal; approved exception to the palette (Lucky, 16 Oct 2026)"}],
         },
         "gear_train": {
@@ -487,7 +574,8 @@ def main():
         over.append(f"{size_kb:.1f} KB is over the {BUDGET_GLB_KB} KB budget")
 
     report = stills(parts, a["stills"])
-    manifest["stills"] = [{"file": os.path.basename(r["still"]), "engine": r.get("engine"), "seconds": r.get("seconds")} for r in report]
+    # Render times vary per run, so they are printed, never written: the manifest is deterministic.
+    manifest["stills"] = [{"file": os.path.basename(r["still"]), "engine": r.get("engine")} for r in report]
     with open(os.path.join(a["out"], "servo-generic.manifest.json"), "w", encoding="utf8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")
