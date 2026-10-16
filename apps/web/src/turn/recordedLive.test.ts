@@ -124,6 +124,26 @@ describe("recorded live path (test builds only)", () => {
     ]);
   });
 
+  it("turn 10 points at the gear train, then turns the gears in its own segment; the ratio is in words only (anatomy slice 4)", async () => {
+    const { handleTurn } = await load();
+    const sid = "recorded-test-0011";
+    const texts = ["teach me robotics", "It gets harder", "show me a real servo", "the rated torque", "Yes", "Longer lever", "The arm itself", "A shorter arm", "What is inside the servo?"];
+    for (const [i, text] of texts.entries()) {
+      const t = await readAll(await handleTurn(post(body(i + 1, text, sid))));
+      expect(t.at(-1)!.type, `turn ${i + 1}: ${JSON.stringify(t.at(-1))}`).toBe("turn.done");
+    }
+    const t10 = await readAll(await handleTurn(post(body(10, "The gear train", sid))));
+    expect(t10.at(-1)!.type, JSON.stringify(t10.at(-1))).toBe("turn.done");
+    expect(t10.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([
+      { type: "highlight_part", part: "gear-train", at: "n1" },
+      { type: "play_animation", animation: "servo-gears-turn", at: "n2" },
+    ]);
+    // No number anywhere in what is said: the ratio is on the stage, computed by the page.
+    const said = t10.filter((e) => e.type === "narration" || e.type === "prompt").flatMap((e) => (e as { parts: Array<{ text?: string; value?: string }> }).parts.map((p) => p.text ?? p.value ?? ""));
+    expect(said.join(" ")).toMatch(/the ratio shown on the stage/);
+    expect(said.join(" ")).not.toMatch(/\d/);
+  });
+
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
     const { handleTurn, sessions } = await load();
     // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,

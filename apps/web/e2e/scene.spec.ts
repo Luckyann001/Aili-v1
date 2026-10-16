@@ -232,10 +232,12 @@ test.describe("selection", () => {
     await openScene(page);
     const c = await rect(canvas(page));
     const arm = label(page, "arm");
-    // Tap where the arm is once the view has settled (under load the first frames can still move it).
+    // Tap where the arm is, once the view has placed its label (the first frames may not have yet:
+    // the position was then missing and the tap went to the page's corner) and it has stopped moving.
     const at = async () => `${await arm.getAttribute("data-x")},${await arm.getAttribute("data-y")}`;
     await expect.poll(async () => {
       const a = await at();
+      if (a.includes("null")) return false;
       await page.waitForTimeout(300);
       return a === (await at());
     }, { timeout: 10_000 }).toBe(true);

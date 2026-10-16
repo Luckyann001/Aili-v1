@@ -30,7 +30,7 @@ const T9_N3 = /^Behind it sits the motor/;
 const T9_Q = /^Which part do you think decides/;
 
 /** Turns 1 to 3 (the servo + arm on stage); each sent once the stage has what the next needs. */
-async function toServo(page: Page, speakMs = 200) {
+async function toServo(page: Page, speakMs = 1200) {
   await installVoiceFakes(page, { speakMs });
   await page.goto("/learn");
   await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
@@ -75,12 +75,12 @@ test.describe("micro servo anatomy (slice 3), recorded live path", () => {
     await expect(note(page)).toHaveText(/Aili exploded the servo/);
     await expect(page.getByText("Illustrative · generic, not measured")).toBeVisible();
     await expect(partsButton(page)).toHaveText("Parts"); // nothing pointed at yet: that is n2's
-    // Each part's short name floats beside it. On a phone the labels that would collide give way (at
-    // most one); a part Aili points at always keeps its label (checked below).
+    // Each part's short name floats beside it. On a phone, with the captions up, the labels that would
+    // collide give way (up to two); a part Aili points at always keeps its label (checked below).
     const ids = ["horn", "upper-case", "gear-train", "motor-and-sensor", "board-and-cover"];
     await page.waitForTimeout(800);
     const shown = (await Promise.all(ids.map((id) => label(page, id).isVisible()))).filter(Boolean).length;
-    expect(shown).toBeGreaterThanOrEqual(info.project.name === "desktop" ? 5 : 4);
+    expect(shown).toBeGreaterThanOrEqual(info.project.name === "desktop" ? 5 : info.project.name === "tablet" ? 4 : 3);
     await expect(caption(page)).toHaveText(T9_N2, { timeout: 10_000 });
     await expect(partsButton(page)).toHaveText("Parts: Gear train");
     await expect(label(page, "gear-train")).toBeVisible();
