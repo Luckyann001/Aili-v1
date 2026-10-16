@@ -30,3 +30,22 @@ export function gearTrainRatio(train: GearTrain): { ratio: number; path: string[
   }
   return { ratio, path };
 }
+
+/**
+ * Each shaft's speed relative to the input shaft (the first mesh's driver = 1), from tooth counts:
+ * across a mesh the driven shaft turns at −(driver teeth ÷ driven teeth) of the driver's speed, so the
+ * direction alternates mesh by mesh and the output turns 1 ÷ ratio as fast. Ideal gears: kinematics
+ * only, no load, friction or efficiency (for an illustrative animation, never a simulation).
+ */
+export function shaftSpeeds(train: GearTrain): Record<string, number> {
+  gearTrainRatio(train); // the same checks: a valid compound chain
+  const byId = new Map(train.gears.map((g) => [g.id, g]));
+  const first = byId.get(train.meshes[0]!.driver)!;
+  const speed: Record<string, number> = { [first.shaft]: 1 };
+  for (const m of train.meshes) {
+    const a = byId.get(m.driver)!;
+    const b = byId.get(m.driven)!;
+    speed[b.shaft] = -speed[a.shaft]! * (a.teeth / b.teeth);
+  }
+  return speed;
+}
