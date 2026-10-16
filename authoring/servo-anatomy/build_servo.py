@@ -55,9 +55,12 @@ EXPLODE = {"horn": 0.060, "upper-case": 0.044, "gear-train": 0.020, "motor-and-s
 
 # Flat PBR colours: brand palette, plus silver for the motor (an approved exception, Lucky 16 Oct 2026).
 COLOURS = {
-    "case": ("#5E5952", 0.0, 0.55),  # mid-dark warm neutral from the Ink family (lighter than Ink, darker than Canvas)
+    # Mid-dark warm neutral from the Ink family. Set lighter than it should look: the page's lights
+    # (ambient + directional, no environment map) render materials at roughly 40% of their base colour,
+    # and #5E5952 came out near-black there (Lucky's slice 2 round of material tweaks, 16 Oct 2026).
+    "case": ("#8A8379", 0.0, 0.55),
     "seam": ("#282724", 0.0, 0.6),  # Ink: the seam line and the cable sleeve
-    "label": ("#7A746C", 0.0, 0.6),  # a lighter warm neutral: the blank label panel
+    "label": ("#A59E93", 0.0, 0.6),  # a lighter warm neutral: the blank label panel
     "gear": ("#C99A56", 0.1, 0.45),  # Gold
     "board": ("#83957E", 0.0, 0.6),  # Sage
     "sensor": ("#917383", 0.0, 0.5),  # Plum
@@ -559,8 +562,8 @@ def main():
         ],
         "materials": {
             "palette": {
-                "case": "#5E5952, a mid-dark warm neutral from the Ink family (lighter than Ink #282724, clearly darker than Canvas)",
-                "label_panel": "#7A746C, a lighter warm neutral (blank, no text)",
+                "case": "#8A8379, a warm neutral from the Ink family; renders mid-dark under the page's lights (lighter than Ink #282724, clearly darker than Canvas)",
+                "label_panel": "#A59E93, a lighter warm neutral (blank, no text)",
                 "seam_and_cable": "Ink #282724",
                 "gears": "Gold #C99A56",
                 "board": "Sage #83957E",

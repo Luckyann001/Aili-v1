@@ -171,8 +171,8 @@
   ],
   "materials": {
     "palette": {
-      "case": "#5E5952, a mid-dark warm neutral from the Ink family (lighter than Ink #282724, clearly darker than Canvas)",
-      "label_panel": "#7A746C, a lighter warm neutral (blank, no text)",
+      "case": "#8A8379, a warm neutral from the Ink family; renders mid-dark under the page's lights (lighter than Ink #282724, clearly darker than Canvas)",
+      "label_panel": "#A59E93, a lighter warm neutral (blank, no text)",
       "seam_and_cable": "Ink #282724",
       "gears": "Gold #C99A56",
       "board": "Sage #83957E",
