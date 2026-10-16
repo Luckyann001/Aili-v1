@@ -6,7 +6,7 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { BackSide, Euler, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3, type Camera, type Object3D } from "three";
+import { BackSide, BufferGeometry, EdgesGeometry, Euler, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3, type Camera, type Material, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
 import { cornersOf, type PartLayout } from "@/scene/layout";
@@ -14,8 +14,9 @@ import { MODELS } from "@/scene/models";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
-import { useScene } from "@/scene/sceneStore";
-import { HORN_TURN_RAD, JOINT, SERVO_GLB_URL, SERVO_ORIGIN, SERVO_PARTS, SERVO_ROTATION, SERVO_ROTATION_ORDER, arrowSweep, servoReadout, type EqStep } from "@/scene/servoArm";
+import { partOffsetGltf, settled } from "@/scene/assetPose";
+import { servoPoseOf, useScene } from "@/scene/sceneStore";
+import { HORN_TURN_RAD, JOINT, SERVO_GLB_URL, SERVO_ORIGIN, SERVO_PARTS, SERVO_POSE_MANIFEST, SERVO_ROTATION, SERVO_ROTATION_ORDER, arrowSweep, layoutServoParts, servoReadout, type EqStep } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
 export interface SceneCanvasProps {
@@ -39,8 +40,15 @@ interface ControlsLike {
 /** Every corner the camera must keep in view for the active scene (read outside React renders). */
 function framingCorners(explode: number) {
   const s = useScene.getState();
+  // Anatomy view: only the servo's parts, as they will be once settled.
+  if (s.cameraView === "anatomy" && s.activeScene === "servo-arm") return cornersOf(layoutServoParts(settled(s.servoView)));
   return MODELS[s.activeScene].framing(s, explode).flatMap((l) => cornersOf(l));
 }
+
+/** Servo + arm: the arm, load and arrows are dimmed while the servo is open or exploded (their numbers never change). */
+const useServoAway = () => useScene((s) => s.activeScene === "servo-arm" && s.servoView !== "assembled");
+const DIM_OPACITY = 0.22;
+// (Dimmed materials are re-created, keyed on the dim state: three only applies a change of `transparent` to a new material.)
 
 export default function SceneCanvas(props: SceneCanvasProps) {
   const activeScene = useScene((s) => s.activeScene);
@@ -95,6 +103,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         </AssetBoundary>
       )}
       {activeScene === "servo-arm" && <TorqueArrow colors={props.colors} />}
+      {activeScene === "servo-arm" && props.spatialMs <= 0 && <OffsetLines colors={props.colors} />}
       {activeScene === "servo-arm" && <EquationMarks colors={props.colors} />}
       <OrbitControls
         makeDefault
@@ -113,6 +122,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       <CameraRig spatialMs={props.spatialMs} host={props.host} />
       {/* Re-mounted per scene, so each scene's triangle count is reported (and budget-tested). */}
       <ReadyProbe key={`${activeScene}:${assetState}`} onReady={props.onReady} />
+      {activeScene === "servo-arm" && <ServoProbe host={props.host} reducedMotion={props.spatialMs <= 0} />}
     </Canvas>
   );
 }
@@ -132,8 +142,9 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const servo = useScene((s) => s.servo);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
+  const dim = useServoAway() && (id === "arm-link" || id === "load");
 
-  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, dim, invalidate]);
 
   // Size depends on the scene settings; position also on the explode amount (set per frame).
   const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m, servo }, k)[id]!;
@@ -156,8 +167,9 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
       {...partEvents(id, select)}
     >
       {geometry(0)}
-      <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} />
-      {selected && (
+      <meshStandardMaterial key={dim ? "dim" : "solid"} color={colors.fills[fill]} roughness={0.7} metalness={0.05} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+      {/* Dimmed (the servo open or exploded), a selected arm or load keeps only its label, not the dark shell. */}
+      {selected && !dim && (
         // Selection outline: an inverted shell OUTLINE_M larger on every side, drawn from inside.
         <mesh raycast={() => null}>
           {geometry(OUTLINE_M)}
@@ -228,23 +240,84 @@ function ServoAsset({ colors, onLoaded }: { colors: SceneColors; onLoaded: () =>
     onLoaded();
     invalidate();
   }, [onLoaded, invalidate]);
+  const from = useScene((s) => s.servoFrom);
+  const to = useScene((s) => s.servoView);
+  const k = useScene((s) => s.servoMotion);
+  const pose = useMemo(() => servoPoseOf({ servoFrom: from, servoView: to, servoMotion: k }), [from, to, k]);
+  useEffect(() => invalidate(), [pose.from, pose.to, pose.k, invalidate]);
+  // A part inside the case, picked while the servo is assembled: the case turns see-through (no auto-explode).
+  const ghostCase = useScene((s) => s.servoView === "assembled" && s.servoMotion === 1 && !!s.selectedId && INSIDE_PARTS.has(s.selectedId));
   return (
     <group position={SERVO_ORIGIN} rotation={servoEuler} name="servo-asset">
       {SERVO_PARTS.map((p) => (
         <group key={p.id} rotation={[0, p.id === "horn" ? HORN_TURN_RAD : 0, 0]}>
-          <AssetNode id={p.id} node={gltf.scene.getObjectByName(p.node)!} bounds={p.bounds} colors={colors} />
+          {/* The pose moves each part along its manifest direction (glTF axes, inside the servo's pose). */}
+          <group position={partOffsetGltf(SERVO_POSE_MANIFEST, p.id, pose)}>
+            <AssetNode id={p.id} node={gltf.scene.getObjectByName(p.node)!} bounds={p.bounds} colors={colors} ghost={ghostCase && CASE_PARTS.has(p.id)} />
+          </group>
         </group>
       ))}
     </group>
   );
 }
 
+/**
+ * Reduced motion: the servo snaps to its new view, and a thin line from each moved part's assembled
+ * place to where it is now stands in for the motion (the still alternative).
+ */
+function OffsetLines({ colors }: { colors: SceneColors }) {
+  const view = useScene((s) => s.servoView);
+  const invalidate = useThree((s) => s.invalidate);
+  const geometry = useMemo(() => {
+    const home = layoutServoParts(settled("assembled"));
+    const now = layoutServoParts(settled(view));
+    const pts: number[] = [];
+    for (const id of Object.keys(now)) {
+      const a = home[id]!.position;
+      const b = now[id]!.position;
+      if (Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) > 1e-6) pts.push(...a, ...b);
+    }
+    const g = new BufferGeometry();
+    g.setAttribute("position", new Float32BufferAttribute(pts, 3));
+    return pts.length ? g : null;
+  }, [view]);
+  useEffect(() => invalidate(), [geometry, colors, invalidate]);
+  if (!geometry) return null;
+  return (
+    <lineSegments geometry={geometry} name="servo-offset-lines" raycast={() => null}>
+      <lineBasicMaterial color={colors.outline} transparent opacity={0.7} toneMapped={false} />
+    </lineSegments>
+  );
+}
+
+/** Parts hidden inside the assembled servo (from the model), and the parts that open it (from the manifest). */
+const INSIDE_PARTS = new Set(MODELS["servo-arm"].parts.filter((p) => p.inside).map((p) => p.id));
+const CASE_PARTS = new Set(SERVO_POSE_MANIFEST.open_parts ?? []);
+
+/** The see-through case: faint faces plus its edges, so the part inside shows through it. */
+function ghostOf(node: Object3D, colors: SceneColors) {
+  const o = node.clone();
+  const faces = new MeshBasicMaterial({ color: colors.outline, transparent: true, opacity: 0.08, depthWrite: false });
+  const edges = new LineBasicMaterial({ color: colors.outline, transparent: true, opacity: 0.55 });
+  const meshes: Mesh[] = [];
+  o.traverse((c) => {
+    if (c instanceof Mesh) meshes.push(c);
+  });
+  for (const m of meshes) {
+    m.material = faces as Material;
+    m.raycast = () => null;
+    m.add(new LineSegments(new EdgesGeometry(m.geometry, 30), edges));
+  }
+  return o;
+}
+
 /** One GLB node as a part: a clone (the loaded scene stays untouched), plus an outline shell when selected. */
-function AssetNode({ id, node, bounds, colors }: { id: string; node: Object3D; bounds: { min: [number, number, number]; max: [number, number, number] }; colors: SceneColors }) {
+function AssetNode({ id, node, bounds, colors, ghost }: { id: string; node: Object3D; bounds: { min: [number, number, number]; max: [number, number, number] }; colors: SceneColors; ghost: boolean }) {
   const selected = useScene((s) => s.selectedId === id);
   const select = useScene((s) => s.select);
   const invalidate = useThree((s) => s.invalidate);
-  useEffect(() => invalidate(), [selected, colors, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, ghost, invalidate]);
+  const ghosted = useMemo(() => ghostOf(node, colors), [node, colors]);
   const object = useMemo(() => {
     const o = node.clone();
     o.name = id;
@@ -267,7 +340,7 @@ function AssetNode({ id, node, bounds, colors }: { id: string; node: Object3D; b
   }, [node, colors.outline, bounds]);
   return (
     <>
-      <primitive object={object} {...partEvents(id, select)} />
+      {ghost ? <primitive object={ghosted} /> : <primitive object={object} {...partEvents(id, select)} />}
       {selected && (
         <group position={outline.center} scale={outline.scale}>
           <group position={outline.center.map((v) => -v) as [number, number, number]}>
@@ -290,8 +363,9 @@ function TorqueArrow({ colors }: { colors: SceneColors }) {
   const equation = useScene((s) => s.equation);
   const grow = useScene((s) => s.eqGrow);
   const invalidate = useThree((s) => s.invalidate);
+  const dim = useServoAway();
   const r = servoReadout(servo, null);
-  useEffect(() => invalidate(), [r.torque_nm, colors, equation, grow, invalidate]);
+  useEffect(() => invalidate(), [r.torque_nm, colors, equation, grow, dim, invalidate]);
   // While the equation is being built, the arrow appears with its steps: the load's share at
   // eq-torque, the arm's own share at eq-arm-share (each growing in as its step starts).
   const building = equation.length > 0;
@@ -309,19 +383,19 @@ function TorqueArrow({ colors }: { colors: SceneColors }) {
       {loadSweep > 0.01 && (
         <mesh rotation={[0, 0, start - loadSweep]} raycast={() => null}>
           <torusGeometry args={[R, 0.003, 6, 32, loadSweep]} />
-          <meshBasicMaterial color={colors.fills.expressive} toneMapped={false} />
+          <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.fills.expressive} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
         </mesh>
       )}
       {armSweep > 0.01 && (
         <mesh rotation={[0, 0, end]} raycast={() => null}>
           <torusGeometry args={[R, 0.0016, 6, 24, armSweep]} />
-          <meshBasicMaterial color={colors.fills.discovery} toneMapped={false} />
+          <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.fills.discovery} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
         </mesh>
       )}
       {/* The head points along the turn at the arrow's end. */}
       <mesh position={[R * Math.cos(end), R * Math.sin(end), 0]} rotation={[0, 0, end + Math.PI]} raycast={() => null}>
         <coneGeometry args={[0.006, 0.012, 12]} />
-        <meshBasicMaterial color={colors.outline} toneMapped={false} />
+        <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.outline} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
       </mesh>
     </group>
   );
@@ -338,7 +412,8 @@ function EquationMarks({ colors }: { colors: SceneColors }) {
   const equation = useScene((s) => s.equation);
   const grow = useScene((s) => s.eqGrow);
   const invalidate = useThree((s) => s.invalidate);
-  useEffect(() => invalidate(), [servo, equation, grow, colors, invalidate]);
+  const dim = useServoAway();
+  useEffect(() => invalidate(), [servo, equation, grow, colors, dim, invalidate]);
   const k = (step: EqStep) => (!equation.includes(step) ? 0 : equation.at(-1) === step ? grow : 1);
   const [, jy, jz] = JOINT;
   const d = Math.min(servo.arm_length_m, servo.load_distance_m);
@@ -348,11 +423,11 @@ function EquationMarks({ colors }: { colors: SceneColors }) {
       <group name={name}>
         <mesh position={[x, top - len / 2, z]} raycast={() => null}>
           <cylinderGeometry args={[r, r, len, 8]} />
-          <meshBasicMaterial color={color} toneMapped={false} />
+          <meshBasicMaterial key={dim ? "dim" : "solid"} color={color} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
         </mesh>
         <mesh position={[x, top - len - 0.004, z]} rotation={[Math.PI, 0, 0]} raycast={() => null}>
           <coneGeometry args={[r * 2.6, 0.008, 10]} />
-          <meshBasicMaterial color={color} toneMapped={false} />
+          <meshBasicMaterial key={dim ? "dim" : "solid"} color={color} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
         </mesh>
       </group>
     );
@@ -364,12 +439,12 @@ function EquationMarks({ colors }: { colors: SceneColors }) {
         <group name="eq-distance">
           <mesh position={[(d * kd) / 2, jy - 0.016, z]} raycast={() => null}>
             <boxGeometry args={[d * kd, 0.0012, 0.0012]} />
-            <meshBasicMaterial color={colors.outline} toneMapped={false} />
+            <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.outline} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
           </mesh>
           {[0, d * kd].map((x) => (
             <mesh key={x} position={[x, jy - 0.016, z]} raycast={() => null}>
               <boxGeometry args={[0.0012, 0.008, 0.0012]} />
-              <meshBasicMaterial color={colors.outline} toneMapped={false} />
+              <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.outline} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
             </mesh>
           ))}
         </group>
@@ -387,6 +462,13 @@ function setCursor(target: EventTarget | null, cursor: string) {
 // explode) inside the safe area, width and height separately (the model is wide and flat).
 const MARGIN = 1.06;
 const defaultDir = new Vector3(...DEFAULT_VIEW.position).sub(new Vector3(...DEFAULT_VIEW.target)).normalize();
+/**
+ * Anatomy view: from the front-left, a little above (the arm runs out to the right, so a view from
+ * the right would look through it), framing the servo's parts at about 60% of the free area.
+ */
+const anatomyDir = new Vector3(-0.72, 0.4, 0.57).normalize();
+const ANATOMY_FILL = 0.6;
+const marginFor = () => (useScene.getState().cameraView === "anatomy" ? 1 / ANATOMY_FILL : MARGIN);
 /** Last known screen shape, kept by Framing. */
 const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1 };
 
@@ -416,7 +498,7 @@ function fitGoal(dir: Vector3, explode: number) {
     const towardCamera = offset.dot(dir);
     distance = Math.max(distance, towardCamera + Math.abs(offset.dot(right)) / tanH, towardCamera + Math.abs(offset.dot(up)) / tanV);
   }
-  return { target, position: target.clone().addScaledVector(dir, distance * MARGIN) };
+  return { target, position: target.clone().addScaledVector(dir, distance * marginFor()) };
 }
 
 /**
@@ -511,10 +593,13 @@ function LabelTracker({
   const params = useScene((s) => s.params);
   const leverDistance_m = useScene((s) => s.leverDistance_m);
   const servo = useScene((s) => s.servo);
+  const servoFrom = useScene((s) => s.servoFrom);
+  const servoView = useScene((s) => s.servoView);
+  const servoMotion = useScene((s) => s.servoMotion);
 
   // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
   const equation = useScene((s) => s.equation);
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, activeScene, equation, invalidate]);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, servoView, servoMotion, activeScene, equation, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
@@ -524,7 +609,7 @@ function LabelTracker({
     const { takeW, takeH } = reservedSpace(area);
     const w = area.clientWidth - takeW;
     const h = area.clientHeight - takeH;
-    const layout = MODELS[activeScene].layout({ params, leverDistance_m, servo }, anim.explode);
+    const layout = MODELS[activeScene].layout({ params, leverDistance_m, servo, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
     // 1. Where each shown label wants to go (clamped inside the safe area).
     const wanted: LabelBox[] = [];
@@ -682,18 +767,20 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
   const resetToken = useScene((s) => s.resetToken);
   const exploded = useScene((s) => s.exploded);
   const activeScene = useScene((s) => s.activeScene);
+  const cameraToken = useScene((s) => s.cameraToken);
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const invalidate = useThree((s) => s.invalidate);
   const tween = useRef<{ t0: number; ms: number } | null>(null);
-  const seen = useRef({ resetToken, exploded, activeScene });
+  const seen = useRef({ resetToken, exploded, activeScene, cameraToken });
 
   useEffect(() => writeCamera(host, camera), [camera, host]);
 
   useEffect(() => {
     const moveTo = (fromDefault: boolean) => {
       if (!controls) return;
-      const d = fromDefault ? defaultDir : dir.copy(camera.position).sub(controls.target).normalize();
+      const anatomy = useScene.getState().cameraView === "anatomy";
+      const d = anatomy ? anatomyDir : fromDefault ? defaultDir : dir.copy(camera.position).sub(controls.target).normalize();
       const g = fitGoal(d, useScene.getState().exploded ? 1 : 0);
       goal.pos.copy(g.position);
       goal.target.copy(g.target);
@@ -713,14 +800,16 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
     refitCamera.current = () => moveTo(false);
 
     const prev = seen.current;
-    seen.current = { resetToken, exploded, activeScene };
-    // Reset or a new scene: frame from the default direction. Explode: keep the current direction.
-    const fromDefault = prev.resetToken !== resetToken || prev.activeScene !== activeScene;
+    seen.current = { resetToken, exploded, activeScene, cameraToken };
+    // Reset, a new scene, or a camera view change (the servo opened, exploded or went back together):
+    // frame from that view's direction. The placeholder's explode keeps the current direction.
+    const fromDefault = prev.resetToken !== resetToken || prev.activeScene !== activeScene || prev.cameraToken !== cameraToken;
     if (fromDefault || prev.exploded !== exploded) moveTo(fromDefault);
+    writeData(host, "cameraView", useScene.getState().cameraView);
     return () => {
       refitCamera.current = null;
     };
-  }, [resetToken, exploded, activeScene, spatialMs, camera, controls, host, invalidate]);
+  }, [resetToken, exploded, activeScene, cameraToken, spatialMs, camera, controls, host, invalidate]);
 
   useFrame(() => {
     const tw = tween.current;
@@ -734,6 +823,26 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
     if (k < 1) invalidate();
     else tween.current = null;
   });
+  return null;
+}
+
+/**
+ * For tests: the servo's state on the host element. data-servo: assembled, open, exploded, or
+ * "moving"; data-servo-case: "see-through" while a part inside is picked on the assembled servo;
+ * data-offset-lines: how many still-alternative lines show (reduced motion).
+ */
+function ServoProbe({ host, reducedMotion }: { host: RefObject<HTMLDivElement | null>; reducedMotion: boolean }) {
+  const view = useScene((s) => s.servoView);
+  const moving = useScene((s) => s.servoMotion < 1);
+  const ghost = useScene((s) => s.servoView === "assembled" && s.servoMotion === 1 && !!s.selectedId && INSIDE_PARTS.has(s.selectedId));
+  useEffect(() => {
+    writeData(host, "servo", moving ? "moving" : view);
+    writeData(host, "servoCase", ghost ? "see-through" : "solid");
+    const away = layoutServoParts(settled(view));
+    const home = layoutServoParts(settled("assembled"));
+    const lines = reducedMotion ? Object.keys(away).filter((id) => away[id]!.position.some((v, i) => Math.abs(v - home[id]!.position[i]!) > 1e-6)).length : 0;
+    writeData(host, "offsetLines", String(lines));
+  }, [host, view, moving, ghost, reducedMotion]);
   return null;
 }
 

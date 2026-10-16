@@ -30,6 +30,7 @@ import { LiveWelcome } from "./LiveWelcome";
 import { PlaceholderBadge } from "./PlaceholderBadge";
 import { Inspector } from "./scene/Inspector";
 import { PartsMenu } from "./scene/PartsMenu";
+import { ServoControls } from "./scene/ServoControls";
 import { SceneFallback } from "./scene/SceneFallback";
 import { SceneLabels } from "./scene/SceneLabels";
 import { SceneViewport } from "./scene/SceneViewport";
@@ -210,6 +211,7 @@ export function LearnStage() {
               />
             </div>
           </div>
+          {sceneUi && activeScene === "servo-arm" && <ServoControls />}
         </div>
 
         {demo && <DemoControls onPlay={() => voice.submit("demo")} onFakeTurn={fakeDemo ? (c) => void demoTurn.start(c, "") : undefined} />}
