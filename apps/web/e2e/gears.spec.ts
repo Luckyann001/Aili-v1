@@ -58,10 +58,16 @@ async function toServo(page: Page, speakMs = 1200) {
     .toBe(true);
 }
 
-/** Two pictures of the canvas a moment apart: different while something turns, equal while still. */
+/**
+ * Two pictures of the canvas a moment apart: different while something turns, equal while still.
+ * The gap is uneven on purpose: at 1.5 turns a second the 10-tooth pinion and the 40-tooth gear each
+ * turn exactly 6 teeth in 400 ms, so pictures 400 ms apart could match while the gears turn. Each
+ * picture of the turning canvas takes about a second in headless Chrome (measured 16 Oct 2026), so
+ * callers poll for up to 15 s.
+ */
 async function moving(page: Page) {
   const a = await canvas(page).screenshot();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(170);
   const b = await canvas(page).screenshot();
   return !a.equals(b);
 }
@@ -117,7 +123,7 @@ test.describe("micro servo parts block and gears (slice 4), recorded live path",
     await expect(host(page)).toHaveAttribute("data-gears", "turning");
     await expect(page.getByTestId("gears-label")).toContainText("Illustrative animation, not a simulation");
     await expect(note(page)).toContainText("You turned the gears");
-    await expect.poll(() => moving(page), { timeout: 5_000 }).toBe(true);
+    await expect.poll(() => moving(page), { timeout: 15_000 }).toBe(true);
     await page.keyboard.press("Enter"); // the same button, now "Stop gears"
     await expect(host(page)).toHaveAttribute("data-gears", "still");
     await expect(note(page)).toContainText("You stopped the gears");
