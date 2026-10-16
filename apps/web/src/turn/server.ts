@@ -5,7 +5,7 @@ import levelQuestionJson from "../../../../content/level-question.json";
 import { FAKE_DIRECTOR } from "./flags";
 import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, loadTemplates, logCheck, recordedLiveRequested, summarizeAttempt } from "./live";
 import { recordedLiveParts } from "aili-recorded-live";
-import { logLiveTurn, type LoggedAttempt } from "./sessionLog";
+import { failureLine, logLiveTurn, type LoggedAttempt } from "./sessionLog";
 
 // Handlers behind POST /api/turn and POST /api/turn/interrupt (M2 slice 6). Two modes:
 // - the fake director (NEXT_PUBLIC_AILI_FAKE_DIRECTOR=1): no provider, no key, no network;
@@ -149,6 +149,8 @@ export async function handleTurn(request: Request): Promise<Response> {
         // Live cost to the dev server's terminal (no learner text, no key): this turn and this page session.
         if (real) {
           console.error(`[live] session ${req.session_id.slice(0, 8)} turn ${req.state_rev}: ${((ledger.spent(req.session_id) - spentBefore) / 1e6).toFixed(4)} USD, page session ${(ledger.spent(req.session_id) / 1e6).toFixed(4)} USD`);
+          // A failed turn says where and why, in one line (the stage, the reason code, the details).
+          for (const e of sent) if (e.type === "turn.error") console.error(failureLine(req.session_id, req.state_rev, e));
           // The local session log (laptop only, git-ignored). A failure to write never breaks the turn.
           try {
             logLiveTurn(req.session_id, { rev: req.state_rev, startedAt, latencyMs: Date.now() - startedAt.getTime(), learnerText: req.input.text, router: routed, attempts, events: sent, costMicroUsd: ledger.spent(req.session_id) - spentBefore, sessionCostMicroUsd: ledger.spent(req.session_id) });

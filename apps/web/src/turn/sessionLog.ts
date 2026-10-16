@@ -41,10 +41,46 @@ function shown(events: TurnEvent[]): string[] {
     else if (e.type === "action") out.push(`- stage: ${JSON.stringify(e.action)}`);
     else if (e.type === "prompt") out.push(`- asks: ${e.text}${e.chips.length ? ` [${e.chips.join(" | ")}]` : ""}`);
     else if (e.type === "turn.done") out.push(`- done (move ${e.move})`);
-    else if (e.type === "turn.error") out.push(`- FAILED (${e.reason}): ${e.message}`);
+    else if (e.type === "turn.error") out.push(`- FAILED (${e.reason}): ${e.message}`, ...failureDetails(e.details).map((d) => `  - detail: ${d}`));
   }
   if (!events.some((e) => e.type === "turn.done" || e.type === "turn.error")) out.push("- stopped before the answer (interrupted or the page left)");
   return out;
+}
+
+/** Which stage of the turn each failure reason comes from (engine: turn.ts FAILURE_MESSAGES). */
+const FAILURE_STAGE: Record<string, string> = {
+  router: "router",
+  director: "professor",
+  validation: "validator",
+  pedagogy: "validator",
+  solver: "solver",
+  timeout: "turn budget",
+  refused: "provider",
+  key_rejected: "provider",
+  spend_limit: "before any call",
+  limit_not_recorded: "before any call",
+  not_configured: "before any call",
+  kill_switch: "before any call",
+  session_cap: "before any call",
+};
+
+/** Anything shaped like a provider key, in case one ever reached a message (it should not). */
+const scrub = (s: string) => s.replace(/sk-[A-Za-z0-9_-]{8,}/g, "[redacted]");
+
+/** A failure's details for the terminal and the session log: at most 12, each at most 300 characters. */
+export const failureDetails = (details: readonly string[] | undefined) =>
+  (details ?? []).slice(0, 12).map((raw) => {
+    const d = scrub(raw); // before cutting, so a cut can never leave part of a key behind
+    return d.length > 300 ? `${d.slice(0, 297)}...` : d;
+  });
+
+/**
+ * One terminal line for a failed live turn: the stage, the reason code and the failure's details
+ * (validator or schema messages, provider error kinds). Never the learner's text or a key.
+ */
+export function failureLine(sessionId: string, rev: number, e: { reason: string; details?: readonly string[] }): string {
+  const d = failureDetails(e.details);
+  return `[live] session ${sessionId.slice(0, 8)} turn ${rev} FAILED at ${FAILURE_STAGE[e.reason] ?? "unknown stage"} (${e.reason}): ${d.length ? d.join(" | ") : "no details"}`;
 }
 
 export function logLiveTurn(sessionId: string, t: TurnRecord): string {

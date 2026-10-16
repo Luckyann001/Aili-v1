@@ -92,6 +92,84 @@ describe("the dev terminal's attempt log (live only)", () => {
   });
 });
 
+describe("a failed live turn says where and why (16 Oct 2026: turn 4 'show me a real servo' failed with no reason printed)", () => {
+  // The router's replies, as the provider adapter hands them over. All three end in the same page
+  // message ("Aili couldn't make sense of that reply this time"); the terminal line tells them apart.
+  const OK = { answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null, wants_direct_answer: false };
+  const cases = [
+    { name: "an empty string where the schema wants at least one character (the provider cannot enforce minLength)", reply: () => ({ json: { ...OK, asks_for_source: "" } }), detail: /asks_for_source: Too small/ },
+    { name: "a reply that is not JSON (e.g. truncated at max_tokens): the adapter hands over null", reply: () => ({ json: null }), detail: /\(classification\): Invalid input: expected object/ },
+    { name: "two network failures (the policy retries once)", reply: () => Promise.reject(new (class extends Error {})("socket hang up")), detail: /router: network|socket hang up/ },
+  ];
+  for (const c of cases)
+    it(`${c.name}: one terminal line with stage, reason and detail; the session log keeps it; the professor is never called`, async () => {
+      const { handleTurn } = await load();
+      const live = await import("./live");
+      const { ProviderError } = await import("@aili/engine");
+      const sent: string[] = [];
+      live.liveDeps.provider = (_config, model) => ({
+        complete: async () => {
+          sent.push(model);
+          if (model === "professor") throw new Error("the professor must not be called");
+          const r = await Promise.resolve(c.reply()).catch(() => {
+            throw new ProviderError("network");
+          });
+          return { ...r, usage: { model: "router" as const, input_tokens: 1200, output_tokens: 90 }, latencyMs: 5 };
+        },
+      });
+      const dir = mkdtempSync(join(tmpdir(), "aili-failure-log-"));
+      (await import("./sessionLog")).sessionLogDeps.dir = () => dir;
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      const events = await readAll(await handleTurn(post(body({ session_id: "fail-test-0001", input: { text: "show me a real servo" } }))));
+      const lines = log.mock.calls.map((x) => String(x[0]));
+      log.mockRestore();
+      expect(events.at(-1)).toMatchObject({ type: "turn.error", reason: "router", message: "Aili couldn't make sense of that reply this time. Nothing on the stage changed." });
+      expect(sent.every((m) => m === "router")).toBe(true);
+      const failed = lines.filter((l) => /FAILED at/.test(l));
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatch(/^\[live\] session fail-tes turn 1 FAILED at router \(router\): /);
+      expect(failed[0]).toMatch(c.detail);
+      expect(lines.join("\n")).not.toMatch(/show me a real servo/); // never the learner's text in the terminal
+      expect(lines.join("\n")).not.toMatch(/placeholder-not-a-key/); // never the key
+      const file = readdirSync(dir).map((f) => readFileSync(join(dir, f), "utf8")).join("\n");
+      expect(file).toMatch(/- FAILED \(router\): Aili couldn't make sense/);
+      expect(file).toMatch(/  - detail: /);
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+  it("replay: 'show me a real servo' with no open question (as after an explanation without a check): a well-formed router reply passes, and the professor is offered fx-servo-arm with the anatomy animations at L2", async () => {
+    const { handleTurn } = await load();
+    const live = await import("./live");
+    let professorInput = "";
+    live.liveDeps.provider = (_config, model) => ({
+      complete: async (req: { input: string }) => {
+        if (model === "router") return { json: { answered_prompt: false, pushback: false, new_evidence: false, frustrated: false, wants_another_example: false, acknowledged: false, guess: null, wants_stop: false, asks_for_source: null, wants_direct_answer: false }, usage: { model: "router" as const, input_tokens: 1200, output_tokens: 90 }, latencyMs: 5 };
+        professorInput = req.input; // what the professor would see; then stop here (no answer needed)
+        throw new (await import("@aili/engine")).ProviderError("server");
+      },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const events = await readAll(await handleTurn(post(body({ session_id: "replay-test-01", input: { text: "show me a real servo" } }))));
+    vi.restoreAllMocks();
+    expect(events.at(-1)).toMatchObject({ type: "turn.error", reason: "director" }); // past the router: the professor was reached
+    expect(professorInput).toMatch(/"id":"fx-servo-arm"/);
+    for (const a of ["servo-explode", "servo-open", "servo-assemble", "servo-gears-turn"]) expect(professorInput).toContain(`"${a}"`);
+    expect(professorInput).not.toMatch(/asset\.servo-generic-anatomy|"id":"servo-arm"/); // never the real drafts
+  });
+
+  it("the line for each reason names its stage; details are capped and anything key-shaped is scrubbed", async () => {
+    const { failureLine } = await import("./sessionLog");
+    expect(failureLine("abcdefgh-1234", 4, { reason: "validation", details: ["narration[0].text: hard-coded number \"2.5\""] })).toBe('[live] session abcdefgh turn 4 FAILED at validator (validation): narration[0].text: hard-coded number "2.5"');
+    expect(failureLine("s", 1, { reason: "director", details: [] })).toMatch(/FAILED at professor \(director\): no details$/);
+    expect(failureLine("s", 1, { reason: "timeout", details: ["x"] })).toMatch(/at turn budget/);
+    expect(failureLine("s", 1, { reason: "kill_switch" })).toMatch(/at before any call/);
+    const long = failureLine("s", 1, { reason: "router", details: [...Array(20)].map((_, i) => `d${i} ${"x".repeat(400)} sk-ant-api03-ABCDEFGHIJKLMNOP`) });
+    expect(long.split(" | ")).toHaveLength(12);
+    expect(long).not.toMatch(/sk-ant/);
+    expect(long).toMatch(/\.\.\./);
+  });
+});
+
 describe("POST /api/turn in live mode", () => {
   it("runs the provider-backed director and router (recorded here): a repaired turn streams to turn.done", async () => {
     const { handleTurn, sent, ledger, sessions } = await load();
