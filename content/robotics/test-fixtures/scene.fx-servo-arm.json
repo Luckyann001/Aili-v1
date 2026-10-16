@@ -139,6 +139,11 @@
       "id": "servo-assemble",
       "description": "The servo's parts go back together.",
       "uses_asset": true
+    },
+    {
+      "id": "servo-gears-turn",
+      "description": "Illustrative animation, not a simulation: the gears turn at the speeds their tooth counts give.",
+      "uses_asset": true
     }
   ],
   "solver": {

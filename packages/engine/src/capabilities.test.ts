@@ -253,7 +253,7 @@ describe("shortlist: published items only, by concept and level", () => {
 
   it("the servo's explode, open and assemble are offered only with a published asset: the fixture's, never the real draft's", async () => {
     const { fixtureRegistry, readJson } = await import("./__fixtures__/registry");
-    const ASSET_ANIMS = ["servo-explode", "servo-open", "servo-assemble"];
+    const ASSET_ANIMS = ["servo-explode", "servo-open", "servo-assemble", "servo-gears-turn"];
     const r = fixtureRegistry().registry;
     const offered = (reg: typeof r) => shortlist(reg, { concepts: [C], level: "L2" }).scenes.find((s) => s.id === "fx-servo-arm")!.animations.map((a) => a.id);
     expect(offered(r)).toEqual(expect.arrayContaining(ASSET_ANIMS)); // asset.fx-servo-generic-anatomy is published

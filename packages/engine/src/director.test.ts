@@ -133,6 +133,12 @@ describe("rule: no digits where the learner reads, except {{placeholders}} from 
     expect(r.errors.join()).toMatch(/narration\[0\]\.text: hard-coded number "2\.5"/);
   });
 
+  it("the gear ratio typed into narration is refused (slice 4: the page shows it, computed from the tooth counts)", () => {
+    const r = run({ narration: [{ id: "n1", text: "The gears give a 46.1 : 1 ratio, so the output turns slowly." }] });
+    expect(r.response).toBeNull();
+    expect(r.errors.join()).toMatch(/narration\[0\]\.text: hard-coded numbers?[^,]*"46\.1"/);
+  });
+
   it("digits are refused in the prompt, chips, assumptions and limitations too", () => {
     const e = errs({ prompt: { text: "Will a 9 g servo do it?", chips: ["Use 20 cm"] }, assumptions: ["arm at 30 degrees"], limitations: ["below 5 V"] });
     expect(e.join("\n")).toMatch(/prompt\.text: hard-coded number "9"/);
