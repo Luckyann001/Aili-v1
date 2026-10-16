@@ -16,6 +16,7 @@
     "test": "npm run test --workspaces --if-present",
     "dev:lan": "npm run dev:lan -w @aili/web",
     "dev:live": "npm run dev:live -w @aili/web",
+    "dev:demo": "npm run dev:demo -w @aili/web",
     "test:e2e": "npm run test:e2e -w @aili/web",
     "test:e2e:nodrafts": "npm run test:e2e:nodrafts -w @aili/web",
     "live-sessions:delete": "node -e \"require('fs').rmSync('live-sessions',{recursive:true,force:true});console.log('Deleted all live session logs (live-sessions/).')\"",
