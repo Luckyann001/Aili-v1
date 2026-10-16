@@ -71,7 +71,7 @@ export const SERVO_GLB_URL = `/assets/${servoAsset.file.split("/").at(-1)}`;
 /** The servo asset's pose data (explode directions and distances, open parts), for the generic pose code. */
 export const SERVO_POSE_MANIFEST = servoAsset as PoseManifest;
 
-export const SERVO_PARTS = servoAsset.parts.map((p) => ({ id: p.id, name: p.name, node: p.node, bounds: p.bounds_gltf_m as { min: Vec3; max: Vec3 } }));
+export const SERVO_PARTS = servoAsset.parts.map((p) => ({ id: p.id, name: p.name, role: p.role, node: p.node, bounds: p.bounds_gltf_m as { min: Vec3; max: Vec3 } }));
 
 /**
  * Pose. In the GLB the output shaft is glTF +Y at x = z = 0 and the case runs along +X. On stage the

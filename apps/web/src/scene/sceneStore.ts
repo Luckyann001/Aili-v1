@@ -54,6 +54,14 @@ export interface SceneState {
   setServoView: (view: AssetView, by: Actor | null, opts?: { snap?: boolean }) => void;
   /** A tween's progress, ignored unless `seq` is the current change. */
   setServoMotion: (seq: number, k: number) => void;
+  /**
+   * The gear train turning (an illustrative animation, not a simulation): only while the gears are in
+   * view (gearsInView). Each start or stop bumps gearsSeq, so a watcher for an earlier start stops.
+   */
+  gearsTurning: boolean;
+  gearsBy: Actor | null;
+  gearsSeq: number;
+  setGearsTurning: (on: boolean, by: Actor | null) => void;
   cameraView: CameraView;
   /** Increments whenever the camera should move to cameraView. */
   cameraToken: number;
@@ -88,7 +96,7 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
     set((s) =>
       s.activeScene === id
         ? {}
-        : { activeScene: id, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene" },
+        : { activeScene: id, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene", gearsTurning: false, gearsBy: null, gearsSeq: s.gearsSeq + 1 },
     ),
   leverDistance_m: 0.05,
   setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
@@ -120,7 +128,13 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
       servoBy: by,
       cameraView: view === "assembled" ? "scene" : "anatomy",
       cameraToken: s.cameraToken + 1,
+      // Assembled, the gears are hidden in the case: they stop.
+      ...(view === "assembled" && s.gearsTurning ? { gearsTurning: false, gearsBy: by, gearsSeq: s.gearsSeq + 1 } : {}),
     })),
+  gearsTurning: false,
+  gearsBy: null,
+  gearsSeq: 0,
+  setGearsTurning: (on, by) => set((s) => ({ gearsTurning: on, gearsBy: by, gearsSeq: s.gearsSeq + 1 })),
   setServoMotion: (seq, k) => set((s) => (s.servoSeq === seq ? { servoMotion: Math.min(1, Math.max(0, k)) } : {})),
   cameraView: "scene",
   cameraToken: 0,
@@ -151,6 +165,15 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
 });
 
 export const useScene = create<SceneState>()((set) => createSceneSlice(set));
+
+/** The servo's parts that sit inside the assembled case (the gear train, the motor). */
+export const SERVO_INSIDE_PARTS: ReadonlySet<string> = new Set(["gear-train", "motor-and-sensor"]);
+
+/** The case turns see-through: a part inside it is picked while the servo is assembled and still. */
+export const caseSeeThrough = (s: Pick<SceneState, "servoView" | "servoMotion" | "selectedId">) => s.servoView === "assembled" && s.servoMotion === 1 && !!s.selectedId && SERVO_INSIDE_PARTS.has(s.selectedId);
+
+/** The gears can be seen: the servo is open or exploded, or its case is see-through. */
+export const gearsInView = (s: Pick<SceneState, "activeScene" | "servoView" | "servoMotion" | "selectedId">) => s.activeScene === "servo-arm" && (s.servoView !== "assembled" || caseSeeThrough(s));
 
 /** The servo's pose now (the 3D view, labels and framing read it). */
 export const servoPoseOf = (s: Pick<SceneState, "servoFrom" | "servoView" | "servoMotion">): AssetPose => ({ from: s.servoFrom, to: s.servoView, k: s.servoMotion });

@@ -23,14 +23,14 @@ beforeEach(() => {
   vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: () => spatial }));
   vi.stubGlobal("requestAnimationFrame", (cb: () => void) => frames.push(cb));
   vi.spyOn(performance, "now").mockImplementation(() => now);
-  useScene.setState({ activeScene: "servo-arm", servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoBy: null, cameraView: "scene" });
+  useScene.setState({ activeScene: "servo-arm", servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoBy: null, cameraView: "scene", selectedId: null, gearsTurning: false, gearsBy: null });
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-const { servoTo, ANIMATIONS } = await import("./animations");
+const { servoTo, gearsTurn, stopGears, ANIMATIONS } = await import("./animations");
 const state = () => useScene.getState();
 
 describe("servo views: one settled state, never half", () => {
@@ -98,6 +98,46 @@ describe("servo views: one settled state, never half", () => {
     void ANIMATIONS["eq-force"]!(() => true);
     await flush();
     expect(state()).toMatchObject({ servoView: "assembled", cameraView: "scene" });
+  });
+
+  it("gears turn only while in view (open, exploded or see-through); otherwise nothing turns and the console says why", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await gearsTurn()(() => true);
+    expect(state().gearsTurning).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/not in view/));
+    useScene.setState({ selectedId: "gear-train" }); // see-through case
+    await gearsTurn()(() => true);
+    expect(state()).toMatchObject({ gearsTurning: true, gearsBy: "professor" });
+  });
+
+  it("gears stop on interrupt or a new turn, on assemble, on Stop, and an older start never stops a newer one", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      useScene.setState({ servoView: "exploded" });
+      let current = true;
+      await gearsTurn()(() => current);
+      expect(state().gearsTurning).toBe(true);
+      current = false; // interrupt, or the next turn began
+      vi.advanceTimersByTime(150);
+      expect(state()).toMatchObject({ gearsTurning: false, gearsBy: null });
+
+      await gearsTurn("learner")(() => true);
+      stopGears("learner");
+      expect(state()).toMatchObject({ gearsTurning: false, gearsBy: "learner" });
+
+      let first = true;
+      await gearsTurn()(() => first); // an older start...
+      await gearsTurn("learner")(() => true); // ...replaced by a newer one
+      first = false;
+      vi.advanceTimersByTime(300);
+      expect(state()).toMatchObject({ gearsTurning: true, gearsBy: "learner" }); // the old watcher did not stop it
+
+      spatial = "0ms";
+      await servoTo("assembled", "learner")(() => true); // the gears are hidden again: they stop
+      expect(state().gearsTurning).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("the professor's animation IDs are the scene manifest's", async () => {

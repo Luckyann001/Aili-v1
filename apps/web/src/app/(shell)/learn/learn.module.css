@@ -1677,3 +1677,50 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* The micro servo's parts in the explanation space (slice 4): name, one-line role, the ratio line. */
+.partsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+  margin: 0 0 var(--aili-space-2);
+  font-weight: 600;
+}
+
+.partsRoles {
+  display: grid;
+  gap: var(--aili-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.partsRoles li {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--aili-space-2);
+  border-left: 2px solid transparent;
+}
+
+/* The part Aili or the learner is pointing at: a thick left rule plus the "Now" tag, not colour alone. */
+.partsRoles li[data-current] {
+  border-left-color: var(--aili-border-strong);
+}
+
+.ratioLine {
+  font-size: 0.85rem;
+}
+
+/* Shown only under reduced motion (the gears' ratio text stands in for their turning). */
+.reducedOnly {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reducedOnly {
+    display: inline;
+  }
+}

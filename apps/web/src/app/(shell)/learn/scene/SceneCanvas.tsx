@@ -15,7 +15,8 @@ import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
 import { partOffsetGltf, settled } from "@/scene/assetPose";
-import { servoPoseOf, useScene } from "@/scene/sceneStore";
+import { GEAR_NODES, PINION_RAD_PER_S } from "@/scene/gears";
+import { caseSeeThrough, servoPoseOf, useScene } from "@/scene/sceneStore";
 import { HORN_TURN_RAD, JOINT, SERVO_GLB_URL, SERVO_ORIGIN, SERVO_PARTS, SERVO_POSE_MANIFEST, SERVO_ROTATION, SERVO_ROTATION_ORDER, arrowSweep, layoutServoParts, servoReadout, type EqStep } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
@@ -142,7 +143,8 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const servo = useScene((s) => s.servo);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
-  const dim = useServoAway() && (id === "arm-link" || id === "load");
+  // The base too: in the anatomy view it sits close to the camera and would fill the picture.
+  const dim = useServoAway() && (id === "arm-link" || id === "load" || id === "base");
 
   useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, dim, invalidate]);
 
@@ -246,7 +248,7 @@ function ServoAsset({ colors, onLoaded }: { colors: SceneColors; onLoaded: () =>
   const pose = useMemo(() => servoPoseOf({ servoFrom: from, servoView: to, servoMotion: k }), [from, to, k]);
   useEffect(() => invalidate(), [pose.from, pose.to, pose.k, invalidate]);
   // A part inside the case, picked while the servo is assembled: the case turns see-through (no auto-explode).
-  const ghostCase = useScene((s) => s.servoView === "assembled" && s.servoMotion === 1 && !!s.selectedId && INSIDE_PARTS.has(s.selectedId));
+  const ghostCase = useScene(caseSeeThrough);
   return (
     <group position={SERVO_ORIGIN} rotation={servoEuler} name="servo-asset">
       {SERVO_PARTS.map((p) => (
@@ -290,8 +292,87 @@ function OffsetLines({ colors }: { colors: SceneColors }) {
   );
 }
 
-/** Parts hidden inside the assembled servo (from the model), and the parts that open it (from the manifest). */
-const INSIDE_PARTS = new Set(MODELS["servo-arm"].parts.filter((p) => p.inside).map((p) => p.id));
+/**
+ * servo-gears-turn: each gear node turns about its own shaft (local +Y) at its shaft's speed from the
+ * ratio chain (input fastest, output slowest, alternating direction), at a fixed visual pace. Under
+ * reduced motion nothing turns (GearArrows shows the directions instead). Renders frames only while turning.
+ */
+function useGearTurning(objects: Object3D[] | null) {
+  const turning = useScene((s) => s.gearsTurning);
+  const reduced = spatialIsZero();
+  const invalidate = useThree((s) => s.invalidate);
+  const t = useRef(0);
+  const base = useMemo(() => {
+    const m = new Map<Object3D, number>();
+    for (const o of objects ?? []) for (const g of GEAR_NODES) {
+      const n = o.getObjectByName(g.node);
+      if (n) m.set(n, n.rotation.y);
+    }
+    return m;
+  }, [objects]);
+  useEffect(() => {
+    if (turning && !reduced) invalidate();
+  }, [turning, reduced, invalidate]);
+  useFrame((_, dt) => {
+    if (!objects || !turning || reduced) return;
+    t.current += Math.min(dt, 0.1);
+    for (const o of objects)
+      for (const g of GEAR_NODES) {
+        const n = o.getObjectByName(g.node);
+        if (n) n.rotation.y = (base.get(n) ?? 0) + g.speed * PINION_RAD_PER_S * t.current;
+      }
+    invalidate();
+  });
+}
+
+/** Reduced motion read where the 3D view cannot see the prop (the media query, as the page's tokens use). */
+const spatialIsZero = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Reduced motion: instead of turning, a curved arrow over each shaft shows which way it turns (from the
+ * ratio chain's sign); the ratio text is shown on the page. Only while the gears are "turning".
+ */
+function GearArrows({ object, colors }: { object: Object3D; colors: SceneColors }) {
+  const turning = useScene((s) => s.gearsTurning);
+  const invalidate = useThree((s) => s.invalidate);
+  const show = turning && spatialIsZero();
+  useEffect(() => invalidate(), [show, invalidate]);
+  const shafts = useMemo(() => {
+    const out = new Map<string, { x: number; y: number; z: number; r: number; sign: number }>();
+    for (const g of GEAR_NODES) {
+      const n = object.getObjectByName(g.node);
+      if (!n) continue;
+      const r = Math.max(0.0018, 1.1 * (0.0002 * g.teeth) / 2); // just outside the shaft's largest gear
+      const prev = out.get(g.shaft);
+      const top = n.position.y + 0.0022;
+      if (!prev || r > prev.r || top > prev.y) out.set(g.shaft, { x: n.position.x, y: Math.max(top, prev?.y ?? 0), z: n.position.z, r: Math.max(r, prev?.r ?? 0), sign: Math.sign(g.speed) });
+    }
+    return [...out.entries()];
+  }, [object]);
+  if (!show) return null;
+  const sweep = 1.5 * Math.PI;
+  return (
+    <group position={object.position} name="gear-arrows">
+      {shafts.map(([shaft, a]) => (
+        // A ring about the shaft (+Y): the torus lies in its XY plane, turned flat; mirrored for the opposite sense.
+        <group key={shaft} position={[a.x, a.y, a.z]} scale={[1, 1, a.sign >= 0 ? 1 : -1]} name={`gear-arrow-${shaft}`}>
+          <group rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh raycast={() => null}>
+              <torusGeometry args={[a.r, 0.0004, 6, 24, sweep]} />
+              <meshBasicMaterial color={colors.outline} toneMapped={false} />
+            </mesh>
+            <mesh position={[a.r * Math.cos(sweep), a.r * Math.sin(sweep), 0]} rotation={[0, 0, sweep]} raycast={() => null}>
+              <coneGeometry args={[0.001, 0.0024, 8]} />
+              <meshBasicMaterial color={colors.outline} toneMapped={false} />
+            </mesh>
+          </group>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** The parts that open the servo (from the manifest): the ones that turn see-through. */
 const CASE_PARTS = new Set(SERVO_POSE_MANIFEST.open_parts ?? []);
 
 /** The see-through case: faint faces plus its edges, so the part inside shows through it. */
@@ -338,9 +419,11 @@ function AssetNode({ id, node, bounds, colors, ghost }: { id: string; node: Obje
     const scale = bounds.min.map((v, i) => 1 + (2 * ASSET_OUTLINE_M) / Math.max(bounds.max[i]! - v, 1e-4)) as [number, number, number];
     return { o, center, scale };
   }, [node, colors.outline, bounds]);
+  useGearTurning(id === "gear-train" ? [object, outline.o] : null);
   return (
     <>
       {ghost ? <primitive object={ghosted} /> : <primitive object={object} {...partEvents(id, select)} />}
+      {id === "gear-train" && <GearArrows object={object} colors={colors} />}
       {selected && (
         <group position={outline.center} scale={outline.scale}>
           <group position={outline.center.map((v) => -v) as [number, number, number]}>
@@ -598,8 +681,11 @@ function LabelTracker({
   const servoMotion = useScene((s) => s.servoMotion);
 
   // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
+  // Also once the viewer is ready: the label layer mounts only then, after the first frame, and with
+  // nothing else asking for a frame its labels stayed unplaced (found by the tap test under load).
   const equation = useScene((s) => s.equation);
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, servoView, servoMotion, activeScene, equation, invalidate]);
+  const viewer = useScene((s) => s.viewer);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, servoView, servoMotion, activeScene, equation, viewer, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
@@ -829,12 +915,14 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
 /**
  * For tests: the servo's state on the host element. data-servo: assembled, open, exploded, or
  * "moving"; data-servo-case: "see-through" while a part inside is picked on the assembled servo;
- * data-offset-lines: how many still-alternative lines show (reduced motion).
+ * data-offset-lines: how many still-alternative lines show (reduced motion); data-gears: turning or still.
  */
 function ServoProbe({ host, reducedMotion }: { host: RefObject<HTMLDivElement | null>; reducedMotion: boolean }) {
   const view = useScene((s) => s.servoView);
   const moving = useScene((s) => s.servoMotion < 1);
-  const ghost = useScene((s) => s.servoView === "assembled" && s.servoMotion === 1 && !!s.selectedId && INSIDE_PARTS.has(s.selectedId));
+  const ghost = useScene(caseSeeThrough);
+  const gears = useScene((s) => s.gearsTurning);
+  useEffect(() => writeData(host, "gears", gears ? "turning" : "still"), [host, gears]);
   useEffect(() => {
     writeData(host, "servo", moving ? "moving" : view);
     writeData(host, "servoCase", ghost ? "see-through" : "solid");

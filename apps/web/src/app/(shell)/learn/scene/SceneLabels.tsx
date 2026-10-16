@@ -8,6 +8,7 @@ import { SERVO_PARTS } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 const SERVO_IDS = new Set(SERVO_PARTS.map((p) => p.id));
+const DIMMED = new Set(["arm-link", "load", "base"]);
 
 /**
  * Part labels as plain DOM inside the safe area (positioned by the 3D view each frame).
@@ -27,7 +28,9 @@ export function SceneLabels({ labels }: { labels: RefObject<Map<string, HTMLElem
       {parts.map((p) => {
         const selected = selectedId === p.id;
         const servoPart = SERVO_IDS.has(p.id);
-        const shown = selected || always.includes(p.id) || (servoAway && servoPart) || (labelsOn && (!p.inside || servoAway));
+        // While the servo is apart, the dimmed arm, load and base give their label space to its parts.
+        const dimmed = servoAway && DIMMED.has(p.id);
+        const shown = !dimmed && (selected || always.includes(p.id) || (servoAway && servoPart) || (labelsOn && (!p.inside || servoAway)));
         return (
           <span
             key={p.id}

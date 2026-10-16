@@ -6,7 +6,9 @@ import { contentLabelOf } from "@/scene/manifests";
 import type { SceneId } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { useStageContent } from "@/turn/stageContent";
-import { EQ_STEPS, eqLine, eqText, GRAVITY_TEXT, MARGIN, RATING_DEF, servoReadout, type EqStep, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
+import { RATIO_NOTE, RATIO_TEXT } from "@/scene/gears";
+import { partNameIn } from "@/scene/models";
+import { EQ_STEPS, eqLine, eqText, GRAVITY_TEXT, MARGIN, RATING_DEF, SERVO_PARTS, servoReadout, type EqStep, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
 import styles from "../learn.module.css";
 
 // The stage's explanation space (docs/m4-plan.md, 16 Oct 2026): a column at the stage's right,
@@ -116,21 +118,44 @@ export function RatingField() {
   );
 }
 
-/** The servo + arm's torque: the total, its split, the inputs, the rating and the margin. */
+/** While the micro servo is open or exploded, the space is about its parts (slice 4). */
+const useServoAway = () => useScene((s) => s.activeScene === "servo-arm" && s.servoView !== "assembled");
+
+/**
+ * The servo + arm's torque: the total, its split, the inputs, the rating and the margin. Compact while
+ * the servo is open or exploded (the total, the rating and the margin only), so the numbers stay in
+ * view, unchanged, beside the parts.
+ */
 function TorqueBlock() {
   const servo = useScene((s) => s.servo);
   const rating = useScene((s) => s.ratedTorque_nm);
+  const compact = useServoAway();
   const r = servoReadout(servo, rating);
   const loadShare = r.torque_nm > 0 ? r.load_torque_nm / r.torque_nm : 0;
   const d = Math.min(servo.arm_length_m, servo.load_distance_m);
   return (
-    <div className={styles.spaceBlock} data-space-block="torque">
+    <div className={styles.spaceBlock} data-space-block="torque" data-compact={compact ? "" : undefined}>
       <p className={styles.totalLine}>
         <span className={styles.totalLabel}>Total the servo must hold</span>
         <span className={styles.totalValue}>
           <strong data-solver-value="torque_nm">{nm(r.torque_nm)}</strong> <span data-solver-value="torque_kgf_cm">{kgfcm(r.torque_kgf_cm)}</span>
         </span>
       </p>
+      {compact ? (
+        <>
+          <RatingField />
+          <MarginLine r={r} />
+        </>
+      ) : (
+        <TorqueDetail servo={servo} r={r} loadShare={loadShare} d={d} />
+      )}
+    </div>
+  );
+}
+
+function TorqueDetail({ servo, r, loadShare, d }: { servo: ReturnType<typeof useScene.getState>["servo"]; r: ServoReadout; loadShare: number; d: number }) {
+  return (
+    <>
       {/* The split: solid for the load, striped for the arm's own weight (shape, not just colour). */}
       <div className={styles.splitTrack} aria-hidden="true">
         <div className={styles.splitLoad} style={{ width: `${(loadShare * 100).toFixed(1)}%` }} />
@@ -154,6 +179,39 @@ function TorqueBlock() {
       <p className={styles.marginNote}>
         {MARGIN.label}: {bands}. Simulation only; hardware untested. Level arm, holding still: no acceleration, friction or gear play.
       </p>
+    </>
+  );
+}
+
+/**
+ * The micro servo's parts (open or exploded): each part's short name and its one-line role from the
+ * asset manifest, tagged illustrative and generic; the gear train carries the ratio line, computed on
+ * the page from the tooth counts. It takes the equation steps' place until the servo is assembled.
+ */
+function PartsBlock() {
+  const away = useServoAway();
+  const selectedId = useScene((s) => s.selectedId);
+  if (!away) return null;
+  return (
+    <div className={styles.spaceBlock} data-space-block="parts">
+      <p className={styles.partsHead}>
+        <span>Inside the servo</span>
+        <span className={styles.gaugeTag}>illustrative, generic</span>
+      </p>
+      <ul className={styles.partsRoles} aria-label="The servo's parts">
+        {SERVO_PARTS.map((p) => (
+          <li key={p.id} data-part-role={p.id} data-current={selectedId === p.id ? "" : undefined}>
+            <strong>{partNameIn("servo-arm", p.id)}</strong>
+            {selectedId === p.id && <span className={styles.eqTag}>Now</span>}
+            <span>{p.role}</span>
+            {p.id === "gear-train" && (
+              <span className={styles.ratioLine} data-ratio-line="">
+                <strong>{RATIO_TEXT}</strong> <span>({RATIO_NOTE})</span>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -172,7 +230,8 @@ function EquationBlock() {
   useEffect(() => {
     if (latest) document.querySelector(`[data-eq-line="${latest}"]`)?.scrollIntoView({ block: "nearest" });
   }, [latest]);
-  if (!latest) return null;
+  const away = useServoAway();
+  if (!latest || away) return null; // open or exploded: the parts take this place; the steps come back on assemble
   const r = servoReadout(servo, rating);
   const d = Math.min(servo.arm_length_m, servo.load_distance_m);
   const next = EQ_STEPS.find((x) => !equation.includes(x));
@@ -209,6 +268,7 @@ function EquationBlock() {
 /** What each scene shows in the space, in order. A scene not listed has no space (the scene keeps the full width). */
 export const SPACE_BLOCKS: Partial<Record<SceneId, Array<{ id: string; render: () => ReactNode }>>> = {
   "servo-arm": [
+    { id: "parts", render: () => <PartsBlock key="parts" /> },
     { id: "equation", render: () => <EquationBlock key="equation" /> },
     { id: "torque", render: () => <TorqueBlock key="torque" /> },
   ],
@@ -219,9 +279,10 @@ function Summary() {
   const servo = useScene((s) => s.servo);
   const rating = useScene((s) => s.ratedTorque_nm);
   const equation = useScene((s) => s.equation);
+  const away = useServoAway();
   const r = servoReadout(servo, rating);
-  // While the equation is being built, the strip shows the current step.
-  if (equation.length) {
+  // While the equation is being built, the strip shows the current step (not while the servo is apart).
+  if (equation.length && !away) {
     const l = eqLine(equation.at(-1)!, r, Math.min(servo.arm_length_m, servo.load_distance_m));
     return (
       <span className={styles.stripText} data-strip-now="">

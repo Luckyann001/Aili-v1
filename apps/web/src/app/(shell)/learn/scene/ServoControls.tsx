@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { ContentBadge } from "@/components/ContentBadge";
+import { GEARS_ANIMATION_LABEL, RATIO_NOTE, RATIO_TEXT } from "@/scene/gears";
+import { useVoice } from "@/voice/store";
 import type { AssetView } from "@/scene/assetPose";
-import { servoTo } from "@/scene/animations";
+import { gearsTurn, servoTo, stopGears } from "@/scene/animations";
 import { partNameIn } from "@/scene/models";
-import { useScene, type Actor } from "@/scene/sceneStore";
+import { gearsInView, useScene, type Actor } from "@/scene/sceneStore";
 import servoAsset from "../../../../../../../content/robotics/capabilities/asset.servo-generic-anatomy.json";
 import type { LabelledItem } from "@aili/schemas/labels";
 import styles from "../learn.module.css";
@@ -27,6 +30,10 @@ export function ServoControls() {
   const selectedId = useScene((s) => s.selectedId);
   const selectedBy = useScene((s) => s.selectedBy);
   const viewer = useScene((s) => s.viewer);
+  const turning = useScene((s) => s.gearsTurning);
+  const gearsBy = useScene((s) => s.gearsBy);
+  const inView = useScene(gearsInView);
+  const [hint, setHint] = useState(false);
   // The still picture (no WebGL) has no moving parts: the controls are for the 3D view only.
   if (viewer !== "ready") return null;
   const servoPart = selectedId && servoAsset.parts.some((p) => p.id === selectedId) ? partNameIn("servo-arm", selectedId) : null;
@@ -38,11 +45,37 @@ export function ServoControls() {
             {b.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={styles.servoButton}
+          aria-pressed={turning}
+          onClick={() => {
+            if (!useScene.getState().gearsTurning && !gearsInView(useScene.getState())) return setHint(true);
+            setHint(false);
+            if (useScene.getState().gearsTurning) return stopGears("learner");
+            // A learner's start stops at the next turn too, like the professor's.
+            const rev = useVoice.getState().rev;
+            void gearsTurn("learner")(() => useVoice.getState().rev === rev);
+          }}
+        >
+          {turning ? "Stop gears" : "Turn gears"}
+        </button>
       </div>
+      {hint && !inView && <p className={styles.servoNote}>Open or explode the servo, or pick the gear train, to see the gears turn.</p>}
+      {turning && (
+        <p className={styles.servoNote} data-testid="gears-label">
+          <span>{GEARS_ANIMATION_LABEL}</span>
+          {/* Reduced motion: no turning; arrows show the directions, and the ratio is said here. */}
+          <span className={styles.reducedOnly}>
+            {RATIO_TEXT} ({RATIO_NOTE})
+          </span>
+        </p>
+      )}
       {/* Open or exploded, the servo itself is in view: its own label (from its manifest). */}
       {view !== "assembled" && <ContentBadge kind="illustrative" item={servoAsset as LabelledItem} />}
       <p className={styles.servoNote} aria-live="polite" data-testid="servo-note">
         {by && <ActorLine by={by} text={DONE[view]} />}
+        {gearsBy && <ActorLine by={gearsBy} text={turning ? "turned the gears" : "stopped the gears"} />}
         {servoPart && selectedBy && <ActorLine by={selectedBy} text={selectedBy === "professor" ? `pointed at the ${servoPart.toLowerCase()}` : `picked the ${servoPart.toLowerCase()}`} />}
       </p>
     </div>

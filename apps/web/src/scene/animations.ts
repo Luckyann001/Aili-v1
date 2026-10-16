@@ -1,7 +1,7 @@
 import { cssDurationMs } from "@/design/duration";
 import { LEVER_LENGTH_M } from "./layout";
 import type { AssetView } from "./assetPose";
-import { useScene, type Actor } from "./sceneStore";
+import { gearsInView, useScene, type Actor } from "./sceneStore";
 import { EQ_STEPS, type EqStep } from "./servoArm";
 
 // Scene animations shared by the prepared lesson and live turns (M4 slice 1: one implementation, so
@@ -67,6 +67,35 @@ export const servoTo = (view: AssetView, by: Actor = "professor") => (isCurrent:
   );
 };
 
+/**
+ * The gear train turns (servo-gears-turn): each gear at its shaft's speed from the ratio chain. Only
+ * while the gears are in view; otherwise nothing turns and the console says why (never a silent no-op).
+ * It keeps turning after its segment and stops when `isCurrent` turns false (the learner interrupted,
+ * or a new turn began), when the servo is assembled, or when a newer start or stop replaces it.
+ */
+export const gearsTurn = (by: Actor = "professor") => (isCurrent: () => boolean) => {
+  const s = useScene.getState();
+  if (s.activeScene !== "servo-arm") return Promise.resolve();
+  if (!gearsInView(s)) {
+    console.warn("[scene] servo-gears-turn: the gears are not in view (open or explode the servo, or point at the gear train)");
+    return Promise.resolve();
+  }
+  s.setGearsTurning(true, by);
+  const seq = useScene.getState().gearsSeq;
+  const watch = setInterval(() => {
+    const now = useScene.getState();
+    if (now.gearsSeq !== seq) return clearInterval(watch); // stopped or restarted since
+    if (!isCurrent() || !gearsInView(now)) {
+      now.setGearsTurning(false, null); // stopped by an interrupt or a new turn: no one's "stop" to show
+      clearInterval(watch);
+    }
+  }, 100);
+  return Promise.resolve();
+};
+
+/** The learner's Stop gears (and any stop): bumps the sequence, so the running watcher ends. */
+export const stopGears = (by: Actor) => useScene.getState().setGearsTurning(false, by);
+
 /** The torque steps are about the whole scene: the servo goes back together and the camera follows. */
 function wholeSceneForTorque() {
   const s = useScene.getState();
@@ -111,4 +140,5 @@ export const ANIMATIONS: Record<string, (isCurrent: () => boolean) => Promise<vo
   "servo-explode": servoTo("exploded"),
   "servo-open": servoTo("open"),
   "servo-assemble": servoTo("assembled"),
+  "servo-gears-turn": gearsTurn(),
 };
