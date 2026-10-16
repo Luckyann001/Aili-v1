@@ -24,7 +24,7 @@
     "motor-and-sensor",
     "upper-case"
   ],
-  "size_kb": 232.2,
+  "size_kb": 233.3,
   "triangles": 5216,
   "budget": {
     "triangles": 8000,
@@ -201,7 +201,89 @@
     ],
     "ratio": 46.080000000000005,
     "ratio_note": "derived by code from the tooth counts (driven ÷ driver per mesh); never typed by hand",
-    "accuracy": "involute flanks approximated with a few points; no backlash, profile shift or tolerance; for looks only"
+    "accuracy": "involute flanks approximated with a few points; no backlash, profile shift or tolerance; for looks only",
+    "gears": [
+      {
+        "id": "motor-pinion",
+        "node": "motor-pinion",
+        "teeth": 10,
+        "shaft": "motor",
+        "phase_rad": 0,
+        "shaft_xz_gltf_m": [
+          0.00467,
+          -0.000799
+        ]
+      },
+      {
+        "id": "stage-1-gear",
+        "node": "stage-1-gear",
+        "teeth": 40,
+        "shaft": "stage-1",
+        "phase_rad": 0.078539816,
+        "shaft_xz_gltf_m": [
+          -0.00033,
+          -0.000799
+        ]
+      },
+      {
+        "id": "stage-1-pinion",
+        "node": "stage-1-pinion",
+        "teeth": 10,
+        "shaft": "stage-1",
+        "phase_rad": 0.453785606,
+        "shaft_xz_gltf_m": [
+          -0.00033,
+          -0.000799
+        ]
+      },
+      {
+        "id": "stage-2-gear",
+        "node": "stage-2-gear",
+        "teeth": 36,
+        "shaft": "stage-2",
+        "phase_rad": 0.087266463,
+        "shaft_xz_gltf_m": [
+          0.0042,
+          0
+        ]
+      },
+      {
+        "id": "stage-2-pinion",
+        "node": "stage-2-pinion",
+        "teeth": 10,
+        "shaft": "stage-2",
+        "phase_rad": 0,
+        "shaft_xz_gltf_m": [
+          0.0042,
+          0
+        ]
+      },
+      {
+        "id": "output-gear",
+        "node": "output-gear",
+        "teeth": 32,
+        "shaft": "output",
+        "phase_rad": 0.09817477,
+        "shaft_xz_gltf_m": [
+          0,
+          0
+        ]
+      }
+    ],
+    "meshing": [
+      {
+        "driver": "motor-pinion",
+        "driven": "stage-1-gear"
+      },
+      {
+        "driver": "stage-1-pinion",
+        "driven": "stage-2-gear"
+      },
+      {
+        "driver": "stage-2-pinion",
+        "driven": "output-gear"
+      }
+    ]
   },
   "teaches": [
     "act.servo-parts",

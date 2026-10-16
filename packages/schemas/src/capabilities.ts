@@ -254,7 +254,24 @@ export const AssetManifest = z
       .object({ palette: z.record(z.string(), z.string()), exceptions: z.array(z.object({ part: KebabId, colour: z.string().min(1), why: z.string().min(1) }).strict()).default([]) })
       .strict(),
     gear_train: z
-      .object({ source: z.string().min(1), label: z.string().min(1), module_m: z.number().positive(), meshes: z.array(z.string()).min(1), ratio: z.number().positive(), ratio_note: z.string().min(1), accuracy: z.string().min(1) })
+      .object({
+        source: z.string().min(1),
+        label: z.string().min(1),
+        module_m: z.number().positive(),
+        meshes: z.array(z.string()).min(1),
+        ratio: z.number().positive(),
+        ratio_note: z.string().min(1),
+        accuracy: z.string().min(1),
+        /** One child node per gear under the gear-train node (turned about its local +Y), with its tooth phase. */
+        gears: z
+          .array(
+            z
+              .object({ id: KebabId, node: z.string().min(1), teeth: z.number().int().min(6), shaft: z.string().min(1), phase_rad: z.number(), shaft_xz_gltf_m: z.tuple([z.number(), z.number()]) })
+              .strict(),
+          )
+          .default([]),
+        meshing: z.array(z.object({ driver: KebabId, driven: KebabId }).strict()).default([]),
+      })
       .strict()
       .optional(),
     /** "Open": these parts move away along their explode direction and distance; the rest stay assembled. */

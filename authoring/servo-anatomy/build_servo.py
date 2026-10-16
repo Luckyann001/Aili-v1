@@ -105,7 +105,8 @@ def hex_rgba(h):
 def bounds_gltf(ob):
     """The part's assembled bounding box in glTF axes (Y up; x, y, z = Blender x, z, -y), metres, 0.01 mm steps.
     The page frames the camera and places labels from it before the GLB has loaded."""
-    vs = [ob.matrix_world @ v.co for v in ob.data.vertices]
+    bpy.context.view_layer.update()
+    vs = [o.matrix_world @ v.co for o in with_children(ob) for v in o.data.vertices]
     pts = [(v.x, v.z, -v.y) for v in vs]
     r = lambda x: round(x, 5) + 0.0  # + 0.0 turns -0.0 into 0.0
     return {"min": [r(min(p[i] for p in pts)) for i in range(3)], "max": [r(max(p[i] for p in pts)) for i in range(3)]}
@@ -263,34 +264,58 @@ def shaft_positions(g, gears):
     return pos
 
 
+def mesh_phases(g, gears):
+    """Tooth phase of every gear (radians), so each mesh starts engaged: on the line of centres the
+    driver has a tooth and the driven gear a gap. Turned at the ratio (driven = −driver × Nr ÷ Nd), the
+    teeth then stay engaged and never collide. Each gear takes part in exactly one mesh."""
+    ph = {}
+    for mesh in g["meshes"]:
+        dr, dn = gears[mesh["driver"]], gears[mesh["driven"]]
+        a = math.radians(SHAFT_ANGLES_DEG[dr["shaft"]])  # direction from the driven gear's centre to the driver's
+        ph[dr["id"]] = round((a + math.pi) % (2 * math.pi / dr["teeth"]), 9)
+        ph[dn["id"]] = round((a + math.pi / dn["teeth"]) % (2 * math.pi / dn["teeth"]), 9)
+    return ph
+
+
+def with_children(ob):
+    """A part and its child nodes (the gear train's gears), in a fixed order."""
+    return [ob] + sorted(ob.children, key=lambda c: c.name)
+
+
 def build(g, gears):
     m = g["module_m"]
     pa = g["pressure_angle_deg"]
     pos = shaft_positions(g, gears)
     parts = {}
 
-    # 3. Gear train: layers from the motor pinion up to the output gear; each driven gear is turned
-    # half a tooth so its teeth sit in the driver's gaps.
+    # 3. Gear train: the part itself is the fixed axle pins; each gear is a child node with its origin
+    # on its own shaft axis (at the gear's lowest face), so a viewer can turn it about that axis. The
+    # output gear carries the output and splined shafts, which turn with it. Tooth phases: mesh_phases.
     layer = {"motor-pinion": 0, "stage-1-gear": 0, "stage-1-pinion": 1, "stage-2-gear": 1, "stage-2-pinion": 2, "output-gear": 2}
-    objs = []
-    for gid, gear in gears.items():
-        z0 = GEAR_Z0 + layer[gid] * 0.0018
-        phase = math.pi / gear["teeth"] if gid.endswith("gear") else 0.0
-        objs.append(prism(gid, gear_outline(gear["teeth"], m, pa, phase), (z0, z0 + gear["face_width_m"]), "gear", pos[gear["shaft"]]))
+    phases = mesh_phases(g, gears)
+    pins = []
     for shaft, (x, y) in pos.items():
         if shaft in ("output", "motor"):
             continue
-        objs.append(prism(f"shaft-{shaft}", circle(SHAFT_RADIUS, 8), (GEAR_Z0 - 0.0005, GEAR_Z0 + 0.0055), "gear", (x, y)))
-    out_top = GEAR_Z0 + 2 * 0.0018 + gears["output-gear"]["face_width_m"]
-    objs.append(prism("output-shaft", circle(SPLINE["radius"] * 0.8, 12), (out_top, SPLINE["z"][0]), "gear"))
-    ridges = SPLINE["ridges"]
-    star = []
-    for i in range(2 * ridges):
-        rr = SPLINE["radius"] if i % 2 == 0 else SPLINE["radius"] * 0.82
-        t = math.pi * i / ridges
-        star.append((rr * math.cos(t), rr * math.sin(t)))
-    objs.append(prism("splined-shaft", star, SPLINE["z"], "gear"))
-    parts["gear-train"] = join("gear-train", objs)
+        pins.append(prism(f"shaft-{shaft}", circle(SHAFT_RADIUS, 8), (GEAR_Z0 - 0.0005, GEAR_Z0 + 0.0055), "gear", (x, y)))
+    parts["gear-train"] = join("gear-train", pins)
+    gear_nodes = {}
+    for gid, gear in gears.items():
+        z0 = GEAR_Z0 + layer[gid] * 0.0018
+        objs = [prism(gid, gear_outline(gear["teeth"], m, pa, phases[gid]), (0.0, gear["face_width_m"]), "gear")]
+        if gid == "output-gear":
+            out_top = 2 * 0.0018 + gear["face_width_m"] + GEAR_Z0 - z0
+            objs.append(prism("output-shaft", circle(SPLINE["radius"] * 0.8, 12), (out_top, SPLINE["z"][0] - z0), "gear"))
+            ridges = SPLINE["ridges"]
+            star = []
+            for i in range(2 * ridges):
+                rr = SPLINE["radius"] if i % 2 == 0 else SPLINE["radius"] * 0.82
+                t = math.pi * i / ridges
+                star.append((rr * math.cos(t), rr * math.sin(t)))
+            objs.append(prism("splined-shaft", star, (SPLINE["z"][0] - z0, SPLINE["z"][1] - z0), "gear"))
+        ob = join(gid, objs) if len(objs) > 1 else objs[0]
+        ob.location = Vector((pos[gear["shaft"]][0], pos[gear["shaft"]][1], z0))
+        gear_nodes[gid] = ob
 
     # 4. Motor (under the motor pinion) and potentiometer (under the output shaft).
     mx, my = pos["motor"]
@@ -351,7 +376,12 @@ def build(g, gears):
     for name, ob in parts.items():
         zs = [v.co.z for v in ob.data.vertices]
         origin_on_axis(ob, min(zs))
-    return parts, pos
+    # The gears become children of the gear-train part, keeping where they are.
+    bpy.context.view_layer.update()
+    for ob in gear_nodes.values():
+        ob.parent = parts["gear-train"]
+        ob.matrix_parent_inverse = parts["gear-train"].matrix_world.inverted()
+    return parts, pos, phases
 
 
 def canonical_indices(glb_path):
@@ -486,6 +516,7 @@ def stills(parts, out_dir):
                     ob.hide_render = True
                     hidden.append(ob)
         size = EXPLODED_RENDER if mode == "explode" else (RENDER["width"], RENDER["height"])
+        objs = [o for ob in objs for o in with_children(ob)]  # the gear train's gears count for the framing
         # Exploded: the column fills about 85 % of the frame height (1 / 0.85 margin).
         frame(cam, objs, direction, margin=1.0 / 0.85 if mode == "explode" else 1.15, size_px=size)
         path = os.path.join(out_dir, f"servo-{name}.png")
@@ -517,17 +548,17 @@ def main():
     bpy.context.scene.unit_settings.system = "METRIC"
     bpy.context.scene.unit_settings.scale_length = 1.0
     g, gears, ratio = load_gears()
-    parts, pos = build(g, gears)
+    parts, pos, phases = build(g, gears)
 
     # Triangulate here, with fixed methods, so the exported GLB is identical run to run (the exporter's
     # own split of concave faces, like the gear outlines, was not deterministic).
-    for ob in parts.values():
+    for ob in [o for p in parts.values() for o in with_children(p)]:
         bm = bmesh.new()
         bm.from_mesh(ob.data)
         bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method="FIXED", ngon_method="EAR_CLIP")
         bm.to_mesh(ob.data)
         bm.free()
-    tris = triangles(parts.values())
+    tris = triangles([o for p in parts.values() for o in with_children(p)])
     os.makedirs(a["out"], exist_ok=True)
     glb = os.path.join(a["out"], "servo-generic.glb")
     for ob in bpy.context.selected_objects:
@@ -581,6 +612,13 @@ def main():
             "ratio": ratio,
             "ratio_note": "derived by code from the tooth counts (driven ÷ driver per mesh); never typed by hand",
             "accuracy": "involute flanks approximated with a few points; no backlash, profile shift or tolerance; for looks only",
+            # One child node per gear under the gear-train node, its origin on its own shaft axis (glTF:
+            # turn it about its local +Y). Phases: each mesh starts engaged (driver tooth, driven gap).
+            "gears": [
+                {"id": gid, "node": gid, "teeth": gear["teeth"], "shaft": gear["shaft"], "phase_rad": phases[gid], "shaft_xz_gltf_m": [round(pos[gear["shaft"]][0], 6) + 0.0, round(-pos[gear["shaft"]][1], 6) + 0.0]}
+                for gid, gear in gears.items()
+            ],
+            "meshing": [{"driver": mm["driver"], "driven": mm["driven"]} for mm in g["meshes"]],
         },
         "teaches": ["act.servo-parts", "act.servo-what-it-is", "act.gear-ratio", "act.torque-speed-tradeoff", "sense.position-sensor", "act.motor-basics"],
         "teaches_proposed": [],
