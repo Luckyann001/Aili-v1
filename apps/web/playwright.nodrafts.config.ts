@@ -7,7 +7,8 @@ const PORT = 3300;
 // AILI_LIVE is pinned ON on purpose: a production build and server must refuse live mode anyway.
 // AILI_E2E_RECORDED_LIVE is set at RUN time only (not at build): a build made without it must refuse
 // the recorded live path even when the variable and the test's cookie are present.
-const ENV = "AILI_DIST_DIR=.next-nodrafts NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=0 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=0 NEXT_PUBLIC_AILI_DEMO_TOOLS=0 AILI_LIVE=1";
+// AILI_CONTENT_MODE=founder-demo is set on purpose too: a production build must ignore the founder demo mode.
+const ENV = "AILI_DIST_DIR=.next-nodrafts NEXT_PUBLIC_AILI_INCLUDE_DRAFTS=0 NEXT_PUBLIC_AILI_FAKE_DIRECTOR=0 NEXT_PUBLIC_AILI_DEMO_TOOLS=0 AILI_LIVE=1 AILI_CONTENT_MODE=founder-demo";
 
 export default defineConfig({
   testDir: "e2e-nodrafts",

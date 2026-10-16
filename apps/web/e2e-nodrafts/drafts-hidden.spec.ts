@@ -96,3 +96,11 @@ test("?demo=1 does nothing in production: no Demo controls, no readout, no fixtu
   await expect(page.getByText("Test fixture")).toHaveCount(0);
   await expect(page.getByText(/Scripted reply/)).toHaveCount(0);
 });
+
+// The founder demo mode (npm run dev:demo) is set in this build's environment and must have no effect.
+test("the founder demo mode is ignored: standard mode, no demo wording, the turn routes 404", async ({ page, request }) => {
+  await page.goto("/learn");
+  await expect(page.locator("[data-content-mode]")).toHaveAttribute("data-content-mode", "standard");
+  await expect(page.getByText(/demo content|founder-reviewed/i)).toHaveCount(0);
+  expect((await request.post("/api/turn", { data: { session_id: "nodrafts-0003", state_rev: 1, input: { text: "x" } } })).status()).toBe(404);
+});
