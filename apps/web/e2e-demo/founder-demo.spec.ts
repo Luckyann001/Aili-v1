@@ -1,13 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import fxAsset from "../../../content/robotics/test-fixtures/asset.fx-servo-generic-anatomy.json";
+import fxScene from "../../../content/robotics/test-fixtures/scene.fx-servo-arm.json";
 import { installVoiceFakes } from "../e2e/voiceFakes";
 
 // The founder demo mode's labels on the live PATH, answered by the RECORDED provider in a test build
 // (playwright.demo.config.ts): no model, no key, no spend. The recording is not presented as live;
 // this checks what the page labels and shows. The expected wording follows the review records: the
 // asset has a founder record; the servo scene gets one only when Lucky adds it after looking.
-const fx = (f: string) => JSON.parse(readFileSync(new URL(`../../../content/robotics/test-fixtures/${f}`, import.meta.url), "utf8"));
-const reviewed = fx("scene.fx-servo-arm.json").review?.role === "founder" && fx("asset.fx-servo-generic-anatomy.json").review?.role === "founder";
+const roleOf = (m: object) => (m as { review?: { role?: string } }).review?.role;
+const reviewed = roleOf(fxScene) === "founder" && roleOf(fxAsset) === "founder";
 const STAGE = reviewed ? "Prepared · reviewed by the founder, not an expert reviewer" : "Prepared · not reviewed";
 const LIVE = reviewed ? "Live AI · Founder-reviewed demo content" : "Live AI · Demo content, not reviewed";
 const NOTE = reviewed ? "Narration is live AI; the lesson content is prepared and founder-reviewed, not expert-reviewed" : "Narration is live AI; the lesson content is prepared and not reviewed yet";
