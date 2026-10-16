@@ -17,7 +17,10 @@
     "predev": "node scripts/copy-assets.mjs",
     "prebuild": "node scripts/copy-assets.mjs",
     "predev:lan": "node scripts/copy-assets.mjs",
-    "predev:live": "node scripts/copy-assets.mjs"
+    "predev:live": "node scripts/copy-assets.mjs",
+    "dev:demo": "AILI_LIVE=1 AILI_CONTENT_MODE=founder-demo next dev -H 127.0.0.1",
+    "predev:demo": "node scripts/copy-assets.mjs",
+    "test:e2e:demo": "playwright test -c playwright.demo.config.ts"
   },
   "dependencies": {
     "@aili/engine": "^0.0.0",
