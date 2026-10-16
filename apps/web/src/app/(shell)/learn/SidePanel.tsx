@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react";
 import { Button } from "@/components/Button";
-import { ContentBadge } from "@/components/ContentBadge";
+import { ContentBadge, LiveContentBadge } from "@/components/ContentBadge";
+import { useDemoLabels } from "@/turn/useDemoLabels";
 import { useLearnUi, type SideView } from "@/state/learnUi";
 import { explanationAt } from "@/lesson/runner";
 import { useLesson } from "@/lesson/store";
@@ -168,13 +169,14 @@ function TurnView({ turn, heading }: { turn: LoggedTurn; heading: string }) {
   // Interrupted (M4 slice 1): only the segments the learner saw, then "Stopped here."
   const stopped = turn.shown !== undefined && turn.shown < turn.lines.length;
   const lines = stopped ? turn.lines.slice(0, turn.shown) : turn.lines;
+  const demoLabels = useDemoLabels();
   return (
     <div className={styles.turnStep}>
       <p className={styles.captionBadges}>
         {turn.source === "live" ? (
           <>
             <ContentBadge kind="live" />
-            <ContentBadge kind="fixture-content" />
+            <LiveContentBadge demo={demoLabels} />
           </>
         ) : (
           <ContentBadge kind="fixture" />

@@ -14,6 +14,9 @@ export const useStageContent = create<{
   fixture: boolean;
   live: boolean;
   scenePicked: boolean;
+  /** The scene manifest a turn put on stage (e.g. "fx-servo-arm"); the founder demo labels read it. */
+  sceneId: string | null;
+  setSceneId: (id: string | null) => void;
   wordsOnlyAnalogy: string | null;
   setWordsOnlyAnalogy: (title: string | null) => void;
   /** A professor turn gave numbers about the scene on stage (and none since the learner's changes). */
@@ -35,6 +38,8 @@ export const useStageContent = create<{
   fixture: false,
   live: false,
   scenePicked: false,
+  sceneId: null,
+  setSceneId: (sceneId) => set({ sceneId }),
   wordsOnlyAnalogy: null,
   setWordsOnlyAnalogy: (wordsOnlyAnalogy) => set({ wordsOnlyAnalogy }),
   spaceOpenFor: null,

@@ -6,6 +6,7 @@ import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { FlaskIcon } from "@/components/ContentBadge";
 import { useStageContent } from "@/turn/stageContent";
+import { useDemoLabels } from "@/turn/useDemoLabels";
 import styles from "./learn.module.css";
 
 /**
@@ -23,8 +24,13 @@ export function PlaceholderBadge() {
   const activeScene = useScene((s) => s.activeScene);
   const fixture = useStageContent((s) => s.fixture);
   const live = useStageContent((s) => s.live);
+  // Founder demo mode (npm run dev:demo): labelled from the fixture manifests the turn put on stage.
+  const demo = useDemoLabels();
   const status = isDraft(activeScene) ? reviewLabelOf(activeScene) : "placeholder";
-  const full = `Prepared content, written in advance. Not a live AI response. ${isDraft(activeScene) ? `${reviewLabelOf(activeScene)}. ` : ""}${MODELS[activeScene].note}`;
+  const pill = demo ? demo.stage : `Prepared · ${status}`;
+  const full = demo
+    ? `Prepared content, written in advance. Not a live AI response. ${demo.reviewed ? "Reviewed by the founder, not an expert reviewer." : "Not reviewed yet."} ${MODELS[activeScene].note}`
+    : `Prepared content, written in advance. Not a live AI response. ${isDraft(activeScene) ? `${reviewLabelOf(activeScene)}. ` : ""}${MODELS[activeScene].note}`;
   return (
     <>
     <span className={styles.badgeWrap}>
@@ -51,7 +57,7 @@ export function PlaceholderBadge() {
             <rect x="2" y="2" width="10" height="10" rx="1.5" />
             <path d="M4.5 5.5h5M4.5 8.5h3.5" />
           </svg>
-          Prepared · {status}
+          {pill}
         </span>
       </button>
       <span id={id} role="note" className={styles.badgeDetail} hidden={!open}>
@@ -63,8 +69,12 @@ export function PlaceholderBadge() {
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="currentColor">
           <circle cx="7" cy="7" r="4.5" />
         </svg>
-        Live AI · Test fixture content
-        <span className={styles.srOnly}>. Answered by a real AI model, using test-fixture content that is not expert-reviewed.</span>
+        {demo ? demo.live : "Live AI · Test fixture content"}
+        <span className={styles.srOnly}>
+          {demo
+            ? `. Narration by a real AI model; the lesson content is prepared${demo.reviewed ? " and reviewed by the founder, not an expert reviewer" : " and not reviewed yet"}.`
+            : ". Answered by a real AI model, using test-fixture content that is not expert-reviewed."}
+        </span>
       </span>
     )}
     {fixture && !live && (

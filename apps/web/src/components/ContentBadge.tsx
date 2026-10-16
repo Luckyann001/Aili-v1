@@ -2,7 +2,7 @@ import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import styles from "./ContentBadge.module.css";
 
 /** Prepared vs live vs AI-composed content must always be visibly labelled (CLAUDE.md, honesty rules). */
-export type ContentKind = "prepared" | "live" | "illustrative" | "fixture" | "fixture-content";
+export type ContentKind = "prepared" | "live" | "illustrative" | "fixture" | "fixture-content" | "demo-reviewed" | "demo-unreviewed";
 
 const LABEL: Record<ContentKind, string> = {
   prepared: "Prepared",
@@ -10,6 +10,9 @@ const LABEL: Record<ContentKind, string> = {
   illustrative: "Illustrative",
   fixture: "Test fixture",
   "fixture-content": "Test fixture content",
+  // The founder demo mode (npm run dev:demo): beside "Live AI", what the lesson content is.
+  "demo-reviewed": "Founder-reviewed demo content",
+  "demo-unreviewed": "Demo content, not reviewed",
 };
 
 const DESCRIPTION: Record<ContentKind, string> = {
@@ -18,6 +21,8 @@ const DESCRIPTION: Record<ContentKind, string> = {
   illustrative: "Illustrative. No verified model.",
   fixture: "Test fixture: a scripted fake-director turn for testing. Not a live AI response.",
   "fixture-content": "Uses test-fixture content made for testing, not expert-reviewed library content.",
+  "demo-reviewed": "Narration is live AI; the lesson content is prepared and reviewed by the founder, not an expert reviewer.",
+  "demo-unreviewed": "Narration is live AI; the lesson content is prepared and not reviewed yet.",
 };
 
 /**
@@ -41,7 +46,8 @@ export function ContentBadge({ kind, item }: { kind: ContentKind; item?: Labelle
 // (illustrative), flask (test fixture, and test-fixture content under a live answer).
 function BadgeIcon({ kind }: { kind: ContentKind }) {
   const p = { width: 14, height: 14, viewBox: "0 0 14 14", "aria-hidden": true, stroke: "currentColor", strokeWidth: 1.6 } as const;
-  if (kind === "prepared")
+  // Prepared, and the founder demo's prepared content (the words say whether it was reviewed).
+  if (kind === "prepared" || kind === "demo-reviewed" || kind === "demo-unreviewed")
     return (
       <svg {...p} fill="none">
         <rect x="2" y="2" width="10" height="10" rx="1.5" />
@@ -60,6 +66,14 @@ function BadgeIcon({ kind }: { kind: ContentKind }) {
       <circle cx="7" cy="7" r="5" />
     </svg>
   );
+}
+
+/**
+ * Beside "Live AI": what the lesson content is. Test-fixture content, or in the founder demo mode
+ * (npm run dev:demo) the demo content's review state, from the manifests the turn put on stage.
+ */
+export function LiveContentBadge({ demo }: { demo: { reviewed: boolean } | null }) {
+  return <ContentBadge kind={demo ? (demo.reviewed ? "demo-reviewed" : "demo-unreviewed") : "fixture-content"} />;
 }
 
 /** Test fixture: a laboratory flask, outline only. */

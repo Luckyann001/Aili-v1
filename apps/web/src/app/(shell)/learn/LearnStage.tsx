@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ContentBadge } from "@/components/ContentBadge";
+import { ContentBadge, LiveContentBadge } from "@/components/ContentBadge";
+import { useDemoLabels, useDemoNote } from "@/turn/useDemoLabels";
+import { FOUNDER_DEMO } from "@/turn/contentMode";
 import { Button } from "@/components/Button";
 import { MODELS } from "@/scene/models";
 import { INCLUDE_DRAFTS, sceneShown } from "@/scene/visibility";
@@ -65,7 +67,10 @@ export function LearnStage() {
   const resetView = useScene((s) => s.resetView);
   const exploded = useScene((s) => s.exploded);
   const activeScene = useScene((s) => s.activeScene);
-  const shown = sceneShown(activeScene);
+  // Founder demo mode: a live turn's published fixture scene shows without the drafts flag.
+  const demoLabels = useDemoLabels();
+  const demoNote = useDemoNote();
+  const shown = sceneShown(activeScene) || demoLabels !== null;
   const toggleExploded = useScene((s) => s.toggleExploded);
   const focusParts = useCallback(
     () => document.querySelector<HTMLButtonElement>('section[aria-label="Stage"] button[aria-haspopup="listbox"]')?.focus(),
@@ -185,7 +190,7 @@ export function LearnStage() {
   const captionLive = muted || !isSpeechOutputSupported() ? "polite" : "off";
 
   return (
-    <div className={styles.learn} data-side={side ?? "closed"}>
+    <div className={styles.learn} data-side={side ?? "closed"} data-content-mode={FOUNDER_DEMO ? "founder-demo" : "standard"}>
       <h1 className={styles.srOnly}>Learn stage</h1>
       <section className={styles.stage} aria-label="Stage" data-dimmed={dimmed ? "" : undefined}>
         {shown && <SceneViewport safeArea={safeArea} labels={labelEls} />}
@@ -237,7 +242,7 @@ export function LearnStage() {
 
         {showWelcome && (
           <LiveWelcome
-            note={LIVE_NOTE}
+            note={demoNote ?? LIVE_NOTE}
             text={text}
             onText={setText}
             inputRef={inputRef}
@@ -258,7 +263,7 @@ export function LearnStage() {
                 // A live answer on test-fixture content carries both labels.
                 <span className={styles.captionBadges}>
                   <ContentBadge kind="live" />
-                  <ContentBadge kind="fixture-content" />
+                  <LiveContentBadge demo={demoLabels} />
                 </span>
               ) : (
                 <ContentBadge kind={caption.source === "fixture" ? "fixture" : "prepared"} />
@@ -334,7 +339,7 @@ export function LearnStage() {
               ? (t) => void demoTurn.start("valid", t)
               : voice.submit
         }
-        note={live ? LIVE_NOTE : fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
+        note={live ? (demoNote ?? LIVE_NOTE) : fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
         chipsSend={live === true}
         onVoice={() => void voice.press()}
         inputRef={inputRef}

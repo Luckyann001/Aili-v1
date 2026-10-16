@@ -38,6 +38,8 @@ export interface StageSnapshot {
   live: boolean;
   /** Whether a turn had already put a scene on stage (live mode's dimmed opening state). */
   scenePicked: boolean;
+  /** The scene manifest that turn put up (the founder demo labels read it). */
+  sceneId: string | null;
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
@@ -60,7 +62,7 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, equation: s.equation, servoView: s.servoView, servoBy: s.servoBy, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, equation: s.equation, servoView: s.servoView, servoBy: s.servoBy, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked, sceneId: useStageContent.getState().sceneId };
 };
 
 function restoreStage(snap: StageSnapshot) {
@@ -73,6 +75,7 @@ function restoreStage(snap: StageSnapshot) {
   s.highlight(snap.selectedId);
   useStageContent.getState().setFixture(snap.fixture, snap.live);
   useStageContent.getState().setScenePicked(snap.scenePicked);
+  useStageContent.getState().setSceneId(snap.sceneId);
 }
 
 /** Applies one stage action as its line starts; an animation runs while the voice is still at `rev`. */
@@ -84,6 +87,7 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
       if (model) {
         s.setScene(model);
         useStageContent.getState().setScenePicked(true);
+        useStageContent.getState().setSceneId(a.scene);
       }
       break;
     }
