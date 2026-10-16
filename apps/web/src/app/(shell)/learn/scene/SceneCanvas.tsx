@@ -16,7 +16,8 @@ import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
 import { partOffsetGltf, settled } from "@/scene/assetPose";
 import { GEAR_NODES, PINION_RAD_PER_S } from "@/scene/gears";
-import { caseSeeThrough, servoPoseOf, useScene } from "@/scene/sceneStore";
+import { LEADER_LAYER } from "./SceneLabels";
+import { caseSeeThrough, HIDDEN_WHILE_APART, servoPoseOf, useScene } from "@/scene/sceneStore";
 import { HORN_TURN_RAD, JOINT, SERVO_GLB_URL, SERVO_ORIGIN, SERVO_PARTS, SERVO_POSE_MANIFEST, SERVO_ROTATION, SERVO_ROTATION_ORDER, arrowSweep, layoutServoParts, servoReadout, type EqStep } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
@@ -46,10 +47,11 @@ function framingCorners(explode: number) {
   return MODELS[s.activeScene].framing(s, explode).flatMap((l) => cornersOf(l));
 }
 
-/** Servo + arm: the arm, load and arrows are dimmed while the servo is open or exploded (their numbers never change). */
+/**
+ * Servo + arm: while the servo is open or exploded, the arm, load, base and the torque marks are hidden
+ * (Lucky, 16 Oct 2026: dimmed, they showed as large ghost shapes); their settings and numbers never change.
+ */
 const useServoAway = () => useScene((s) => s.activeScene === "servo-arm" && s.servoView !== "assembled");
-const DIM_OPACITY = 0.22;
-// (Dimmed materials are re-created, keyed on the dim state: three only applies a change of `transparent` to a new material.)
 
 export default function SceneCanvas(props: SceneCanvasProps) {
   const activeScene = useScene((s) => s.activeScene);
@@ -143,10 +145,9 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const servo = useScene((s) => s.servo);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
-  // The base too: in the anatomy view it sits close to the camera and would fill the picture.
-  const dim = useServoAway() && (id === "arm-link" || id === "load" || id === "base");
+  const hidden = useServoAway() && HIDDEN_WHILE_APART.has(id);
 
-  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, dim, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, hidden, invalidate]);
 
   // Size depends on the scene settings; position also on the explode amount (set per frame).
   const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m, servo }, k)[id]!;
@@ -161,6 +162,7 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
     ) : (
       <cylinderGeometry args={[size[0] + inflate, size[0] + inflate, size[1] + 2 * inflate, 24]} />
     );
+  if (hidden) return null; // the servo is apart: the arm, load and base step out of the way
   return (
     <mesh
       ref={ref}
@@ -169,9 +171,8 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
       {...partEvents(id, select)}
     >
       {geometry(0)}
-      <meshStandardMaterial key={dim ? "dim" : "solid"} color={colors.fills[fill]} roughness={0.7} metalness={0.05} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
-      {/* Dimmed (the servo open or exploded), a selected arm or load keeps only its label, not the dark shell. */}
-      {selected && !dim && (
+      <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} />
+      {selected && (
         // Selection outline: an inverted shell OUTLINE_M larger on every side, drawn from inside.
         <mesh raycast={() => null}>
           {geometry(OUTLINE_M)}
@@ -457,7 +458,7 @@ function TorqueArrow({ colors }: { colors: SceneColors }) {
   const loadSweep = (r.torque_nm > 0 ? fullSweep * (r.load_torque_nm / r.torque_nm) : 0) * k("eq-torque");
   const armSweep = (fullSweep - (r.torque_nm > 0 ? fullSweep * (r.load_torque_nm / r.torque_nm) : 0)) * k("eq-arm-share");
   const total = loadSweep + armSweep;
-  if (total < 0.01) return null;
+  if (total < 0.01 || dim) return null; // hidden while the servo is apart
   const R = 0.032;
   const start = Math.PI / 2; // from the top, clockwise as seen from the front
   const end = start - total;
@@ -466,19 +467,19 @@ function TorqueArrow({ colors }: { colors: SceneColors }) {
       {loadSweep > 0.01 && (
         <mesh rotation={[0, 0, start - loadSweep]} raycast={() => null}>
           <torusGeometry args={[R, 0.003, 6, 32, loadSweep]} />
-          <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.fills.expressive} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+          <meshBasicMaterial color={colors.fills.expressive} toneMapped={false} />
         </mesh>
       )}
       {armSweep > 0.01 && (
         <mesh rotation={[0, 0, end]} raycast={() => null}>
           <torusGeometry args={[R, 0.0016, 6, 24, armSweep]} />
-          <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.fills.discovery} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+          <meshBasicMaterial color={colors.fills.discovery} toneMapped={false} />
         </mesh>
       )}
       {/* The head points along the turn at the arrow's end. */}
       <mesh position={[R * Math.cos(end), R * Math.sin(end), 0]} rotation={[0, 0, end + Math.PI]} raycast={() => null}>
         <coneGeometry args={[0.006, 0.012, 12]} />
-        <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.outline} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+        <meshBasicMaterial color={colors.outline} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -506,15 +507,16 @@ function EquationMarks({ colors }: { colors: SceneColors }) {
       <group name={name}>
         <mesh position={[x, top - len / 2, z]} raycast={() => null}>
           <cylinderGeometry args={[r, r, len, 8]} />
-          <meshBasicMaterial key={dim ? "dim" : "solid"} color={color} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+          <meshBasicMaterial color={color} toneMapped={false} />
         </mesh>
         <mesh position={[x, top - len - 0.004, z]} rotation={[Math.PI, 0, 0]} raycast={() => null}>
           <coneGeometry args={[r * 2.6, 0.008, 10]} />
-          <meshBasicMaterial key={dim ? "dim" : "solid"} color={color} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+          <meshBasicMaterial color={color} toneMapped={false} />
         </mesh>
       </group>
     );
   const kd = k("eq-distance");
+  if (dim) return null; // hidden while the servo is apart
   return (
     <group name="equation-marks">
       {arrow(d, jy - 0.006, 0.03 * k("eq-force"), 0.0018, colors.outline, "eq-force")}
@@ -522,12 +524,12 @@ function EquationMarks({ colors }: { colors: SceneColors }) {
         <group name="eq-distance">
           <mesh position={[(d * kd) / 2, jy - 0.016, z]} raycast={() => null}>
             <boxGeometry args={[d * kd, 0.0012, 0.0012]} />
-            <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.outline} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+            <meshBasicMaterial color={colors.outline} toneMapped={false} />
           </mesh>
           {[0, d * kd].map((x) => (
             <mesh key={x} position={[x, jy - 0.016, z]} raycast={() => null}>
               <boxGeometry args={[0.0012, 0.008, 0.0012]} />
-              <meshBasicMaterial key={dim ? "dim" : "solid"} color={colors.outline} toneMapped={false} transparent={dim} opacity={dim ? DIM_OPACITY : 1} depthWrite={!dim} />
+              <meshBasicMaterial color={colors.outline} toneMapped={false} />
             </mesh>
           ))}
         </group>
@@ -547,10 +549,13 @@ const MARGIN = 1.06;
 const defaultDir = new Vector3(...DEFAULT_VIEW.position).sub(new Vector3(...DEFAULT_VIEW.target)).normalize();
 /**
  * Anatomy view: from the front-left, a little above (the arm runs out to the right, so a view from
- * the right would look through it), framing the servo's parts at about 60% of the free area.
+ * the right would look through it), framing the servo's parts as they will be (explode offsets
+ * included) at about 70% of the free area (Lucky, 16 Oct 2026: at 60%, with the old long spread, the
+ * servo filled about a tenth of the stage), centred in it.
  */
 const anatomyDir = new Vector3(-0.72, 0.4, 0.57).normalize();
-const ANATOMY_FILL = 0.6;
+// 0.8 of the limiting side as fitted; perspective and the centring leave about 0.7 on screen.
+const ANATOMY_FILL = 0.8;
 const marginFor = () => (useScene.getState().cameraView === "anatomy" ? 1 / ANATOMY_FILL : MARGIN);
 /** Last known screen shape, kept by Framing. */
 const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1 };
@@ -581,7 +586,20 @@ function fitGoal(dir: Vector3, explode: number) {
     const towardCamera = offset.dot(dir);
     distance = Math.max(distance, towardCamera + Math.abs(offset.dot(right)) / tanH, towardCamera + Math.abs(offset.dot(up)) / tanV);
   }
-  return { target, position: target.clone().addScaledVector(dir, distance * marginFor()) };
+  const d = distance * marginFor();
+  // Anatomy: centre the parts' projected extent (not their box's centre) in the free area.
+  if (useScene.getState().cameraView === "anatomy") {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const c of corners) {
+      offset.set(...c).sub(target);
+      const depth = d - offset.dot(dir);
+      const x = offset.dot(right) / (depth * tanH);
+      const y = offset.dot(up) / (depth * tanV);
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    target.addScaledVector(right, ((x0 + x1) / 2) * d * tanH).addScaledVector(up, ((y0 + y1) / 2) * d * tanV);
+  }
+  return { target, position: target.clone().addScaledVector(dir, d) };
 }
 
 /**
@@ -697,12 +715,38 @@ function LabelTracker({
     const h = area.clientHeight - takeH;
     const layout = MODELS[activeScene].layout({ params, leverDistance_m, servo, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
+    // For tests: the free area (canvas px) and each servo part's box on screen (the size checks).
+    writeData(host, "freeArea", [area.offsetLeft, area.offsetTop, w, h].map((n) => n.toFixed(1)).join(","));
+    if (activeScene === "servo-arm") writeData(host, "servoBoxes", JSON.stringify(Object.fromEntries(SERVO_PARTS.map((p) => [p.id, screenBox(layout[p.id]!, camera, size)]))));
     // 1. Where each shown label wants to go (clamped inside the safe area).
     const wanted: LabelBox[] = [];
+    // The servo's parts: label above the part's box on screen, never on it, with a leader line down to it.
+    const partBox = new Map<string, { x: number; y: number; w: number; h: number }>();
     for (const part of MODELS[activeScene].parts) {
       const el = labels.current.get(part.id);
       if (!el) continue;
-      v.set(...layout[part.id]!.labelAnchor).project(camera);
+      const pl = layout[part.id]!;
+      if (pl.kind === "asset" && el.offsetWidth > 0) {
+        const [x0, y0, x1, y1] = screenBox(pl, camera, size);
+        const box = { x: x0 - area.offsetLeft, y: y0 - area.offsetTop, w: x1 - x0, h: y1 - y0 };
+        partBox.set(part.id, box);
+        el.dataset.box = [x0, y0, x1, y1].map((n) => n.toFixed(1)).join(",");
+        el.dataset.x = ((x0 + x1) / 2).toFixed(1);
+        el.dataset.y = y0.toFixed(1);
+        const lw = el.offsetWidth;
+        const lh = el.offsetHeight;
+        wanted.push({
+          id: part.id,
+          x: Math.min(Math.max(box.x + box.w / 2 - lw / 2, PAD), Math.max(PAD, w - lw - PAD)),
+          y: Math.min(Math.max(box.y - lh - 12, PAD), Math.max(PAD, h - lh - PAD)),
+          w: lw,
+          h: lh,
+          priority: part.id === selectedId ? 10 : 0,
+          avoid: box,
+        });
+        continue;
+      }
+      v.set(...pl.labelAnchor).project(camera);
       const sx = ((v.x + 1) / 2) * size.width;
       const sy = ((1 - v.y) / 2) * size.height;
       // For tests: where the part's anchor is on the canvas, before clamping.
@@ -748,11 +792,23 @@ function LabelTracker({
       });
     }
     // 2. Resolve collisions: the selected label stays put; others move aside or hide.
+    const leaders: string[] = [];
     for (const p of placeLabels(wanted, { w, h }, PAD)) {
       const el = labels.current.get(p.id)!;
       el.style.visibility = p.hidden ? "hidden" : "";
       el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
+      // A short leader from the label to the nearest point of its part's box.
+      const box = partBox.get(p.id);
+      if (box && !p.hidden) {
+        const lx = p.x + el.offsetWidth / 2;
+        const ly = p.y + (p.y + el.offsetHeight / 2 < box.y ? el.offsetHeight : 0);
+        const tx = Math.min(Math.max(lx, box.x + 2), box.x + box.w - 2);
+        const ty = Math.min(Math.max(ly, box.y + 2), box.y + box.h - 2);
+        leaders.push(`<line x1="${lx.toFixed(1)}" y1="${ly.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" />`);
+      }
     }
+    const layer = labels.current.get(LEADER_LAYER);
+    if (layer) layer.innerHTML = leaders.length ? `<svg width="${w.toFixed(0)}" height="${h.toFixed(0)}" aria-hidden="true">${leaders.join("")}</svg>` : "";
   });
   return null;
 }
@@ -782,6 +838,19 @@ function modelFits(camera: Camera, size: { width: number; height: number }, area
     if (x < area.x - 1 || x > area.x + area.w + 1 || y < area.y - 1 || y > area.y + area.h + 1) return false;
   }
   return true;
+}
+
+/** One part's box on screen, canvas pixels: [x0, y0, x1, y1]. */
+function screenBox(p: PartLayout, camera: Camera, size: { width: number; height: number }): [number, number, number, number] {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const h = p.kind === "cylinder" ? [p.size[0], p.size[1] / 2, p.size[0]] : p.size.map((d) => d / 2);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+    v.set(p.position[0] + sx * h[0]!, p.position[1] + sy * h[1]!, p.position[2] + sz * h[2]!).project(camera);
+    const x = ((v.x + 1) / 2) * size.width;
+    const y = ((1 - v.y) / 2) * size.height;
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+  }
+  return [x0, y0, x1, y1];
 }
 
 /** On-screen box (canvas pixels) around every part's corners: "x0,y0,x1,y1". For tests. */
@@ -923,6 +992,8 @@ function ServoProbe({ host, reducedMotion }: { host: RefObject<HTMLDivElement | 
   const ghost = useScene(caseSeeThrough);
   const gears = useScene((s) => s.gearsTurning);
   useEffect(() => writeData(host, "gears", gears ? "turning" : "still"), [host, gears]);
+  // For tests: what is hidden while the servo is apart (nothing once it is assembled).
+  useEffect(() => writeData(host, "hiddenParts", view === "assembled" ? "" : [...HIDDEN_WHILE_APART].join(",")), [host, view]);
   useEffect(() => {
     writeData(host, "servo", moving ? "moving" : view);
     writeData(host, "servoCase", ghost ? "see-through" : "solid");

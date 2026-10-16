@@ -166,6 +166,9 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
 
 export const useScene = create<SceneState>()((set) => createSceneSlice(set));
 
+/** Hidden while the servo is open or exploded (not dimmed): back on assemble and for the torque steps. */
+export const HIDDEN_WHILE_APART: ReadonlySet<string> = new Set(["arm-link", "load", "base"]);
+
 /** The servo's parts that sit inside the assembled case (the gear train, the motor). */
 export const SERVO_INSIDE_PARTS: ReadonlySet<string> = new Set(["gear-train", "motor-and-sensor"]);
 

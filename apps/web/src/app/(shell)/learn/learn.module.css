@@ -1724,3 +1724,37 @@
     display: inline;
   }
 }
+
+/* Leader lines from servo part labels to their parts (drawn by the 3D view each frame). */
+.leaderLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.leaderLayer line {
+  stroke: var(--aili-text);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+/* The servo's label and the "hidden" note on one row (slice: anatomy visibility, 16 Oct 2026). */
+.servoApartRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin: 0;
+}
+
+/* Narrow screens: only the latest "who did what" line, so the model keeps its room. */
+@media (max-width: 599px) {
+  .servoNote[data-testid="servo-note"] > :not(:last-child) {
+    display: none;
+  }
+}
+
+/* The "Now" tag beside a part's name keeps its own width (not stretched across the column). */
+.partsRoles li > .eqTag {
+  justify-self: start;
+}

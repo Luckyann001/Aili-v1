@@ -71,8 +71,15 @@ export function ServoControls() {
           </span>
         </p>
       )}
-      {/* Open or exploded, the servo itself is in view: its own label (from its manifest). */}
-      {view !== "assembled" && <ContentBadge kind="illustrative" item={servoAsset as LabelledItem} />}
+      {/* Open or exploded: the servo's own label (from its manifest) and what is hidden, on one row. */}
+      {view !== "assembled" && (
+        <p className={styles.servoApartRow}>
+          <ContentBadge kind="illustrative" item={servoAsset as LabelledItem} />
+          <span className={styles.servoNote} data-testid="hidden-note">
+            Arm and load hidden while you look inside
+          </span>
+        </p>
+      )}
       <p className={styles.servoNote} aria-live="polite" data-testid="servo-note">
         {by && <ActorLine by={by} text={DONE[view]} />}
         {gearsBy && <ActorLine by={gearsBy} text={turning ? "turned the gears" : "stopped the gears"} />}
