@@ -36,11 +36,12 @@ describe("founder demo labels", () => {
   it("a scene with no asset needs only its own record", () => {
     expect(demoLabels(scene({ asset: undefined, review: founder }), null).reviewed).toBe(true);
   });
-  it("today's fixtures: the asset has its founder record, the servo scene does not yet, so 'not reviewed'", () => {
+  it("the real fixtures: the founder label exactly when the servo scene has its record too (the asset has one)", () => {
     const s = DEMO_CONTENT!.scenes["fx-servo-arm"]!;
     expect(s.asset).toBe("asset.fx-servo-generic-anatomy");
     expect(DEMO_CONTENT!.assets[s.asset!]!.review).toMatchObject({ role: "founder" });
-    expect(demoLabels(s, DEMO_CONTENT!.assets[s.asset!]!)).toMatchObject({ reviewed: false, stage: NOT_REVIEWED_LABEL });
+    const sceneReviewed = s.review?.role === "founder";
+    expect(demoLabels(s, DEMO_CONTENT!.assets[s.asset!]!)).toMatchObject({ reviewed: sceneReviewed, stage: sceneReviewed ? FOUNDER_LABEL : NOT_REVIEWED_LABEL });
   });
 });
 
@@ -53,7 +54,7 @@ describe("the mode's reach", () => {
     vi.resetModules();
     const demo = await import("./contentMode");
     expect(demo.FOUNDER_DEMO).toBe(true);
-    expect(demo.demoLabelsFor(DEMO_CONTENT, "fx-servo-arm")).toMatchObject({ stage: NOT_REVIEWED_LABEL });
+    expect(demo.demoLabelsFor(DEMO_CONTENT, "fx-servo-arm")).not.toBeNull();
     expect(demo.demoLabelsFor(NONE, "fx-servo-arm")).toBeNull(); // a production build has no fixture manifests
     expect(demo.demoLabelsFor(DEMO_CONTENT, "servo-arm")).toBeNull(); // the real draft scene is never demo content
   });

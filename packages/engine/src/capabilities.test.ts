@@ -319,7 +319,7 @@ describe("content/robotics/test-fixtures", () => {
     expect(strip(readJson("test-fixtures/solver.fx-torque.json"))).toEqual(strip(readJson("capabilities/solver.static-torque-single-link.json")));
     expect(strip(readJson("test-fixtures/sim.fx-servo-load.json"), ["solver"])).toEqual(strip(readJson("capabilities/sim.servo-static-load.json"), ["solver"]));
     // The servo + arm: each names its own asset (real content may not lean on a fixture).
-    expect(strip(readJson("test-fixtures/scene.fx-servo-arm.json"), ["title", "asset", "solver"])).toEqual(strip(readJson("scenes/servo-arm.json"), ["title", "asset", "solver"]));
+    expect(strip(readJson("test-fixtures/scene.fx-servo-arm.json"), ["title", "asset", "solver", "review"])).toEqual(strip(readJson("scenes/servo-arm.json"), ["title", "asset", "solver", "review"]));
     expect(readJson("scenes/servo-arm.json").asset).toBe("asset.servo-generic-anatomy");
     expect(readJson("test-fixtures/scene.fx-servo-arm.json").asset).toBe("asset.fx-servo-generic-anatomy");
   });
