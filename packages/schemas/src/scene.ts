@@ -42,7 +42,16 @@ export const SceneParam = z
 
 export const SceneAnimation = z.object({ id: KebabId, description: z.string().min(1) }).strict();
 
-export const Review = z.object({ by: z.string().min(2), on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict();
+/**
+ * Who reviewed an item, when, and in what role. "founder": the founder's review for the demo, a
+ * documented exception to the expert-review rule (CLAUDE.md); shown as "reviewed by the founder, not an
+ * expert reviewer". "expert": a domain expert. Absent role: an expert review, as before.
+ */
+export const ReviewRole = z.enum(["founder", "expert"]);
+export const Review = z.object({ by: z.string().min(2), on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), role: ReviewRole.optional() }).strict();
+
+/** A 3D asset's ID (asset manifests live in the capability registry). */
+export const AssetId = z.string().regex(/^asset\.[a-z0-9]+(-[a-z0-9]+)*$/, "IDs look like asset.some-name");
 
 export const SceneManifest = z
   .object({
@@ -62,6 +71,8 @@ export const SceneManifest = z
     parts: z.array(ScenePart).min(1),
     params: z.array(SceneParam).default([]),
     animations: z.array(SceneAnimation).default([]),
+    /** The 3D asset this scene draws, if any (its manifest is in the capability registry). */
+    asset: AssetId.optional(),
     /** Fixed inputs for the scene's solver (SI, unit in the name). Never shown as results. */
     solver: z.object({ id: z.string().min(1), constants: z.record(z.string().regex(/_(m|kg|deg|m_per_s2)$/), z.number()) }).strict().optional(),
   })
@@ -87,6 +98,8 @@ export const ConceptSeed = z
     review_status: ReviewStatus,
     /** Skipping or assigning work on this concept needs the learner's explicit acknowledgement. M4 decides which concepts get it. */
     safety_critical: z.boolean().default(false),
+    /** Concepts to understand first (docs/m4-plan.md §1); each must exist in the graph. */
+    prerequisites: z.array(ConceptId).default([]),
   })
   .strict();
 export type ConceptSeed = z.infer<typeof ConceptSeed>;

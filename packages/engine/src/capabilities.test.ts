@@ -239,6 +239,23 @@ describe("shortlist: published items only, by concept and level", () => {
     expect(shortlist(drafts, { concepts: [C], level: "L1" }).analogies).toEqual([]);
   });
 
+  it("assets are never offered: the real draft anatomy, nor its published fixture copy (slice 1 wires nothing)", async () => {
+    const { fixtureRegistry } = await import("./__fixtures__/registry");
+    const r = fixtureRegistry();
+    expect(r.errors).toEqual([]);
+    expect(r.registry.assets.map((a) => [a.id, a.review_status])).toEqual([["asset.servo-generic-anatomy", "draft"], ["asset.fx-servo-generic-anatomy", "published"]]);
+    for (const c of r.registry.assets[0]!.teaches) for (const level of ["L1", "L2", "L3"] as const) {
+      const s = shortlist(r.registry, { concepts: [c], level });
+      expect([...s.ids].filter((id) => id.startsWith("asset."))).toEqual([]);
+    }
+    expect(loadRegistry(real(), PROD).registry.assets.map((a) => a.review_status)).toEqual(["draft"]);
+  });
+
+  it("a concept's prerequisites must exist", () => {
+    const concepts = [...readJson("concepts.json"), { id: "act.fx-orphan", title: "Orphan", review_status: "draft", prerequisites: ["mech.force"] }];
+    expect(loadRegistry({ ...real(), concepts }, PROD).errors.join("\n")).toMatch(/act\.fx-orphan has unknown prerequisite "mech\.force"/);
+  });
+
   it("a simulation whose solver is not published is left out", () => {
     const reg = withItems([solver({ review_status: "reviewed" }), sim()]).registry;
     const s = shortlist(reg, { concepts: [C], level: "L2" });
@@ -261,12 +278,12 @@ describe("content/robotics/test-fixtures", () => {
     expect(r.registry.scenes).toEqual([]);
   });
 
-  it("every fixture is marked test_fixture and carries no review or verification record", async () => {
+  it("every fixture is marked test_fixture and carries no review or verification record (except a founder review named as a fixture)", async () => {
     const { fixtureFiles } = await load();
     const files = fixtureFiles();
     for (const { file, data } of [...files.scenes, ...files.capabilities]) {
       expect(data.test_fixture, file).toBe(true);
-      expect(data.review, file).toBeUndefined();
+      if (data.review) expect(data.review, file).toMatchObject({ by: expect.stringMatching(/^Test fixture/), role: "founder" });
       if (data.type === "source") expect(data.verified, file).toBeNull();
     }
   });

@@ -1,4 +1,5 @@
 import {
+  type AssetManifest,
   Capability,
   ConceptSeed,
   REVIEW_LABEL,
@@ -23,6 +24,8 @@ export interface Registry {
   analogies: AnalogyManifest[];
   sources: SourceManifest[];
   readings: ReadingManifest[];
+  /** 3D assets. Never offered to the professor directly (not in any shortlist). */
+  assets: AssetManifest[];
 }
 
 export interface RegistryInput {
@@ -36,11 +39,11 @@ export interface LoadOptions {
   allowTestFixtures: boolean;
 }
 
-const EMPTY: Registry = { concepts: [], scenes: [], solvers: [], simulations: [], analogies: [], sources: [], readings: [] };
+const EMPTY: Registry = { concepts: [], scenes: [], solvers: [], simulations: [], analogies: [], sources: [], readings: [], assets: [] };
 
 export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registry: Registry; errors: string[] } {
   const errors: string[] = [];
-  const reg: Registry = { ...EMPTY, concepts: [], scenes: [], solvers: [], simulations: [], analogies: [], sources: [], readings: [] };
+  const reg: Registry = { ...EMPTY, concepts: [], scenes: [], solvers: [], simulations: [], analogies: [], sources: [], readings: [], assets: [] };
   const where = new Map<string, string>(); // item ID → file, for duplicate and reference messages
   const fixtures = new Set<string>();
 
@@ -48,6 +51,7 @@ export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registr
   if (concepts.success) reg.concepts = concepts.data;
   else errors.push(`concepts: ${concepts.error.issues.map((i) => i.message).join("; ")}`);
   const conceptIds = new Set(reg.concepts.map((c) => c.id));
+  for (const c of reg.concepts) for (const p of c.prerequisites) if (!conceptIds.has(p)) errors.push(`concepts: ${c.id} has unknown prerequisite "${p}"`);
 
   const add = (file: string, item: { id: string; test_fixture?: true }) => {
     if (where.has(item.id)) {
@@ -83,6 +87,7 @@ export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registr
     else if (c.type === "simulation") reg.simulations.push(c);
     else if (c.type === "analogy") reg.analogies.push(c);
     else if (c.type === "source") reg.sources.push(c);
+    else if (c.type === "asset") reg.assets.push(c);
     else reg.readings.push(c);
   }
 
@@ -92,7 +97,8 @@ export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registr
     if (!where.has(toId)) errors.push(`${file}: ${fromId} refers to unknown ${what} "${toId}"`);
     else if (fixtures.has(toId) && !fromFixture) errors.push(`${file}: ${fromId} refers to test fixture "${toId}"`);
   };
-  const teaching = [...reg.scenes, ...reg.solvers, ...reg.simulations, ...reg.analogies, ...reg.readings];
+  const teaching = [...reg.scenes, ...reg.solvers, ...reg.simulations, ...reg.analogies, ...reg.readings, ...reg.assets];
+  for (const s of reg.scenes) if (s.asset) ref(s.id, !!s.test_fixture, s.asset, "asset");
   for (const item of teaching)
     for (const c of item.teaches) if (!conceptIds.has(c)) errors.push(`${where.get(item.id)}: ${item.id} teaches unknown concept "${c}"`);
 

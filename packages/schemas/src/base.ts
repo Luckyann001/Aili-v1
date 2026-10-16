@@ -20,8 +20,12 @@ export type ConceptId = z.infer<typeof ConceptId>;
  * "published" for demos and tests, but never carries a review record: no reviewer is invented.
  */
 export function reviewRules(item: { id: string; review_status: string; review?: unknown; test_fixture?: true }, ctx: z.RefinementCtx) {
-  if (item.test_fixture && item.review) {
-    ctx.addIssue({ code: "custom", message: `${item.id}: a test fixture never carries a review record (no reviewer may be invented)` });
+  // One exception (Lucky's decision 2026-10-16): a fixture standing in for a founder-reviewed demo item
+  // may carry a founder review, named as a fixture, so no real reviewer is invented.
+  const review = item.review as { by?: string; role?: string } | undefined;
+  const fixtureFounder = !!review && review.role === "founder" && /^test fixture/i.test(review.by ?? "");
+  if (item.test_fixture && item.review && !fixtureFounder) {
+    ctx.addIssue({ code: "custom", message: `${item.id}: a test fixture never carries a review record (no reviewer may be invented), except a founder review named as a test fixture` });
   } else if (!item.test_fixture && item.review_status !== "draft" && !item.review) {
     ctx.addIssue({ code: "custom", message: `${item.id}: "${item.review_status}" needs a named human reviewer and date (review.by, review.on); the AI never publishes` });
   }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ConceptId, Fidelity, ReviewStatus, reviewRules } from "./base";
-import { KebabId, Level, Provenance, Review } from "./scene";
+import { AssetId, KebabId, Level, Provenance, Review } from "./scene";
 
 // Capability registry beyond scenes (architecture §4 and §11): solvers, simulations, analogies,
 // and evidence (a source plus a reading item). JSON in git, every field declared, unknown fields
@@ -202,5 +202,74 @@ export const ReadingManifest = z
   .superRefine((r, ctx) => reviewRules(r, ctx));
 export type ReadingManifest = z.infer<typeof ReadingManifest>;
 
-export const Capability = z.discriminatedUnion("type", [SolverManifest, SimulationManifest, AnalogyManifest, SourceManifest, ReadingManifest]);
+/**
+ * A 3D asset (visuals doc §1.2): a GLB with named part nodes, real units, a size budget and an honest
+ * label. Scripted or modelled offline; the AI never publishes it. Matches the manifest the authoring
+ * script writes (authoring/servo-anatomy/build_servo.py).
+ */
+const AssetPart = z
+  .object({
+    id: KebabId,
+    name: z.string().min(1),
+    role: z.string().min(1),
+    /** The GLB node that draws this part. */
+    node: z.string().min(1),
+    explode: z.object({ direction_gltf: z.tuple([z.number(), z.number(), z.number()]), distance_m: z.number().min(0) }).strict(),
+  })
+  .strict();
+export const AssetManifest = z
+  .object({
+    id: AssetId,
+    type: z.literal("asset"),
+    version: Semver,
+    title: z.string().min(1),
+    /** The honest one-line label shown with the asset (illustrative/generic vs measured). */
+    label: z.string().min(1),
+    fidelity: Fidelity,
+    provenance: Provenance,
+    /** Where it came from, in words (for example the tool and that it is generic, not measured). */
+    provenance_note: z.string().min(1),
+    license: z.string().min(1),
+    review_status: ReviewStatus,
+    review: Review.optional(),
+    test_fixture: z.literal(true).optional(),
+    format: z.literal("glb"),
+    /** Repository path of the GLB. */
+    file: z.string().regex(/\.glb$/),
+    /** The GLB's node names (each part's node must be one of them). */
+    nodes: z.array(z.string().min(1)).min(1),
+    size_kb: z.number().positive(),
+    triangles: z.number().int().positive(),
+    budget: z.object({ triangles: z.number().int().positive(), glb_kb: z.number().positive(), status: z.string().min(1) }).strict(),
+    units: z.literal("metres"),
+    shaft_axis: z.object({ blender: z.string().min(1), gltf: z.string().min(1), origin: z.string().min(1) }).strict().optional(),
+    parts: z.array(AssetPart).min(1),
+    materials: z
+      .object({ palette: z.record(z.string(), z.string()), exceptions: z.array(z.object({ part: KebabId, colour: z.string().min(1), why: z.string().min(1) }).strict()).default([]) })
+      .strict(),
+    gear_train: z
+      .object({ source: z.string().min(1), label: z.string().min(1), module_m: z.number().positive(), meshes: z.array(z.string()).min(1), ratio: z.number().positive(), ratio_note: z.string().min(1), accuracy: z.string().min(1) })
+      .strict()
+      .optional(),
+    teaches: z.array(ConceptId).min(1),
+    /** Concepts the asset would teach that are not in the concept graph yet (never validated as existing). */
+    teaches_proposed: z.array(ConceptId).default([]),
+    teaches_note: z.string().optional(),
+    stills: z.array(z.object({ file: z.string().min(1), engine: z.string().nullable() }).strict()).default([]),
+  })
+  .strict()
+  .superRefine((a, ctx) => {
+    reviewRules(a, ctx);
+    if (a.triangles > a.budget.triangles) ctx.addIssue({ code: "custom", message: `${a.id}: ${a.triangles} triangles is over the ${a.budget.triangles} budget` });
+    if (a.size_kb > a.budget.glb_kb) ctx.addIssue({ code: "custom", message: `${a.id}: ${a.size_kb} KB is over the ${a.budget.glb_kb} KB budget` });
+    const nodes = new Set(a.nodes);
+    for (const p of a.parts) if (!nodes.has(p.node)) ctx.addIssue({ code: "custom", message: `${a.id}: part "${p.id}" names node "${p.node}", which is not in the GLB's nodes` });
+    const ids = a.parts.map((p) => p.id);
+    const dup = ids.find((id, i) => ids.indexOf(id) !== i);
+    if (dup) ctx.addIssue({ code: "custom", message: `${a.id}: duplicate part "${dup}"` });
+    for (const e of a.materials.exceptions) if (!ids.includes(e.part)) ctx.addIssue({ code: "custom", message: `${a.id}: a colour exception names unknown part "${e.part}"` });
+  });
+export type AssetManifest = z.infer<typeof AssetManifest>;
+
+export const Capability = z.discriminatedUnion("type", [SolverManifest, SimulationManifest, AnalogyManifest, SourceManifest, ReadingManifest, AssetManifest]);
 export type Capability = z.infer<typeof Capability>;
