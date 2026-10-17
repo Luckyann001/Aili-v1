@@ -28,7 +28,7 @@ describe("scene registry: the files in content/robotics", () => {
   it("all load and validate", () => {
     const r = validateRegistry(sceneFiles(), concepts());
     expect(r.errors).toEqual([]);
-    expect(r.scenes.map((s) => s.id).sort()).toEqual(["base-joint-arm", "lever-analogy", "servo-arm"]);
+    expect(r.scenes.map((s) => s.id).sort()).toEqual(["bag-hold", "base-joint-arm", "lever-analogy", "servo-arm"]);
   });
 
   it("files written by the AI are drafts (the AI never publishes)", () => {
@@ -94,7 +94,7 @@ describe("drafts: visibility and label", () => {
 
   it("production excludes drafts unless the dev flag is set", () => {
     expect(visibleScenes([...scenes, reviewed], { includeDrafts: includeDraftsFromEnv({}) }).map((s) => s.id)).toEqual(["reviewed-scene"]);
-    expect(visibleScenes([...scenes, reviewed], { includeDrafts: includeDraftsFromEnv({ NEXT_PUBLIC_AILI_INCLUDE_DRAFTS: "1" }) })).toHaveLength(4);
+    expect(visibleScenes([...scenes, reviewed], { includeDrafts: includeDraftsFromEnv({ NEXT_PUBLIC_AILI_INCLUDE_DRAFTS: "1" }) })).toHaveLength(5);
     expect(includeDraftsFromEnv({ NEXT_PUBLIC_AILI_INCLUDE_DRAFTS: "true" })).toBe(false); // only "1" turns it on
   });
 

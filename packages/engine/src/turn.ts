@@ -34,8 +34,12 @@ export type TurnEvent = { turn_id: string; seq: number; rev: number } & (
       type: "turn.done";
       move: DirectorResponse["move"];
       explanation: TurnExplanation;
-      /** The analogy this turn used; `words_only` when the registry has no picture of it (the page says so). */
-      analogy?: { id: string; title: string; words_only: boolean };
+      /**
+       * The analogy this turn used. `words_only`: its picture was not on stage during this turn (it has
+       * none, or it was not put up); the page says so. `scene`: its picture, if one exists, so the page
+       * can clear the note the moment that scene appears.
+       */
+      analogy?: { id: string; title: string; words_only: boolean; scene?: string };
       /** The turn gave numbers about the scene on stage, from the stage's settings (the page's note resets). */
       stage_numbers?: true;
     }
@@ -554,7 +558,11 @@ export class TurnSession {
     if (rev !== this.rev) return;
     this.state = next;
     const an = r.analogy ? sl.analogies.find((a) => a.id === r.analogy) : undefined;
-    send({ type: "turn.done", move: r.move, explanation, ...(an ? { analogy: { id: an.id, title: an.title, words_only: !an.scene } } : {}), ...(stagedCalcs.size ? { stage_numbers: true as const } : {}) });
+    // Words only unless its picture was actually on stage during this turn (slice B, 17 Oct 2026): a
+    // picture that exists but was not put up still counts as told in words only.
+    const onStage = new Set([before.activeScene, ...r.actions.filter((a) => a.type === "select_scene").map((a) => (a as { scene: string }).scene)]);
+    const pictured = !!an?.scene && onStage.has(an.scene);
+    send({ type: "turn.done", move: r.move, explanation, ...(an ? { analogy: { id: an.id, title: an.title, words_only: !pictured, ...(an.scene ? { scene: an.scene } : {}) } } : {}), ...(stagedCalcs.size ? { stage_numbers: true as const } : {}) });
   }
 }
 

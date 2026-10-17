@@ -51,6 +51,7 @@
       ]
     }
   ],
+  "auto_select": false,
   "handover": [
     {
       "to": "servo-arm",

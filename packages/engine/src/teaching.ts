@@ -128,7 +128,7 @@ export function unsupportedAttributions(narration: ReadonlyArray<{ text: string 
  */
 export function selectSceneForConcept(
   r: DirectorResponse,
-  scenes: ReadonlyArray<{ id: string; teaches: readonly string[] }>,
+  scenes: ReadonlyArray<{ id: string; teaches: readonly string[]; auto_select?: boolean }>,
   activeScene: string | undefined,
   topicConcepts: readonly string[] = [],
 ): { r: DirectorResponse; warning: string } | null {
@@ -138,7 +138,8 @@ export function selectSceneForConcept(
   if (!concept) return null;
   // The scene on stage stays when it teaches the concept too (the servo + arm after the lever).
   if (scenes.some((s) => s.id === activeScene && s.teaches.includes(concept))) return null;
-  const scene = scenes.find((s) => s.teaches.includes(concept));
+  // Never a scene marked for the professor to select only (auto_select: false).
+  const scene = scenes.find((s) => s.auto_select !== false && s.teaches.includes(concept));
   if (!scene) return null;
   const why = named ? "the answer put no scene on stage" : "starting scene for the topic; the answer named no concept";
   // Bound to the first segment, so the scene is there as the explanation starts (M4 slice 1).

@@ -101,7 +101,7 @@ describe("capability registry: the files in content/robotics", () => {
     expect(r.registry.simulations.map((s) => s.id)).toEqual(["sim.servo-static-load"]);
     expect(r.registry.solvers.map((s) => s.id)).toEqual(["solver.static-torque-single-link"]);
     expect(r.registry.sources.map((s) => s.id).sort()).toEqual(["src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
-    expect(r.registry.scenes.map((s) => s.id).sort()).toEqual(["base-joint-arm", "lever-analogy", "servo-arm"]);
+    expect(r.registry.scenes.map((s) => s.id).sort()).toEqual(["bag-hold", "base-joint-arm", "lever-analogy", "servo-arm"]);
   });
 
   it("are drafts written by the AI: no review record, not fixtures", () => {
@@ -269,6 +269,34 @@ describe("shortlist: published items only, by concept and level", () => {
     // An asset animation on a scene with no asset is refused.
     const { asset: _a, ...noAsset } = readJson("scenes/servo-arm.json");
     expect(loadRegistry({ ...real(), scenes: [...dir("scenes").filter((f) => f.file !== "servo-arm.json"), { file: "servo-arm.json", data: noAsset }] }, PROD).errors.join("\n")).toMatch(/uses an asset, but names no asset/);
+  });
+
+  it("handovers are checked at load: target scene, units, never a mass or the learner's rating, parts exist", async () => {
+    const { readJson } = await import("./__fixtures__/registry");
+    const bag = readJson("scenes/bag-hold.json");
+    const load = (h: object) => {
+      const scenes = [...dir("scenes").filter((f) => f.file !== "bag-hold.json"), { file: "bag-hold.json", data: { ...bag, handover: [h] } }];
+      return loadRegistry({ ...real(), scenes }, PROD).errors.join("\n");
+    };
+    expect(loadRegistry(real(), PROD).errors).toEqual([]); // the real handover is valid
+    expect(load({ to: "no-such-scene", settings: [{ from: "reach_m", to: "arm_length_m" }] })).toMatch(/refers to unknown scene "no-such-scene"/);
+    expect(load({ to: "servo-arm", settings: [{ from: "reach_m", to: "load_mass_kg" }] })).toMatch(/units differ/);
+    expect(load({ to: "servo-arm", settings: [{ from: "reach_m", to: "rated_torque_nm" }] })).toMatch(/the learner enters themselves/);
+    expect(load({ to: "servo-arm", settings: [{ from: "reach_m", to: "no_such_m" }] })).toMatch(/is not a setting of "servo-arm"/);
+    expect(load({ to: "servo-arm", settings: [{ from: "reach_m", to: "arm_length_m" }], parts: [{ from: "bag", to: "no-such-part" }] })).toMatch(/is not a part of "servo-arm"/);
+    // A setting that is not the bag scene's own, caught by the scene schema.
+    expect(load({ to: "servo-arm", settings: [{ from: "weight_kg", to: "arm_length_m" }] })).toMatch(/carries "weight_kg", which is not one of this scene's settings/);
+  });
+
+  it("the bag scene's fixture copy matches the real one; each hands over to its own servo scene", async () => {
+    const { readJson } = await import("./__fixtures__/registry");
+    const strip = ({ id: _i, title: _t, level: _l, review_status: _r, test_fixture: _f, handover: _h, ...rest }: Record<string, unknown>) => rest;
+    const fx = readJson("test-fixtures/scene.fx-bag-hold.json");
+    const realBag = readJson("scenes/bag-hold.json");
+    expect(strip(fx)).toEqual(strip(realBag));
+    expect(fx.handover).toEqual(realBag.handover.map((h: { to: string }) => ({ ...h, to: "fx-servo-arm" })));
+    expect(realBag.handover[0].to).toBe("servo-arm");
+    expect(realBag.auto_select).toBe(false); // the engine never puts the bag on stage by itself
   });
 
   it("a concept's prerequisites must exist", () => {

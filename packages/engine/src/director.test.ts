@@ -39,7 +39,7 @@ const errs = (o: object, ctx = CTX) => run(o, ctx).errors;
 describe("director response: setup", () => {
   it("the fixture registry loads, and its shortlist holds the fixtures only (real content is draft)", () => {
     expect(loaded.errors).toEqual([]);
-    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-ruler-held-out", "analogy.fx-shopping-bag", "fx-lever", "fx-servo-arm", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
+    expect([...SL.ids].sort()).toEqual(["analogy.fx-long-wrench", "analogy.fx-ruler-held-out", "analogy.fx-shopping-bag", "fx-bag-hold", "fx-lever", "fx-servo-arm", "read.fx-moments", "sim.fx-servo-load", "solver.fx-torque", "src.fx-book"]);
   });
 
   it("a valid response passes", () => {
@@ -717,7 +717,7 @@ describe("analogy honesty rule: a picture only when one exists (docs/m4-plan.md 
   });
   it("pointing at an analogy object with no picture on stage is a warning; 'Picture …' in words is not", () => {
     expect(warn({ analogy: "analogy.fx-shopping-bag", narration: [seg("n1", "Watch the bag as your arm stretches out.")], actions: [] })).toEqual([
-      'analogy not pictured: narration[0] points at "bag" from "analogy.fx-shopping-bag", but no picture of it is on stage (it has none: words only)',
+      'analogy not pictured: narration[0] points at "bag" from "analogy.fx-shopping-bag", but no picture of it is on stage',
     ]);
     expect(warn({ analogy: "analogy.fx-shopping-bag", narration: [seg("n1", "Picture holding a bag at arm's length.")], actions: [] })).toEqual([]);
   });

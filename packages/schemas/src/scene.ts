@@ -99,6 +99,12 @@ export const SceneManifest = z
     animations: z.array(SceneAnimation).default([]),
     /** The 3D asset this scene draws, if any (its manifest is in the capability registry). */
     asset: AssetId.optional(),
+    /**
+     * May the engine put this scene on stage by itself (the starting scene, or the scene for a concept
+     * the answer named)? False for a scene that should appear only when the professor selects it, like
+     * an analogy's picture that hands over to another scene (slice B, 17 Oct 2026).
+     */
+    auto_select: z.boolean().default(true),
     /** Human-written handovers to other scenes: which settings and parts carry across. */
     handover: z.array(SceneHandover).default([]),
     /** Fixed inputs for the scene's solver (SI, unit in the name). Never shown as results. */

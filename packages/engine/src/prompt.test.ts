@@ -53,8 +53,11 @@ describe("assembly", () => {
     expect(a.input.indexOf("<shortlist>")).toBeLessThan(a.input.indexOf("<session_state>"));
     expect(a.input.indexOf("<session_state>")).toBeLessThan(a.input.indexOf("<learner_input>"));
     const sl = JSON.parse(unescape(blockOf(a.input, "shortlist")));
-    expect(sl.scenes[0]).toMatchObject({ id: "fx-lever", on_stage: true });
-    expect(sl.scenes[0].settings[0]).toEqual({ id: "weight_distance_m", unit: "m", min: 0.03, max: 0.3 });
+    const lever = sl.scenes.find((x: { id: string }) => x.id === "fx-lever");
+    expect(lever).toMatchObject({ id: "fx-lever", on_stage: true });
+    expect(lever.settings[0]).toEqual({ id: "weight_distance_m", unit: "m", min: 0.03, max: 0.3 });
+    // No scene titles (Lucky's decision 2026-10-17): IDs, part names and settings only.
+    for (const x of sl.scenes) expect(x.title, x.id).toBeUndefined();
     // The servo + arm's rated torque is the learner's to enter, so it is not offered to the model.
     const servo = sl.scenes.find((x: { id: string }) => x.id === "fx-servo-arm");
     expect(servo.settings.map((x: { id: string }) => x.id)).toEqual(["arm_length_m", "arm_mass_kg", "load_mass_kg", "load_distance_m"]);
@@ -66,7 +69,7 @@ describe("assembly", () => {
     expect(sl.solvers[0].excludes).toBeUndefined();
     expect(sl.readings[0].guide.key_claims[0]).toBe("Moment is force times distance");
     // Each analogy says whether a picture of it exists (docs/m4-plan.md addendum A). The block groups items by kind + "s".
-    expect(Object.fromEntries(sl.analogys.map((x: { id: string; visual: string }) => [x.id, x.visual]))).toEqual({ "analogy.fx-long-wrench": "none", "analogy.fx-ruler-held-out": "fx-lever", "analogy.fx-shopping-bag": "none" });
+    expect(Object.fromEntries(sl.analogys.map((x: { id: string; visual: string }) => [x.id, x.visual]))).toEqual({ "analogy.fx-long-wrench": "none", "analogy.fx-ruler-held-out": "fx-lever", "analogy.fx-shopping-bag": "fx-bag-hold" }) // its picture since slice B;
     const state = JSON.parse(unescape(blockOf(a.input, "session_state")));
     expect(state).toMatchObject({ request_id: "turn_7", state_rev: 7, posture: "learning", open_prompt: { from_turn: 1 }, last_moves: [{ move: "explain", asked: true }] });
     expect(unescape(blockOf(a.input, "learner_input")).trim()).toBe("Why is it harder to hold far out?");

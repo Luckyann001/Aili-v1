@@ -1032,10 +1032,22 @@ describe("turn.done names the analogy and whether it is words only (docs/m4-plan
     const last = events.at(-1)!;
     return last.type === "turn.done" ? last.analogy : last.type;
   };
-  it("a words-only analogy, one with a picture, and none", async () => {
-    expect(await done("analogy.fx-shopping-bag")).toEqual({ id: "analogy.fx-shopping-bag", title: "Holding a shopping bag at arm's length (test fixture)", words_only: true });
-    expect(await done("analogy.fx-ruler-held-out")).toEqual({ id: "analogy.fx-ruler-held-out", title: "A ruler held out (test fixture)", words_only: false });
+  it("words only unless its picture was on stage this turn; one with a picture on stage; none", async () => {
+    // The bag has a picture now (fx-bag-hold), but this turn did not put it up: still told in words only.
+    expect(await done("analogy.fx-shopping-bag")).toEqual({ id: "analogy.fx-shopping-bag", title: "Holding a shopping bag at arm's length (test fixture)", words_only: true, scene: "fx-bag-hold" });
+    expect(await done("analogy.fx-ruler-held-out")).toEqual({ id: "analogy.fx-ruler-held-out", title: "A ruler held out (test fixture)", words_only: false, scene: "fx-lever" });
     expect(await done()).toBeUndefined();
+  });
+  it("the bag told with its picture put on stage this turn: not words only", async () => {
+    const VALID2 = (validRecording.steps[0] as { ok: { json: Record<string, unknown> } }).ok.json;
+    const told = [{ id: "n1", text: "Hold a bag out: your shoulder is the servo, the bag is the load, your arm is the arm." }, { id: "n2", text: "Where it breaks down: a shoulder tires, a servo heats up while it holds." }];
+    const director: Director = { async respond(req) { return { response: { ...VALID2, request_id: req.request_id, state_rev: req.state_rev, analogy: "analogy.fx-shopping-bag", narration: told, calc_requests: [], actions: [{ type: "select_scene", scene: "fx-bag-hold", at: "n1" }] } }; } };
+    const s = new TurnSession({ registry, director, router: createFakeRouter(), state: start(), concepts: ["mech.torque.static"], level: "L2" });
+    const events: TurnEvent[] = [];
+    await s.run(input, (e) => events.push(e));
+    const last = events.at(-1)!;
+    expect(last.type, JSON.stringify(last)).toBe("turn.done");
+    expect(last.type === "turn.done" && last.analogy).toEqual({ id: "analogy.fx-shopping-bag", title: "Holding a shopping bag at arm's length (test fixture)", words_only: false, scene: "fx-bag-hold" });
   });
 });
 

@@ -52,7 +52,8 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
       kind: "scene",
       rank: s.id === activeScene ? 100 : 30,
       keep: s.id === activeScene || hasSafety(s),
-      data: { id: s.id, title: s.title, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.filter((p) => !p.learner_supplied).map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id) },
+      // No title (Lucky's decision 2026-10-17, option 1): the ID and part names say what the scene is; titles stay in the UI.
+      data: { id: s.id, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.filter((p) => !p.learner_supplied).map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id) },
     });
   const usedSolvers = new Set(sl.simulations.map((s) => s.solver.id));
   // The learner's rating never reaches the model: no rated-torque inputs, no rating share (Lucky's decision 2026-10-15).
