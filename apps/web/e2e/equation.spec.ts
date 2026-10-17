@@ -25,9 +25,11 @@ const N3 = /^Next the distance/;
 const N4 = /^Force times distance is the torque/;
 
 /**
- * Turns 1 to 5, each sent as soon as the stage has what the next turn needs (an early send is an
- * interrupt, as a learner would do it): turn 1 plays to its question (turn 2's slide needs the lever).
- * Then turn 6 is sent; returns when its first caption shows.
+ * Turns 1 to 5, each played to its LAST line before the next is sent, then turn 6 is sent; returns
+ * when turn 6's first caption shows. Not sent early (16 Oct 2026): an early send interrupts the turn,
+ * the next request then says the learner saw only its first segment, and under load that could leave
+ * out a scene change, so the next recorded answer failed its checks and its repair used up the
+ * following recorded step: the recording then ran a turn ahead (3 failures in a full run).
  */
 async function toTurn6(page: Page, o: { muted?: boolean } = {}) {
   await installVoiceFakes(page, { speakMs: 3000 });
@@ -37,20 +39,21 @@ async function toTurn6(page: Page, o: { muted?: boolean } = {}) {
   await welcomeBox(page).fill("teach me robotics");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(caption(page)).toHaveText(/^If the weight slides farther/, { timeout: 40_000 });
-  await send(page, "It gets harder");
-  await expect(caption(page)).toHaveText(/^Yes, farther out is harder/, { timeout: 30_000 });
-  await send(page, "show me a real servo");
-  await expect(caption(page)).toHaveText(/^Now the same idea on a robot joint/, { timeout: 30_000 });
-  await send(page, "the rated torque");
-  await expect(caption(page)).toHaveText(/^Yes, check its rated torque/, { timeout: 30_000 });
-  await send(page, "Yes");
-  await expect(caption(page)).toHaveText(/^Here is the ruler held out/, { timeout: 30_000 });
+  for (const [text, last] of [
+    ["It gets harder", /^Watch the weight slide out to the end/],
+    ["show me a real servo", /^What would you check on your own servo's datasheet/],
+    ["the rated torque", /^Shall we look at the ruler held out again/],
+    ["Yes", /^Why does the far weight take more effort/],
+  ] as const) {
+    await send(page, text);
+    await expect(caption(page)).toHaveText(last, { timeout: 60_000 });
+  }
   await send(page, "Longer lever");
   await expect(caption(page)).toHaveText(/^Yes, a longer lever/, { timeout: 30_000 });
 }
 
 test.describe("τ = F × d on the servo + arm (slice B), recorded live path", () => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   test.beforeEach(async ({ page, baseURL }) => {
     await page.context().addCookies([{ name: "aili-e2e-live", value: "1", url: baseURL! }]);
   });
@@ -119,6 +122,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
   // Screenshots for Lucky (git-ignored apps/web/screenshots/equation): desktop and phone, after turn 7.
   test("screenshots of the equation on the servo + arm", async ({ page }, info) => {
     test.skip(info.project.name !== "desktop", "taken once");
+    test.setTimeout(600_000);
     const dir = "screenshots/equation";
     mkdirSync(dir, { recursive: true });
     for (const [width, height, name] of [[1280, 800, "desktop"], [412, 915, "phone"]] as const) {
@@ -139,7 +143,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
   // another label, a part label or the torque panel.
   test("desktop: no label overlap at the slider extremes (arm length, load distance, load mass)", async ({ page }, info) => {
     test.skip(info.project.name !== "desktop", "desktop layout; phones show one full label at a time");
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
     await toTurn6(page);
     await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 30_000 });
     await send(page, "The arm itself");
@@ -192,7 +196,7 @@ test.describe("τ = F × d on the servo + arm (slice B), recorded live path", ()
   // Option A (Lucky's decision 2026-10-15): after a turn that gave numbers about the scene, moving a
   // slider shows "The professor's numbers use the settings from its last turn."; the next such turn clears it.
   test("a slider moved after the professor's numbers shows the settings note; the next turn with numbers clears it", async ({ page }, info) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
     await toTurn6(page);
     await expect(caption(page)).toHaveText(/^What else pulls down on the joint/, { timeout: 30_000 });
     await send(page, "The arm itself");
