@@ -18,6 +18,10 @@ export interface StageScene {
   id: string;
   params: readonly StageParam[];
   solver?: { id: string; constants: Record<string, number> };
+  /** Human-written handovers to other scenes (slice B): settings that carry across on select_scene. */
+  handover?: ReadonlyArray<{ to: string; settings: ReadonlyArray<{ from: string; to: string }> }>;
+  /** What each animation leaves on stage (declared in the manifest): a setting at its min or max. */
+  animations?: ReadonlyArray<{ id: string; sets?: ReadonlyArray<{ param: string; to: "min" | "max" }> }>;
 }
 export type StageSettings = Record<string, number>;
 
@@ -45,18 +49,54 @@ export function applyStageSetting(scene: Pick<StageScene, "params">, settings: S
   return next;
 }
 
-/** The stage after a turn's actions: a new scene starts from its defaults; set_parameter changes a setting. */
+/**
+ * The settings of scene `to` when a turn selects it while `from` is on stage: the target's defaults,
+ * then the handover the scene on stage declares for `to` (each value through applyStageSetting, so it
+ * is clamped into the target's bounds and a load stays on its arm, in the manifest's order). The model
+ * only selects the scene; nothing it sends is read here.
+ */
+export function settingsAfterSelect(scenes: ReadonlyArray<StageScene>, from: { scene?: string; settings?: StageSettings }, to: string): StageSettings | undefined {
+  const target = scenes.find((s) => s.id === to);
+  if (!target) return undefined;
+  let next = stageDefaults(target);
+  const h = scenes.find((s) => s.id === from.scene)?.handover?.find((x) => x.to === to);
+  if (h && from.settings)
+    for (const m of h.settings) {
+      const v = from.settings[m.from];
+      if (v !== undefined) next = applyStageSetting(target, next, m.to, v);
+    }
+  return next;
+}
+
+/** The settings after an animation that declares what it leaves on stage (e.g. the reach at its maximum). */
+export function settingsAfterAnimation(scene: StageScene, settings: StageSettings, animation: string): StageSettings {
+  let next = settings;
+  for (const e of scene.animations?.find((a) => a.id === animation)?.sets ?? []) {
+    const p = scene.params.find((x) => x.id === e.param);
+    if (p) next = applyStageSetting(scene, next, p.id, e.to === "max" ? p.max : p.min);
+  }
+  return next;
+}
+
+/**
+ * The stage after a turn's actions: a new scene starts from its defaults plus any handover from the
+ * scene on stage; set_parameter changes a setting; an animation applies what it declares.
+ */
 export function stageAfterActions(
   scenes: ReadonlyArray<StageScene>,
   start: { scene?: string; settings?: StageSettings },
-  actions: ReadonlyArray<{ type: string; scene?: string; param?: string; value?: number }>,
+  actions: ReadonlyArray<{ type: string; scene?: string; param?: string; value?: number; animation?: string }>,
 ): { scene?: string; settings?: StageSettings } {
   let scene = start.scene;
   let settings = start.settings ?? (scene ? defaultsOf(scenes, scene) : undefined);
   for (const a of actions) {
     if (a.type === "select_scene" && a.scene && a.scene !== scene) {
+      settings = settingsAfterSelect(scenes, { scene, settings }, a.scene);
       scene = a.scene;
-      settings = defaultsOf(scenes, scene);
+    }
+    if (a.type === "play_animation" && scene && a.animation) {
+      const m = scenes.find((s) => s.id === scene);
+      if (m) settings = settingsAfterAnimation(m, settings ?? stageDefaults(m), a.animation);
     }
     if (a.type === "set_parameter" && scene && a.param !== undefined && a.value !== undefined) {
       const m = scenes.find((s) => s.id === scene);

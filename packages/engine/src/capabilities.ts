@@ -98,7 +98,24 @@ export function loadRegistry(input: RegistryInput, opts: LoadOptions): { registr
     else if (fixtures.has(toId) && !fromFixture) errors.push(`${file}: ${fromId} refers to test fixture "${toId}"`);
   };
   const teaching = [...reg.scenes, ...reg.solvers, ...reg.simulations, ...reg.analogies, ...reg.readings, ...reg.assets];
+  const sceneById = new Map(reg.scenes.map((s) => [s.id, s]));
   for (const s of reg.scenes) {
+    // Handovers (slice B): the target scene exists, each carried setting lands on a setting with the
+    // same unit (never the learner's rating, never a mass), and each mapped part exists there.
+    for (const h of s.handover) {
+      ref(s.id, !!s.test_fixture, h.to, "scene");
+      const t = sceneById.get(h.to);
+      if (!t) continue;
+      for (const m of h.settings) {
+        const from = s.params.find((p) => p.id === m.from)!;
+        const to = t.params.find((p) => p.id === m.to);
+        if (!to) errors.push(`${where.get(s.id)}: ${s.id} hands "${m.from}" over to "${m.to}", which is not a setting of "${t.id}"`);
+        else if (to.learner_supplied) errors.push(`${where.get(s.id)}: ${s.id} hands "${m.from}" over to "${m.to}", which the learner enters themselves`);
+        else if (to.unit !== from.unit) errors.push(`${where.get(s.id)}: ${s.id} hands "${m.from}" (${from.unit}) over to "${m.to}" (${to.unit}): the units differ`);
+        else if (from.unit === "kg") errors.push(`${where.get(s.id)}: ${s.id} hands a mass over ("${m.from}"): masses never carry`);
+      }
+      for (const m of h.parts) if (!t.parts.some((p) => p.id === m.to)) errors.push(`${where.get(s.id)}: ${s.id} maps part "${m.from}" to "${m.to}", which is not a part of "${t.id}"`);
+    }
     if (s.asset) ref(s.id, !!s.test_fixture, s.asset, "asset");
     else if (s.animations.some((a) => a.uses_asset)) errors.push(`${where.get(s.id)}: ${s.id} has an animation that uses an asset, but names no asset`);
   }

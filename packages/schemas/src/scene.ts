@@ -46,6 +46,25 @@ export const SceneAnimation = z
     description: z.string().min(1),
     /** Plays on the scene's 3D asset (explode, open, assemble): offered to the professor only when that asset is published. */
     uses_asset: z.literal(true).optional(),
+    /**
+     * What the animation leaves on stage, declared by a person: a setting taken to its minimum or maximum.
+     * The shared stage function applies it too, so the page and the server agree after it plays.
+     */
+    sets: z.array(z.object({ param: z.string().min(1), to: z.enum(["min", "max"]) }).strict()).default([]),
+  })
+  .strict();
+
+/**
+ * A human-written handover to another scene (slice B, 16 Oct 2026): when a turn selects `to` while
+ * this scene is on stage, these settings carry across (same units, clamped into the target's bounds)
+ * and a selected part becomes its counterpart. The model only selects the scene; it never supplies
+ * the values. Masses never carry.
+ */
+export const SceneHandover = z
+  .object({
+    to: KebabId,
+    settings: z.array(z.object({ from: z.string().min(1), to: z.string().min(1) }).strict()).min(1),
+    parts: z.array(z.object({ from: KebabId, to: KebabId }).strict()).default([]),
   })
   .strict();
 
@@ -80,6 +99,8 @@ export const SceneManifest = z
     animations: z.array(SceneAnimation).default([]),
     /** The 3D asset this scene draws, if any (its manifest is in the capability registry). */
     asset: AssetId.optional(),
+    /** Human-written handovers to other scenes: which settings and parts carry across. */
+    handover: z.array(SceneHandover).default([]),
     /** Fixed inputs for the scene's solver (SI, unit in the name). Never shown as results. */
     solver: z.object({ id: z.string().min(1), constants: z.record(z.string().regex(/_(m|kg|deg|m_per_s2)$/), z.number()) }).strict().optional(),
   })
@@ -93,6 +114,17 @@ export const SceneManifest = z
     ] as const) {
       const dup = ids.find((id, i) => ids.indexOf(id) !== i);
       if (dup) ctx.addIssue({ code: "custom", message: `${s.id}: duplicate ${what} ID "${dup}"` });
+    }
+    // An animation's effect names one of this scene's own settings, never the learner's rating.
+    for (const a of s.animations)
+      for (const e of a.sets) {
+        const p = s.params.find((x) => x.id === e.param);
+        if (!p || p.learner_supplied) ctx.addIssue({ code: "custom", message: `${s.id}: animation "${a.id}" sets "${e.param}", which is not one of this scene's settings` });
+      }
+    // A handover names this scene's own settings and parts (the target's are checked by the registry loader).
+    for (const h of s.handover) {
+      for (const m of h.settings) if (!s.params.some((p) => p.id === m.from)) ctx.addIssue({ code: "custom", message: `${s.id}: handover to "${h.to}" carries "${m.from}", which is not one of this scene's settings` });
+      for (const m of h.parts) if (!s.parts.some((p) => p.id === m.from)) ctx.addIssue({ code: "custom", message: `${s.id}: handover to "${h.to}" maps part "${m.from}", which is not one of this scene's parts` });
     }
   });
 export type SceneManifest = z.infer<typeof SceneManifest>;
