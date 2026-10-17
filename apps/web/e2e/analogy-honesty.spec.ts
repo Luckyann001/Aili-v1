@@ -3,8 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { installVoiceFakes } from "./voiceFakes";
 
 // The analogy honesty rule (docs/m4-plan.md addendum A), through the live path with the RECORDED
-// provider (e2e/fixtures/live-recording.json): turn 4 tells the shopping-bag analogy, which has no
-// picture, so the page says "Analogy in words only"; turn 5 tells the ruler analogy with its picture
+// provider (e2e/fixtures/live-recording.json): turn 4 tells the shopping-bag analogy without putting its
+// picture up, so the page says "Analogy in words only"; turn 5 tells the ruler analogy with its picture
 // on stage, so it does not.
 
 const welcomeBox = (p: Page) => p.getByRole("textbox", { name: "What do you want to learn?" });
@@ -39,10 +39,11 @@ test.describe("analogy honesty rule (addendum A), recorded live path", () => {
     await expect(caption(page)).toHaveText(/^What would you check on your own servo's datasheet/, { timeout: 30_000 });
     await expect(note(page)).toHaveCount(0);
 
-    // Turn 4: the bag, in words only (no picture exists; the stage keeps the servo + arm).
+    // Turn 4: the bag, in words only. Its picture exists since slice B (fx-bag-hold) but this turn does
+    // not put it up (the stage keeps the servo + arm), so it is still told in words only.
     await send(page, "the rated torque");
     await expect(caption(page)).toHaveText(/picture holding a shopping bag/, { timeout: 30_000 });
-    await expect(note(page)).toHaveText(/^Analogy in words only\. No picture of this yet\./);
+    await expect(note(page)).toHaveText(/^Analogy in words only\. Its picture is not on stage\./);
     await expect(page.getByRole("region", { name: "Explanation space" })).toBeVisible(); // still the servo + arm
     // Captions off: the label stays (the stage is still not a picture of the bag).
     await page.getByRole("button", { name: "Captions" }).click();

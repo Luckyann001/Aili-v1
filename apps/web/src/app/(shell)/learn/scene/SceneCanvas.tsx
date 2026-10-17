@@ -9,6 +9,7 @@ import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useSt
 import { BackSide, BufferGeometry, EdgesGeometry, Euler, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3, type Camera, type Material, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
+import { settingsOf } from "@/scene/handover";
 import { cornersOf, layoutBag, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
@@ -127,6 +128,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       {/* Re-mounted per scene, so each scene's triangle count is reported (and budget-tested). */}
       <ReadyProbe key={`${activeScene}:${assetState}`} onReady={props.onReady} />
       {activeScene === "servo-arm" && <ServoProbe host={props.host} reducedMotion={props.spatialMs <= 0} />}
+      <StageProbe host={props.host} />
     </Canvas>
   );
 }
@@ -1026,6 +1028,16 @@ function ServoProbe({ host, reducedMotion }: { host: RefObject<HTMLDivElement | 
     const lines = reducedMotion ? Object.keys(away).filter((id) => away[id]!.position.some((v, i) => Math.abs(v - home[id]!.position[i]!) > 1e-6)).length : 0;
     writeData(host, "offsetLines", String(lines));
   }, [host, view, moving, ghost, reducedMotion]);
+  return null;
+}
+
+/** For tests: the scene on stage and its settings, as the shared stage function names them (data-stage). */
+function StageProbe({ host }: { host: RefObject<HTMLDivElement | null> }) {
+  const scene = useScene((s) => s.activeScene);
+  const servo = useScene((s) => s.servo);
+  const lever = useScene((s) => s.leverDistance_m);
+  const bag = useScene((s) => s.bagReach_m);
+  useEffect(() => writeData(host, "stage", JSON.stringify({ scene, settings: settingsOf(scene, { servo, leverDistance_m: lever, bagReach_m: bag }) })), [host, scene, servo, lever, bag]);
   return null;
 }
 
