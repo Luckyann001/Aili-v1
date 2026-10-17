@@ -18,7 +18,9 @@ export const useStageContent = create<{
   sceneId: string | null;
   setSceneId: (id: string | null) => void;
   wordsOnlyAnalogy: string | null;
-  setWordsOnlyAnalogy: (title: string | null) => void;
+  /** That analogy's picture (a scene ID), if one exists: the note goes when it appears; null when it has none. */
+  wordsOnlyScene: string | null;
+  setWordsOnlyAnalogy: (title: string | null, scene?: string | null) => void;
   /** A professor turn gave numbers about the scene on stage (and none since the learner's changes). */
   stageNumbersGiven: boolean;
   settingsNote: boolean;
@@ -41,7 +43,8 @@ export const useStageContent = create<{
   sceneId: null,
   setSceneId: (sceneId) => set({ sceneId }),
   wordsOnlyAnalogy: null,
-  setWordsOnlyAnalogy: (wordsOnlyAnalogy) => set({ wordsOnlyAnalogy }),
+  wordsOnlyScene: null,
+  setWordsOnlyAnalogy: (wordsOnlyAnalogy, scene = null) => set({ wordsOnlyAnalogy, wordsOnlyScene: wordsOnlyAnalogy ? scene : null }),
   spaceOpenFor: null,
   setSpaceOpenFor: (spaceOpenFor) => set({ spaceOpenFor }),
   ratingRequest: 0,

@@ -10,6 +10,7 @@ import { useScene, type Actor } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
 import { ANIMATIONS } from "@/scene/animations";
+import { changeScene } from "@/scene/handover";
 import { isServoParam, type EqStep, type ServoParams } from "@/scene/servoArm";
 import { actionsByLine, DROPPED_MESSAGE, initialTurnClient, turnClientReducer, type TurnClientAction, type TurnClientState } from "./client";
 import { useStageContent } from "./stageContent";
@@ -26,6 +27,7 @@ export interface StageSnapshot {
   activeScene: SceneId;
   selectedId: string | null;
   leverDistance_m: number;
+  bagReach_m: number;
   servo: ServoParams;
   /** The equation steps on stage (servo + arm). */
   equation: EqStep[];
@@ -43,7 +45,7 @@ export interface StageSnapshot {
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
-const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy", "fx-servo-arm": "servo-arm" };
+const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy", "fx-servo-arm": "servo-arm", "fx-bag-hold": "bag-hold" };
 
 /** Live turns whose answer failed the checks twice: what the learner sees (their text is kept). */
 export const REJECTED_LIVE_MESSAGE = "I couldn't put a good answer together for that. Your message is back in the box: try rephrasing it, or send it again. Nothing on the stage changed.";
@@ -62,13 +64,14 @@ export const useTurnClient = create<{ state: TurnClientState<StageSnapshot>; dis
 
 const snapshotStage = (): StageSnapshot => {
   const s = useScene.getState();
-  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, servo: s.servo, equation: s.equation, servoView: s.servoView, servoBy: s.servoBy, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked, sceneId: useStageContent.getState().sceneId };
+  return { activeScene: s.activeScene, selectedId: s.selectedId, leverDistance_m: s.leverDistance_m, bagReach_m: s.bagReach_m, servo: s.servo, equation: s.equation, servoView: s.servoView, servoBy: s.servoBy, fixture: useStageContent.getState().fixture, live: useStageContent.getState().live, scenePicked: useStageContent.getState().scenePicked, sceneId: useStageContent.getState().sceneId };
 };
 
 function restoreStage(snap: StageSnapshot) {
   const s = useScene.getState();
   s.setScene(snap.activeScene);
   s.setLeverDistance(snap.leverDistance_m);
+  s.setBagReach(snap.bagReach_m);
   useScene.setState({ servo: snap.servo });
   s.setEquation(snap.equation);
   if (useScene.getState().servoView !== snap.servoView) useScene.getState().setServoView(snap.servoView, snap.servoBy, { snap: true });
@@ -85,7 +88,10 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
     case "select_scene": {
       const model = FIXTURE_SCENE_MODEL[a.scene] ?? (a.scene in MODELS ? (a.scene as SceneId) : null);
       if (model) {
-        s.setScene(model);
+        // The shared stage function decides the new scene's settings (and any handover), as on the server.
+        changeScene(model);
+        // The analogy's picture is on stage now: its "words only" note goes.
+        if (useStageContent.getState().wordsOnlyScene === a.scene) useStageContent.getState().setWordsOnlyAnalogy(null);
         useStageContent.getState().setScenePicked(true);
         useStageContent.getState().setSceneId(a.scene);
       }
@@ -227,7 +233,10 @@ export function useDemoTurn(voice: Voice, live = false, keepText?: (text: string
               if (seq === 0) {
                 useStageContent.getState().setFixture(true, live);
                 // An analogy with no picture is said to be words only, as its lines start.
-                useStageContent.getState().setWordsOnlyAnalogy(after.analogy?.words_only ? after.analogy.title : null);
+                // Words only unless its picture is on stage now; if the turn puts it up later, the note goes then.
+                const an = after.analogy;
+                const pictureOn = !!an?.scene && useStageContent.getState().sceneId === an.scene;
+                useStageContent.getState().setWordsOnlyAnalogy(an && (an.words_only || !pictureOn) ? an.title : null, an?.scene ?? null);
                 // Numbers about the scene from the stage's settings: the "last turn's settings" note goes.
                 if (after.stageNumbers) useStageContent.getState().stageNumbersTurn();
               }

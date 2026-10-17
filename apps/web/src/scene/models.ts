@@ -1,18 +1,21 @@
 import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import servoArmManifest from "../../../../content/robotics/scenes/servo-arm.json";
 import type { AssetPose } from "./assetPose";
-import { LEVER_LENGTH_M, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
+import bagManifest from "../../../../content/robotics/scenes/bag-hold.json";
+import { BAG_REACH, LEVER_LENGTH_M, layoutBag, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
 import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams } from "./servoArm";
 
 // The scenes the Learn stage can show (manifests: content/robotics/scenes/*.json). Each model lays
 // out its parts from the scene state; the 3D view, labels, framing and fallback all use this.
 
-export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm";
+export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm" | "bag-hold";
 
 export interface ModelState {
   params: Params;
   leverDistance_m: number;
+  /** Bag held out: shoulder to hand, metres (hands over to the servo's arm length). */
+  bagReach_m: number;
   servo: ServoParams;
   /** The servo + arm's servo view (settled, or on its way): the parts move with it. */
   servoPose?: AssetPose;
@@ -68,6 +71,21 @@ export const MODELS: Record<SceneId, SceneModel> = {
     layout: (s) => layoutLever(s.leverDistance_m),
     // The weight slides along the whole ruler in the lesson: frame both ends of its travel.
     framing: () => [layoutLever(0), layoutLever(LEVER_LENGTH_M)],
+  },
+  "bag-hold": {
+    id: "bag-hold",
+    title: "Holding a shopping bag out",
+    parts: [
+      { id: "shoulder", name: "Shoulder", fill: "explore" },
+      { id: "arm", name: "Arm", fill: "discovery" },
+      { id: "hand", name: "Hand", fill: "explore" },
+      { id: "bag", name: "Bag", fill: "expressive" },
+    ],
+    note: `${contentLabel(bagManifest as LabelledItem).label}. Everyday analogy, drawn from simple shapes: not a measurement.`,
+    explodable: false,
+    layout: (s) => layoutBag(s.bagReach_m),
+    // The bag moves out with the reach: frame both ends of its travel, so the camera never chases it.
+    framing: () => [layoutBag(BAG_REACH.min), layoutBag(BAG_REACH.max)],
   },
   "servo-arm": {
     id: "servo-arm",

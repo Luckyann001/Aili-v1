@@ -1,5 +1,5 @@
 import { cssDurationMs } from "@/design/duration";
-import { LEVER_LENGTH_M } from "./layout";
+import { BAG_REACH, LEVER_LENGTH_M } from "./layout";
 import type { AssetView } from "./assetPose";
 import { gearsInView, useScene, type Actor } from "./sceneStore";
 import { EQ_STEPS, type EqStep } from "./servoArm";
@@ -19,6 +19,21 @@ export function slideWeightOut(isCurrent: () => boolean): Promise<void> {
   const to = LEVER_LENGTH_M;
   const set = (d: number) => () => useScene.getState().setLeverDistance(d);
   return tween(isCurrent, (k) => set(from + (to - from) * k)(), [set(0.12), set(0.2), set(to)]);
+}
+
+/**
+ * Bag held out: the arm reaches from where it is to its longest (the manifest declares this, so the
+ * server's stage agrees and the reach that hands over to the servo is the long one). Same timing as
+ * the weight slide; under reduced motion, three still steps.
+ */
+export function bagReachOut(isCurrent: () => boolean): Promise<void> {
+  const from = useScene.getState().bagReach_m;
+  const to = BAG_REACH.max;
+  const at = (k: number) => () => useScene.getState().setBagReach(from + (to - from) * k);
+  return tween(isCurrent, (k) => at(k)(), [at(0.4), at(0.7), at(1)]).then(() => {
+    // An interrupt after the segment started still leaves the declared end state (as the server has it).
+    useScene.getState().setBagReach(to);
+  });
 }
 
 /**
@@ -136,6 +151,7 @@ function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Arra
 export const ANIMATIONS: Record<string, (isCurrent: () => boolean) => Promise<void>> = {
   "slide-weight-out": slideWeightOut,
   "slide-load-out": slideLoadOut,
+  "bag-reach-out": bagReachOut,
   ...Object.fromEntries(EQ_STEPS.map((step) => [step, showEqStep(step)])),
   "servo-explode": servoTo("exploded"),
   "servo-open": servoTo("open"),

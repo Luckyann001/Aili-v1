@@ -9,7 +9,7 @@ import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useSt
 import { BackSide, BufferGeometry, EdgesGeometry, Euler, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3, type Camera, type Material, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
-import { cornersOf, type PartLayout } from "@/scene/layout";
+import { cornersOf, layoutBag, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
@@ -106,6 +106,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         </AssetBoundary>
       )}
       {activeScene === "servo-arm" && <TorqueArrow colors={props.colors} />}
+      {activeScene === "bag-hold" && <BagHandle colors={props.colors} />}
       {activeScene === "servo-arm" && props.spatialMs <= 0 && <OffsetLines colors={props.colors} />}
       {activeScene === "servo-arm" && <EquationMarks colors={props.colors} />}
       <OrbitControls
@@ -142,15 +143,16 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const activeScene = useScene((s) => s.activeScene);
   const params = useScene((s) => s.params);
   const leverDistance_m = useScene((s) => s.leverDistance_m);
+  const bagReach_m = useScene((s) => s.bagReach_m);
   const servo = useScene((s) => s.servo);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
   const hidden = useServoAway() && HIDDEN_WHILE_APART.has(id);
 
-  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, servo, hidden, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, bagReach_m, servo, hidden, invalidate]);
 
   // Size depends on the scene settings; position also on the explode amount (set per frame).
-  const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m, servo }, k)[id]!;
+  const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m, bagReach_m, servo }, k)[id]!;
   const { kind, size } = layoutAt(0);
   useFrame(() => {
     ref.current?.position.set(...layoutAt(anim.explode).position);
@@ -436,6 +438,27 @@ function AssetNode({ id, node, bounds, colors, ghost }: { id: string; node: Obje
   );
 }
 
+/** The bag's handle: two thin straps from the hand down to the bag's top. Decoration, not a part. */
+function BagHandle({ colors }: { colors: SceneColors }) {
+  const reach = useScene((s) => s.bagReach_m);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [reach, colors, invalidate]);
+  const l = layoutBag(reach);
+  const hand = l.hand!.position;
+  const top = l.bag!.position[1] + l.bag!.size[1] / 2;
+  const y = (hand[1] + top) / 2;
+  return (
+    <group name="bag-handle">
+      {[-0.018, 0.018].map((dx) => (
+        <mesh key={dx} position={[hand[0] + dx, y, 0]} raycast={() => null}>
+          <boxGeometry args={[0.003, Math.max(0.001, hand[1] - top), 0.003]} />
+          <meshStandardMaterial color={colors.fills.expressive} roughness={0.7} metalness={0.05} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /**
  * Servo + arm: a curved arrow round the joint, the direction gravity turns the arm. Its sweep follows
  * the solver's needed torque on a fixed visual scale (not a measurement). It splits in two: the
@@ -693,6 +716,7 @@ function LabelTracker({
   const activeScene = useScene((s) => s.activeScene);
   const params = useScene((s) => s.params);
   const leverDistance_m = useScene((s) => s.leverDistance_m);
+  const bagReach_m = useScene((s) => s.bagReach_m);
   const servo = useScene((s) => s.servo);
   const servoFrom = useScene((s) => s.servoFrom);
   const servoView = useScene((s) => s.servoView);
@@ -703,7 +727,7 @@ function LabelTracker({
   // nothing else asking for a frame its labels stayed unplaced (found by the tap test under load).
   const equation = useScene((s) => s.equation);
   const viewer = useScene((s) => s.viewer);
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, servo, servoView, servoMotion, activeScene, equation, viewer, invalidate]);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, bagReach_m, servo, servoView, servoMotion, activeScene, equation, viewer, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
@@ -713,7 +737,7 @@ function LabelTracker({
     const { takeW, takeH } = reservedSpace(area);
     const w = area.clientWidth - takeW;
     const h = area.clientHeight - takeH;
-    const layout = MODELS[activeScene].layout({ params, leverDistance_m, servo, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) }, anim.explode);
+    const layout = MODELS[activeScene].layout({ params, leverDistance_m, bagReach_m, servo, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) }, anim.explode);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
     // For tests: the free area (canvas px) and each servo part's box on screen (the size checks).
     writeData(host, "freeArea", [area.offsetLeft, area.offsetTop, w, h].map((n) => n.toFixed(1)).join(","));
@@ -768,7 +792,7 @@ function LabelTracker({
       });
     }
     // Labels that are not parts (the equation's steps), placed the same way; the latest step wins space.
-    const extra = MODELS[activeScene].extraAnchors?.({ params, leverDistance_m, servo }) ?? {};
+    const extra = MODELS[activeScene].extraAnchors?.({ params, leverDistance_m, bagReach_m, servo }) ?? {};
     const latest = useScene.getState().equation.at(-1);
     for (const [id, anchor] of Object.entries(extra)) {
       const el = labels.current.get(id);

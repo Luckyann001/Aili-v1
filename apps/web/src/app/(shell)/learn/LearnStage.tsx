@@ -109,6 +109,7 @@ export function LearnStage() {
   const [welcomeGone, setWelcomeGone] = useState(false);
   const scenePicked = useStageContent((s) => s.scenePicked);
   const wordsOnlyAnalogy = useStageContent((s) => s.wordsOnlyAnalogy);
+  const wordsOnlyScene = useStageContent((s) => s.wordsOnlyScene);
   const settingsNote = useStageContent((s) => s.settingsNote);
   const showWelcome = live === true && !welcomeGone;
   // The bottom input takes over once the welcome has gone. Both boxes share inputRef, so this runs
@@ -288,7 +289,7 @@ export function LearnStage() {
               <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M2.5 4h9M2.5 7h9M2.5 10h5.5" />
               </svg>
-              Analogy in words only. No picture of this yet.
+              {wordsOnlyScene ? "Analogy in words only. Its picture is not on stage." : "Analogy in words only. No picture of this yet."}
               <span className={styles.srOnly}> ({wordsOnlyAnalogy.replace(/\s*\(test fixture\)$/, "")})</span>
             </p>
           )}

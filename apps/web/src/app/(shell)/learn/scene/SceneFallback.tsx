@@ -1,6 +1,6 @@
 "use client";
 
-import { LEVER_LENGTH_M } from "@/scene/layout";
+import { BAG_REACH, LEVER_LENGTH_M } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
 import { useScene } from "@/scene/sceneStore";
 import { JOINT, layoutServoArm, SERVO_PARTS, type ServoParams } from "@/scene/servoArm";
@@ -34,6 +34,18 @@ function lever(distance_m: number): Record<string, Shape> {
     hand: { x: 20, y: 95, w: 30, h: 40, label: [35, 150] },
     ruler: { x: 50, y: 110, w: 240, h: 8, label: [200, 140] },
     weight: { x: wx - 14, y: 82, w: 28, h: 28, label: [wx, 72] },
+  };
+}
+
+/** Bag held out, side view: the shoulder at x 40, the reach scaled so the longest fills the picture. */
+function bagHold(reach_m: number): Record<string, Shape> {
+  const r = Math.min(BAG_REACH.max, Math.max(BAG_REACH.min, reach_m));
+  const hx = 60 + (r / BAG_REACH.max) * 200; // the hand's x: 60 at no reach, 260 at the longest
+  return {
+    shoulder: { x: 30, y: 60, w: 30, h: 40, label: [45, 50] },
+    arm: { x: 60, y: 72, w: hx - 60, h: 14, label: [(60 + hx) / 2, 104] },
+    hand: { x: hx - 10, y: 70, w: 20, h: 18, label: [hx, 62] },
+    bag: { x: hx - 22, y: 112, w: 44, h: 50, label: [hx, 178] },
   };
 }
 
@@ -99,8 +111,9 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
   const activeScene = useScene((s) => s.activeScene);
   const distance = useScene((s) => s.leverDistance_m);
   const servo = useScene((s) => s.servo);
+  const bagReach = useScene((s) => s.bagReach_m);
   const model = MODELS[activeScene];
-  const shapes = activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : ARM;
+  const shapes = activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : activeScene === "bag-hold" ? bagHold(bagReach) : ARM;
   const names = model.parts.map((p) => p.name.toLowerCase()).join(", ");
   const parts = activeScene === "servo-arm" ? SERVO_ORDER.map((id) => model.parts.find((p) => p.id === id)!) : model.parts;
   return (

@@ -144,6 +144,30 @@ describe("recorded live path (test builds only)", () => {
     expect(said.join(" ")).not.toMatch(/\d/);
   });
 
+  it("turn 11: the bag with its picture, the reach-out, then the handover: the servo starts with the bag's reach as its arm length (slice B)", async () => {
+    const { handleTurn, sessions } = await load();
+    const sid = "recorded-test-0012";
+    const texts = ["teach me robotics", "It gets harder", "show me a real servo", "the rated torque", "Yes", "Longer lever", "The arm itself", "A shorter arm", "What is inside the servo?", "The gear train"];
+    for (const [i, text] of texts.entries()) {
+      const t = await readAll(await handleTurn(post(body(i + 1, text, sid))));
+      expect(t.at(-1)!.type, `turn ${i + 1}: ${JSON.stringify(t.at(-1))}`).toBe("turn.done");
+    }
+    const t11 = await readAll(await handleTurn(post(body(11, "Can you show me the bag example?", sid))));
+    const done = t11.at(-1)!;
+    expect(done.type, JSON.stringify(done)).toBe("turn.done");
+    expect(t11.filter((e) => e.type === "action").map((e) => (e as { action: unknown }).action)).toEqual([
+      { type: "select_scene", scene: "fx-bag-hold", at: "n1" },
+      { type: "play_animation", animation: "bag-reach-out", at: "n2" },
+      { type: "select_scene", scene: "fx-servo-arm", at: "n4" },
+      { type: "highlight_part", part: "load", at: "n4" },
+    ]);
+    // Told with its picture on stage: not words only.
+    expect(done).toMatchObject({ analogy: { id: "analogy.fx-shopping-bag", words_only: false, scene: "fx-bag-hold" } });
+    // The server's stage: the reach-out left the reach at its longest, and the handover carried it.
+    expect(sessions.get(sid)!.activeScene).toBe("fx-servo-arm");
+    expect(sessions.get(sid)!.stageSettings).toMatchObject({ arm_length_m: 0.3, load_distance_m: 0.3, arm_mass_kg: 0.04, load_mass_kg: 0.1 });
+  });
+
   it("an interrupted turn's note arrives inside the next turn's request: that turn starts from the stage the learner saw (M4 slice 1)", async () => {
     const { handleTurn, sessions } = await load();
     // Turn 5 puts the lever on stage in its SECOND segment; the learner interrupts during the first,

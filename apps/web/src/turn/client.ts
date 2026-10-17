@@ -25,8 +25,8 @@ export interface TurnClientState<Snapshot> {
   prompt: { text: string; parts: TextPart[]; chips: string[] } | null;
   /** The text panel's content, sent with turn.done. */
   explanation: TurnExplanation | null;
-  /** The analogy the turn used, if any, and whether it is words only (no picture exists). */
-  analogy?: { id: string; title: string; words_only: boolean } | null;
+  /** The analogy the turn used, if any: whether it was told in words only (its picture not on stage this turn), and its picture's scene. */
+  analogy?: { id: string; title: string; words_only: boolean; scene?: string } | null;
   /** The turn gave numbers about the scene on stage (from the stage's settings). */
   stageNumbers?: boolean;
   /** One plain line: the error, "Stopped." or the dropped connection. */

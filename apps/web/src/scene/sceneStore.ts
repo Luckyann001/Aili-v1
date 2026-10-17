@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
+import { BAG_REACH, DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
 import type { AssetPose, AssetView } from "./assetPose";
 import { MODELS, type SceneId } from "./models";
 import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type EqStep, type ServoParamId, type ServoParams } from "./servoArm";
@@ -19,6 +19,9 @@ export interface SceneState {
   /** Lever analogy: distance of the weight from the hand, metres (drawing; effort comes from the solver). */
   leverDistance_m: number;
   setLeverDistance: (d: number) => void;
+  /** Bag held out: shoulder to hand, metres (drawing; hands over to the servo's arm length). */
+  bagReach_m: number;
+  setBagReach: (r: number) => void;
   /** Servo + arm settings (SI). The torque shown comes from the solver, never from the drawing. */
   servo: ServoParams;
   setServoParam: (id: ServoParamId, value: number) => void;
@@ -99,6 +102,8 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
         : { activeScene: id, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene", gearsTurning: false, gearsBy: null, gearsSeq: s.gearsSeq + 1 },
     ),
   leverDistance_m: 0.05,
+  bagReach_m: 0.1,
+  setBagReach: (r) => set(() => ({ bagReach_m: Math.min(BAG_REACH.max, Math.max(BAG_REACH.min, r)) })),
   setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
   servo: DEFAULT_SERVO_PARAMS,
   setServoParam: (id, value) => set((s) => ({ servo: setServoParam(s.servo, id, value) })),

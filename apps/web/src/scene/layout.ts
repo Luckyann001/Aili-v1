@@ -111,3 +111,26 @@ export function layoutLever(weightDistance_m: number): Record<string, PartLayout
     weight: { kind: "box", size: [WEIGHT_S, WEIGHT_S, WEIGHT_S], position: [d, LEVER_Y + RULER_T / 2 + WEIGHT_S / 2, 0], labelAnchor: [d, LEVER_Y + RULER_T / 2 + WEIGHT_S, 0] },
   };
 }
+
+// ── Bag held out (content/robotics/scenes/bag-hold.json; slice B, 17 Oct 2026) ─────────────────
+// A shoulder block, a straight arm out to the hand, and a shopping bag hanging from the hand by its
+// handle. One setting, the reach (shoulder to hand), which hands over to the servo's arm length.
+// Drawing sizes only, no numbers: illustrative, generic, not measured.
+
+export const BAG_REACH = { min: 0.1, max: 0.3 } as const;
+const SHOULDER_Y = 0.16;
+const BAG_ARM_T = 0.03;
+/** The handle's drop from the hand to the bag's top (drawn by the 3D view as two thin straps). */
+export const BAG_HANDLE_DROP_M = 0.03;
+const BAG = { w: 0.07, h: 0.08, d: 0.045 };
+
+export function layoutBag(reach_m: number): Record<string, PartLayout> {
+  const r = Math.min(BAG_REACH.max, Math.max(BAG_REACH.min, reach_m));
+  const bagTop = SHOULDER_Y - BAG_ARM_T / 2 - BAG_HANDLE_DROP_M;
+  return {
+    shoulder: { kind: "box", size: [0.06, 0.07, 0.06], position: [-0.03, SHOULDER_Y, 0], labelAnchor: [-0.03, SHOULDER_Y + 0.035, 0] },
+    arm: { kind: "box", size: [r, BAG_ARM_T, 0.035], position: [r / 2, SHOULDER_Y, 0], labelAnchor: [r * 0.45, SHOULDER_Y + BAG_ARM_T / 2, 0] },
+    hand: { kind: "box", size: [0.035, 0.04, 0.04], position: [r, SHOULDER_Y, 0], labelAnchor: [r, SHOULDER_Y + 0.02, 0] },
+    bag: { kind: "box", size: [BAG.w, BAG.h, BAG.d], position: [r, bagTop - BAG.h / 2, 0], labelAnchor: [r + BAG.w / 2, bagTop - BAG.h / 2, 0] },
+  };
+}
