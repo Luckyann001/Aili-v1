@@ -1,0 +1,14 @@
+{
+  "id": "src.mit-16-30-feedback-control-2010",
+  "type": "source",
+  "kind": "course",
+  "title": "16.30 Feedback Control Systems, Fall 2010",
+  "authors": [
+    "MIT OpenCourseWare"
+  ],
+  "edition": "Fall 2010",
+  "url": "https://ocw.mit.edu/courses/16-30-feedback-control-systems-fall-2010/",
+  "access": "free",
+  "rights": "CC BY-NC-SA (as stated in docs/lesson-drone-pid.md, not yet checked on the page): link only, no copying into Aili",
+  "verified": null
+}

@@ -1,0 +1,42 @@
+{
+  "id": "read.pid-altitude-intro",
+  "type": "reading",
+  "version": "0.1.0",
+  "teaches": [
+    "ctl.open-vs-closed-loop",
+    "ctl.error",
+    "ctl.proportional",
+    "ctl.overshoot",
+    "ctl.steady-state-error",
+    "ctl.derivative",
+    "ctl.integral"
+  ],
+  "review_status": "draft",
+  "source": "src.mit-16-30-feedback-control-2010",
+  "location": "The PID lecture: not chosen yet. Lucky picks the lecture and checks each key claim against it (docs/lesson-drone-pid.md, reading guide).",
+  "level": "L1",
+  "purpose": "intro",
+  "est_minutes": 30,
+  "guide": {
+    "key_claims": [
+      "A feedback controller measures, compares with the target, and corrects, over and over.",
+      "P pushes in proportion to the current gap.",
+      "With gravity, P alone leaves the drone below the target, because it needs a gap to make the thrust that holds it up.",
+      "D pushes against the speed of change, which damps the bounce. At rest it adds nothing.",
+      "I adds up the gap over time, so it keeps increasing thrust until the gap is zero. At rest it holds the weight.",
+      "Too much P or I causes overshoot and ringing (too much I can stop it settling at all); too much D makes it sluggish, and on real drones amplifies sensor noise."
+    ],
+    "misconceptions": [
+      "\"D makes the drone go faster.\" It does the opposite: it resists fast changes.",
+      "\"I is just a stronger P.\" P reacts to the gap now; I reacts to the gap's history.",
+      "\"Bigger gains are always better.\" They trade a smaller gap for more bounce, and motors have a limit.",
+      "\"The controller knows the drone's weight.\" A basic PID doesn't; it only sees the gap.",
+      "\"P only should reach the target eventually if you wait.\" With a constant pull like gravity, it never does."
+    ],
+    "teach_back_prompts": [
+      "In one sentence each, what do P, I and D do?",
+      "Why does a P-only drone hover low?"
+    ],
+    "application_question": "A delivery drone picks up a parcel mid-flight. What happens to its height with P and D only, and what fixes it?"
+  }
+}

@@ -1,0 +1,1027 @@
+{
+  "id": "drone-pid",
+  "title": "A drone holding its height",
+  "prepared": true,
+  "beats": [
+    {
+      "id": "hook",
+      "kind": "framing",
+      "move": "explain",
+      "narration": [
+        {
+          "id": "hook-1",
+          "text": "This drone has no pilot."
+        },
+        {
+          "id": "hook-2",
+          "text": "Many times a second it measures its height and decides how hard to spin its propellers."
+        },
+        {
+          "id": "hook-3",
+          "text": "Watch the gust push it down. It climbs back on its own."
+        },
+        {
+          "id": "hook-4",
+          "text": "In this lesson you'll build that decision yourself."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select_scene",
+          "scene": "drone-altitude"
+        },
+        {
+          "type": "apply_preset",
+          "preset": "pid"
+        },
+        {
+          "type": "set_parameter",
+          "param": "wind_force_n",
+          "value": 4
+        },
+        {
+          "type": "set_parameter",
+          "param": "wind_start_s",
+          "value": 1
+        },
+        {
+          "type": "set_parameter",
+          "param": "wind_duration_s",
+          "value": 1
+        },
+        {
+          "type": "run_simulation",
+          "by": "aili",
+          "start": "hover"
+        }
+      ]
+    },
+    {
+      "id": "hook-probe",
+      "kind": "probe",
+      "move": "probe",
+      "concepts": [
+        "ctl.error"
+      ],
+      "narration": [
+        {
+          "id": "hook-probe-1",
+          "text": "Suppose the drone is below its target. What should it do?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "set_parameter",
+          "param": "wind_force_n",
+          "value": 0
+        },
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "push-harder",
+              "label": "Push harder"
+            },
+            {
+              "id": "push-less",
+              "label": "Push less"
+            },
+            {
+              "id": "not-sure",
+              "label": "No idea"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hook-commit",
+      "kind": "commit",
+      "move": "probe",
+      "narration": [
+        {
+          "id": "hook-commit-1",
+          "text": "Got it. Here's how the drone decides."
+        }
+      ]
+    },
+    {
+      "id": "hook-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.error"
+      ],
+      "narration": [
+        {
+          "id": "hook-reveal-1",
+          "text": "Too low means more thrust, so it climbs. Too high means less, so it sinks."
+        }
+      ],
+      "feedback": {
+        "about": "hook-probe",
+        "correct_choice": "push-harder",
+        "correct": "Yes: too low means push harder.",
+        "incorrect": "Pushing less would let it sink further. Too low needs more thrust, so it climbs.",
+        "unsure": "That's a fair place to start. Too low needs more thrust, so it climbs."
+      }
+    },
+    {
+      "id": "loop",
+      "kind": "explain",
+      "move": "explain",
+      "concepts": [
+        "ctl.open-vs-closed-loop",
+        "ctl.error"
+      ],
+      "narration": [
+        {
+          "id": "loop-1",
+          "text": "Measure: the height sensor under the body reads how high the drone is."
+        },
+        {
+          "id": "loop-2",
+          "text": "Compare: the gap between where it is and where it should be is called the error."
+        },
+        {
+          "id": "loop-3",
+          "text": "Correct: it changes its thrust to close the gap, then measures again."
+        },
+        {
+          "id": "loop-4",
+          "text": "Every controller in this lesson only ever looks at that gap. The question is how to turn a gap into thrust."
+        }
+      ],
+      "actions": [
+        {
+          "type": "highlight_part",
+          "part": "sensor-altitude"
+        },
+        {
+          "type": "play_animation",
+          "animation": "feedback-loop"
+        }
+      ],
+      "explanation": {
+        "title": "The feedback loop",
+        "body": "Measure the height, compare it with the target, correct the thrust, and repeat. The error is the target height minus the measured height.",
+        "assumptions": [
+          "the drone moves only up and down",
+          "drag is simplified and exaggerated so the bounce dies out quickly"
+        ]
+      }
+    },
+    {
+      "id": "p-predict",
+      "kind": "probe",
+      "move": "probe",
+      "concepts": [
+        "ctl.proportional"
+      ],
+      "narration": [
+        {
+          "id": "p-predict-1",
+          "text": "Here's the simplest rule: push harder the bigger the gap. That's P, for proportional."
+        },
+        {
+          "id": "p-predict-2",
+          "text": "Where will the drone end up?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "p-only"
+        },
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "on-target",
+              "label": "Exactly on target"
+            },
+            {
+              "id": "above",
+              "label": "Above it"
+            },
+            {
+              "id": "below",
+              "label": "Below it"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p-commit",
+      "kind": "commit",
+      "move": "probe",
+      "narration": [
+        {
+          "id": "p-commit-1",
+          "text": "Got it. Press Run to test your guess."
+        }
+      ]
+    },
+    {
+      "id": "p-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "p-reveal-1",
+          "text": "It rises, bobs, and settles below the line, short by {{final_error_m}}."
+        },
+        {
+          "id": "p-reveal-2",
+          "text": "At rest the thrust arrow and the weight arrow are the same length."
+        }
+      ],
+      "actions": [
+        {
+          "type": "run_simulation",
+          "by": "learner",
+          "start": "ground"
+        }
+      ],
+      "feedback": {
+        "about": "p-predict",
+        "correct_choice": "below",
+        "correct": "You predicted below the target, and that is what happened.",
+        "incorrect": "You expected it somewhere else. It settles below the target, and here is why.",
+        "unsure": "You weren't sure, and that's fine. It settles below the target, and here is why."
+      }
+    },
+    {
+      "id": "p-mechanism",
+      "kind": "explain",
+      "move": "explain",
+      "concepts": [
+        "ctl.proportional",
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "p-mechanism-1",
+          "text": "To hover, thrust must equal the drone's weight."
+        },
+        {
+          "id": "p-mechanism-2",
+          "text": "But P only pushes when there's a gap."
+        },
+        {
+          "id": "p-mechanism-3",
+          "text": "So the drone sinks until the gap is just big enough to make that thrust. No gap, no push."
+        }
+      ],
+      "explanation": {
+        "title": "Why P alone hovers low",
+        "body": "At rest the speed is zero, so the only push is P: Kp times the gap. To hold the drone up that push must equal its weight, so a gap has to remain. A bigger Kp needs a smaller gap, but never none.",
+        "assumptions": [
+          "the drone moves only up and down",
+          "drag is simplified and exaggerated so the bounce dies out quickly"
+        ],
+        "limits": [
+          "a basic PID does not know the drone's weight; it only sees the gap"
+        ]
+      }
+    },
+    {
+      "id": "p-analogy",
+      "kind": "explain",
+      "move": "explain",
+      "concepts": [
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "p-analogy-1",
+          "text": "Think of cruise control on a hill."
+        },
+        {
+          "id": "p-analogy-2",
+          "text": "The hill pulls the car back, the way gravity pulls the drone down."
+        },
+        {
+          "id": "p-analogy-3",
+          "text": "With a P-like rule the car settles a little slower than the set speed, just as the drone settles a little low."
+        }
+      ]
+    },
+    {
+      "id": "bigger-p",
+      "kind": "framing",
+      "move": "explain",
+      "narration": [
+        {
+          "id": "bigger-p-1",
+          "text": "Let's try a much bigger P. The first run stays on the plot as a faint ghost line."
+        },
+        {
+          "id": "bigger-p-2",
+          "text": "Press Run when you're ready."
+        }
+      ],
+      "actions": [
+        {
+          "type": "set_parameter",
+          "param": "kp_n_per_m",
+          "value": 30
+        },
+        {
+          "type": "run_simulation",
+          "by": "learner",
+          "start": "ground"
+        }
+      ]
+    },
+    {
+      "id": "bigger-p-result",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.proportional",
+        "ctl.overshoot"
+      ],
+      "narration": [
+        {
+          "id": "bigger-p-result-1",
+          "text": "The gap shrinks to {{final_error_m}}."
+        },
+        {
+          "id": "bigger-p-result-2",
+          "text": "But the drone now shoots higher past where it ends up, by {{overshoot_m}}, and this time it crosses the target line before settling back below it."
+        }
+      ]
+    },
+    {
+      "id": "why-not-huge",
+      "kind": "check",
+      "move": "probe",
+      "concepts": [
+        "ctl.overshoot"
+      ],
+      "narration": [
+        {
+          "id": "why-not-huge-1",
+          "text": "So why not just make P huge?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "bigger-better",
+              "label": "Bigger is always better"
+            },
+            {
+              "id": "trade",
+              "label": "It trades the gap for bounce"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ],
+      "feedback": {
+        "about": "why-not-huge",
+        "correct_choice": "trade",
+        "correct": "Right: a smaller gap, but more bounce.",
+        "incorrect": "Bigger is not always better: the gap shrinks, but the bounce grows.",
+        "unsure": "Here's the catch: the gap shrinks, but the bounce grows."
+      }
+    },
+    {
+      "id": "why-not-huge-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.overshoot"
+      ],
+      "narration": [
+        {
+          "id": "why-not-huge-reveal-1",
+          "text": "More P means harder pushes, so the drone shoots further past."
+        },
+        {
+          "id": "why-not-huge-reveal-2",
+          "text": "And the motors have a maximum: push hard enough and they run out."
+        }
+      ]
+    },
+    {
+      "id": "d-probe",
+      "kind": "probe",
+      "move": "probe",
+      "concepts": [
+        "ctl.derivative"
+      ],
+      "narration": [
+        {
+          "id": "d-probe-1",
+          "text": "Let's fix the bounce first."
+        },
+        {
+          "id": "d-probe-2",
+          "text": "If you were flying it by hand, what would you do as it rushes up toward the line?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "p-only"
+        },
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "ease-off",
+              "label": "Ease off early"
+            },
+            {
+              "id": "push-harder",
+              "label": "Push harder"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d-commit",
+      "kind": "commit",
+      "move": "probe",
+      "narration": [
+        {
+          "id": "d-commit-1",
+          "text": "Got it. Here's the rule that does that."
+        }
+      ]
+    },
+    {
+      "id": "d-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.derivative"
+      ],
+      "narration": [
+        {
+          "id": "d-reveal-1",
+          "text": "D, for derivative, watches how fast the drone is moving and pushes against that speed."
+        },
+        {
+          "id": "d-reveal-2",
+          "text": "Rushing up means it eases off before it overshoots."
+        }
+      ],
+      "feedback": {
+        "about": "d-probe",
+        "correct_choice": "ease-off",
+        "correct": "Yes: easing off early is exactly the idea.",
+        "incorrect": "Pushing harder would make it shoot further past. The fix is to ease off early.",
+        "unsure": "That's fine. The fix is to ease off early, as it rushes up."
+      }
+    },
+    {
+      "id": "d-run",
+      "kind": "framing",
+      "move": "explain",
+      "narration": [
+        {
+          "id": "d-run-1",
+          "text": "The three bars beside the drone show what P, I and D each add to the thrust."
+        },
+        {
+          "id": "d-run-2",
+          "text": "Press Run and watch the D bar point down while the drone climbs."
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "p-d"
+        },
+        {
+          "type": "run_simulation",
+          "by": "learner",
+          "start": "ground"
+        }
+      ]
+    },
+    {
+      "id": "d-result",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.derivative",
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "d-result-1",
+          "text": "The bounce is gone. The gap is still there: {{final_error_m}}."
+        },
+        {
+          "id": "d-result-2",
+          "text": "Notice D didn't fix the gap. At rest the speed is zero, so D adds nothing."
+        }
+      ]
+    },
+    {
+      "id": "i-probe",
+      "kind": "probe",
+      "move": "probe",
+      "concepts": [
+        "ctl.integral"
+      ],
+      "narration": [
+        {
+          "id": "i-probe-1",
+          "text": "The drone has been too low for a while now. What kind of rule would notice that?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "remember",
+              "label": "One that remembers the gap"
+            },
+            {
+              "id": "stronger-p",
+              "label": "A stronger P"
+            },
+            {
+              "id": "stronger-d",
+              "label": "A stronger D"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "i-commit",
+      "kind": "commit",
+      "move": "probe",
+      "narration": [
+        {
+          "id": "i-commit-1",
+          "text": "Got it. Here's the rule that remembers."
+        }
+      ]
+    },
+    {
+      "id": "i-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.integral"
+      ],
+      "narration": [
+        {
+          "id": "i-reveal-1",
+          "text": "I, for integral, keeps a running total of the gap over time."
+        },
+        {
+          "id": "i-reveal-2",
+          "text": "While the drone stays low, the total keeps growing and adds more thrust, until the gap is closed."
+        }
+      ],
+      "feedback": {
+        "about": "i-probe",
+        "correct_choice": "remember",
+        "correct": "Yes: a rule that remembers how long the gap has lasted.",
+        "incorrect": "A stronger P or D still sees only the gap now, or the speed now. To notice 'too low for a while' the rule has to remember.",
+        "unsure": "That's fine. To notice 'too low for a while' the rule has to remember the gap."
+      }
+    },
+    {
+      "id": "i-run",
+      "kind": "framing",
+      "move": "explain",
+      "narration": [
+        {
+          "id": "i-run-1",
+          "text": "Now all three together. Press Run."
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "pid"
+        },
+        {
+          "type": "run_simulation",
+          "by": "learner",
+          "start": "ground"
+        }
+      ]
+    },
+    {
+      "id": "i-result",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.integral"
+      ],
+      "narration": [
+        {
+          "id": "i-result-1",
+          "text": "It reaches the line, and the gap closes."
+        },
+        {
+          "id": "i-result-2",
+          "text": "Look at the bars at rest: P and D are back to nothing, and the I bar alone holds up the weight."
+        },
+        {
+          "id": "i-result-3",
+          "text": "Now the memory is doing the holding, so the gap can be zero."
+        }
+      ],
+      "actions": [
+        {
+          "type": "highlight_part",
+          "part": "body"
+        }
+      ]
+    },
+    {
+      "id": "too-much-i",
+      "kind": "framing",
+      "move": "explain",
+      "narration": [
+        {
+          "id": "too-much-i-1",
+          "text": "Now pick the Too much I preset and press Run."
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "too-much-i"
+        },
+        {
+          "type": "run_simulation",
+          "by": "learner",
+          "start": "ground"
+        }
+      ]
+    },
+    {
+      "id": "too-much-i-result",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.integral",
+        "ctl.overshoot"
+      ],
+      "narration": [
+        {
+          "id": "too-much-i-result-1",
+          "text": "It shoots past and rings, and the checks strip warns that it is still oscillating."
+        },
+        {
+          "id": "too-much-i-result-2",
+          "text": "I has momentum. Its total takes time to unwind, so it keeps pushing after the drone has passed the line."
+        },
+        {
+          "id": "too-much-i-result-3",
+          "text": "Tuning is a balance."
+        }
+      ]
+    },
+    {
+      "id": "heavy-predict",
+      "kind": "probe",
+      "move": "probe",
+      "concepts": [
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "heavy-predict-1",
+          "text": "We bolt on a camera, so the drone is heavier."
+        },
+        {
+          "id": "heavy-predict-2",
+          "text": "With P and D only, will the gap be bigger, smaller or the same?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "p-d"
+        },
+        {
+          "type": "set_parameter",
+          "param": "payload_kg",
+          "value": 0.5
+        },
+        {
+          "type": "highlight_part",
+          "part": "payload-camera"
+        },
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "bigger",
+              "label": "Bigger"
+            },
+            {
+              "id": "smaller",
+              "label": "Smaller"
+            },
+            {
+              "id": "same",
+              "label": "The same"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heavy-commit",
+      "kind": "commit",
+      "move": "probe",
+      "narration": [
+        {
+          "id": "heavy-commit-1",
+          "text": "Got it. Press Run to test your guess."
+        }
+      ]
+    },
+    {
+      "id": "heavy-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "heavy-reveal-1",
+          "text": "The gap grows to {{final_error_m}}."
+        },
+        {
+          "id": "heavy-reveal-2",
+          "text": "More weight needs more thrust, and P only makes thrust from a gap, so it needs a bigger gap."
+        }
+      ],
+      "actions": [
+        {
+          "type": "run_simulation",
+          "by": "learner",
+          "start": "ground"
+        }
+      ],
+      "feedback": {
+        "about": "heavy-predict",
+        "correct_choice": "bigger",
+        "correct": "You predicted a bigger gap, and that is what happened.",
+        "incorrect": "You expected otherwise. The gap grows, and here is why.",
+        "unsure": "You weren't sure, and that's fine. The gap grows, and here is why."
+      }
+    },
+    {
+      "id": "wind-check",
+      "kind": "check",
+      "move": "probe",
+      "concepts": [
+        "ctl.integral"
+      ],
+      "narration": [
+        {
+          "id": "wind-check-1",
+          "text": "A steady wind pushes down. Which term brings the drone back to exactly the target?"
+        }
+      ],
+      "actions": [
+        {
+          "type": "set_parameter",
+          "param": "payload_kg",
+          "value": 0
+        },
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "p",
+              "label": "P"
+            },
+            {
+              "id": "i",
+              "label": "I"
+            },
+            {
+              "id": "d",
+              "label": "D"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ],
+      "feedback": {
+        "about": "wind-check",
+        "correct_choice": "i",
+        "correct": "Yes: I.",
+        "incorrect": "Not that one. P needs a gap to push, and D needs speed, so neither can hold the drone exactly on target against a steady push.",
+        "unsure": "Here's the answer: I."
+      }
+    },
+    {
+      "id": "wind-reveal",
+      "kind": "reveal",
+      "move": "explain",
+      "concepts": [
+        "ctl.integral"
+      ],
+      "narration": [
+        {
+          "id": "wind-reveal-1",
+          "text": "Watch: the wind starts and pushes the drone down."
+        },
+        {
+          "id": "wind-reveal-2",
+          "text": "I keeps adding while the drone is low, until it holds the weight and the wind together, with no gap left."
+        }
+      ],
+      "actions": [
+        {
+          "type": "apply_preset",
+          "preset": "pid"
+        },
+        {
+          "type": "set_parameter",
+          "param": "wind_force_n",
+          "value": 2
+        },
+        {
+          "type": "set_parameter",
+          "param": "wind_start_s",
+          "value": 1
+        },
+        {
+          "type": "set_parameter",
+          "param": "wind_duration_s",
+          "value": 14
+        },
+        {
+          "type": "run_simulation",
+          "by": "aili",
+          "start": "hover"
+        }
+      ]
+    },
+    {
+      "id": "teach-back",
+      "kind": "check",
+      "move": "teach_back",
+      "narration": [
+        {
+          "id": "teach-back-1",
+          "text": "Tell me in one sentence each what P, I and D do. Say it to yourself, then compare."
+        }
+      ],
+      "actions": [
+        {
+          "type": "set_parameter",
+          "param": "wind_force_n",
+          "value": 0
+        },
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "compare",
+              "label": "Show me the key points"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not sure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "teach-back-compare",
+      "kind": "link",
+      "move": "explain",
+      "narration": [
+        {
+          "id": "teach-back-compare-1",
+          "text": "Compare your sentences with these. This is a self-check, not a grade."
+        },
+        {
+          "id": "teach-back-compare-2",
+          "text": "P pushes in proportion to the gap now. D pushes against the speed, which damps the bounce."
+        },
+        {
+          "id": "teach-back-compare-3",
+          "text": "I adds up the gap over time, so at rest it holds the weight with no gap left."
+        }
+      ],
+      "explanation": {
+        "title": "Key points to compare with",
+        "body": "A feedback controller measures, compares with the target and corrects, over and over. P pushes in proportion to the current gap. With gravity, P alone leaves the drone below the target, because it needs a gap to make the thrust that holds it up. D pushes against the speed of change, which damps the bounce; at rest it adds nothing. I adds up the gap over time, so it keeps increasing thrust until the gap is zero; at rest it holds the weight. Too much P or I causes overshoot and ringing; too much D makes it sluggish.",
+        "limits": [
+          "a self-check in prepared mode; Aili grades a typed answer only in live mode"
+        ]
+      }
+    },
+    {
+      "id": "limits",
+      "kind": "explain",
+      "move": "explain",
+      "concepts": [
+        "ctl.open-vs-closed-loop"
+      ],
+      "narration": [
+        {
+          "id": "limits-1",
+          "text": "Where this model stops: real drones also tilt and move sideways; this one only goes up and down."
+        },
+        {
+          "id": "limits-2",
+          "text": "Real motors take time to speed up, real height sensors are noisy, and the drag here is exaggerated."
+        },
+        {
+          "id": "limits-3",
+          "text": "The numbers teach the idea. They are not settings for tuning a real drone."
+        }
+      ],
+      "explanation": {
+        "title": "Where the model stops",
+        "body": "This is a simplified teaching model.",
+        "assumptions": [
+          "the drone moves only up and down",
+          "drag is simplified and exaggerated so the bounce dies out quickly"
+        ],
+        "limits": [
+          "real drones also tilt and move sideways",
+          "real motors take time to speed up; here thrust changes instantly",
+          "real height sensors are noisy, and D amplifies noise, so real controllers filter it",
+          "real flight controllers usually add a hover-thrust estimate and run several loops inside each other",
+          "the numbers teach the idea; they are not settings for tuning a real drone"
+        ]
+      }
+    },
+    {
+      "id": "next",
+      "kind": "check",
+      "move": "probe",
+      "narration": [
+        {
+          "id": "next-1",
+          "text": "You just tuned a controller by hand, the way engineers do."
+        },
+        {
+          "id": "next-2",
+          "text": "Some robots now learn their controllers through practice. That's a later lesson."
+        }
+      ],
+      "actions": [
+        {
+          "type": "show_choices",
+          "choices": [
+            {
+              "id": "tell-me",
+              "label": "Tell me when it's ready"
+            },
+            {
+              "id": "not-sure",
+              "label": "Not now"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
