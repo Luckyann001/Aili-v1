@@ -245,12 +245,12 @@ describe("shortlist: published items only, by concept and level", () => {
     const { fixtureRegistry } = await import("./__fixtures__/registry");
     const r = fixtureRegistry();
     expect(r.errors).toEqual([]);
-    expect(r.registry.assets.map((a) => [a.id, a.review_status])).toEqual([["asset.servo-generic-anatomy", "draft"], ["asset.fx-servo-generic-anatomy", "published"]]);
-    for (const c of r.registry.assets[0]!.teaches) for (const level of ["L1", "L2", "L3"] as const) {
+    expect(r.registry.assets.map((a) => [a.id, a.review_status]).sort()).toEqual([["asset.fx-servo-generic-anatomy", "published"], ["asset.quadcopter-generic", "draft"], ["asset.servo-generic-anatomy", "draft"]]);
+    for (const c of r.registry.assets.flatMap((a) => a.teaches)) for (const level of ["L1", "L2", "L3"] as const) {
       const s = shortlist(r.registry, { concepts: [c], level });
       expect([...s.ids].filter((id) => id.startsWith("asset."))).toEqual([]);
     }
-    expect(loadRegistry(real(), PROD).registry.assets.map((a) => a.review_status)).toEqual(["draft"]);
+    expect(loadRegistry(real(), PROD).registry.assets.map((a) => a.review_status)).toEqual(["draft", "draft"]);
   });
 
   it("the servo's explode, open and assemble are offered only with a published asset: the fixture's, never the real draft's", async () => {
@@ -264,7 +264,7 @@ describe("shortlist: published items only, by concept and level", () => {
     const onDraft = { ...readJson("test-fixtures/scene.fx-servo-arm.json"), asset: "asset.servo-generic-anatomy" };
     const r2 = withItems([]).registry;
     const reg2 = { ...fixtureRegistry().registry, scenes: [...r.scenes.filter((s) => s.id !== "fx-servo-arm"), ...validateRegistry([{ file: "x.json", data: onDraft }], readJson("concepts.json"), DEV).scenes] };
-    expect(r2.assets.map((a) => a.review_status)).toEqual(["draft"]);
+    expect(r2.assets.map((a) => a.review_status)).toEqual(["draft", "draft"]);
     const left = offered(reg2);
     for (const id of ASSET_ANIMS) expect(left).not.toContain(id);
     expect(left).toContain("slide-load-out");

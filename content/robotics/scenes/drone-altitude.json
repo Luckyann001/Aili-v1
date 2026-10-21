@@ -197,6 +197,16 @@
     {
       "id": "feedback-loop",
       "description": "The Measure, Compare, Correct ring draws around the drone: the height sensor glows, the error bracket appears, the thrust arrow grows."
+    },
+    {
+      "id": "drone-explode",
+      "description": "The drone's parts move apart so each one can be seen (illustrative spacing).",
+      "uses_asset": true
+    },
+    {
+      "id": "drone-assemble",
+      "description": "The drone's parts go back together.",
+      "uses_asset": true
     }
   ],
   "solver": {
@@ -206,5 +216,6 @@
       "drag_n_s_per_m": 1,
       "thrust_to_weight_ratio": 2
     }
-  }
+  },
+  "asset": "asset.quadcopter-generic"
 }

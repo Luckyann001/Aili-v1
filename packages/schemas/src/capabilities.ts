@@ -245,14 +245,19 @@ export const AssetManifest = z
     review_status: ReviewStatus,
     review: Review.optional(),
     test_fixture: z.literal(true).optional(),
-    format: z.literal("glb"),
-    /** Repository path of the GLB. */
-    file: z.string().regex(/\.glb$/),
-    /** The GLB's node names (each part's node must be one of them). */
+    /**
+     * "glb": a file modelled offline (the servo). "procedural": geometry written in code and reviewed by a
+     * person (the drone, Oct 21 2026; the visuals doc §1 allows procedural models written in code, reviewed by a person).
+     */
+    format: z.enum(["glb", "procedural"]),
+    /** Repository path of the GLB, or of the code module that builds a procedural asset. */
+    file: z.string().regex(/\.(glb|ts)$/),
+    /** The GLB's node names, or a procedural asset's mesh names (each part's node must be one of them). */
     nodes: z.array(z.string().min(1)).min(1),
-    size_kb: z.number().positive(),
+    /** The GLB's size; null for a procedural asset (its code ships with the page). */
+    size_kb: z.number().positive().nullable(),
     triangles: z.number().int().positive(),
-    budget: z.object({ triangles: z.number().int().positive(), glb_kb: z.number().positive(), status: z.string().min(1) }).strict(),
+    budget: z.object({ triangles: z.number().int().positive(), glb_kb: z.number().positive().nullable(), status: z.string().min(1) }).strict(),
     units: z.literal("metres"),
     shaft_axis: z.object({ blender: z.string().min(1), gltf: z.string().min(1), origin: z.string().min(1) }).strict().optional(),
     parts: z.array(AssetPart).min(1),
@@ -294,7 +299,10 @@ export const AssetManifest = z
   .superRefine((a, ctx) => {
     reviewRules(a, ctx);
     if (a.triangles > a.budget.triangles) ctx.addIssue({ code: "custom", message: `${a.id}: ${a.triangles} triangles is over the ${a.budget.triangles} budget` });
-    if (a.size_kb > a.budget.glb_kb) ctx.addIssue({ code: "custom", message: `${a.id}: ${a.size_kb} KB is over the ${a.budget.glb_kb} KB budget` });
+    const glb = a.format === "glb";
+    if (glb !== a.file.endsWith(".glb")) ctx.addIssue({ code: "custom", message: `${a.id}: a ${a.format} asset's file ends in ${glb ? ".glb" : ".ts"}` });
+    if (glb !== (a.size_kb !== null) || glb !== (a.budget.glb_kb !== null)) ctx.addIssue({ code: "custom", message: `${a.id}: size_kb and budget.glb_kb are set for a GLB and null for a procedural asset` });
+    if (a.size_kb !== null && a.budget.glb_kb !== null && a.size_kb > a.budget.glb_kb) ctx.addIssue({ code: "custom", message: `${a.id}: ${a.size_kb} KB is over the ${a.budget.glb_kb} KB budget` });
     const nodes = new Set(a.nodes);
     for (const p of a.parts) if (!nodes.has(p.node)) ctx.addIssue({ code: "custom", message: `${a.id}: part "${p.id}" names node "${p.node}", which is not in the GLB's nodes` });
     const ids = a.parts.map((p) => p.id);
