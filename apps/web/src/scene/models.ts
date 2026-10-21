@@ -2,6 +2,8 @@ import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import servoArmManifest from "../../../../content/robotics/scenes/servo-arm.json";
 import type { AssetPose } from "./assetPose";
 import bagManifest from "../../../../content/robotics/scenes/bag-hold.json";
+import droneManifest from "../../../../content/robotics/scenes/drone-altitude.json";
+import { droneFraming, hiddenDroneParts, layoutDrone, type DroneState } from "./drone";
 import { BAG_REACH, LEVER_LENGTH_M, layoutBag, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
 import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams } from "./servoArm";
@@ -9,7 +11,7 @@ import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams 
 // The scenes the Learn stage can show (manifests: content/robotics/scenes/*.json). Each model lays
 // out its parts from the scene state; the 3D view, labels, framing and fallback all use this.
 
-export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm" | "bag-hold";
+export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm" | "bag-hold" | "drone-altitude";
 
 export interface ModelState {
   params: Params;
@@ -19,6 +21,8 @@ export interface ModelState {
   servo: ServoParams;
   /** The servo + arm's servo view (settled, or on its way): the parts move with it. */
   servoPose?: AssetPose;
+  /** The drone's settings and its height (from a solver run; 0 at rest). */
+  drone: DroneState;
 }
 
 export interface SceneModel {
@@ -40,11 +44,19 @@ export interface SceneModel {
   framing: (s: ModelState, explode: number) => Array<Record<string, PartLayout>>;
   /** Labels that are not parts (the servo + arm's equation steps): where each points, metres. */
   extraAnchors?: (s: ModelState) => Record<string, [number, number, number]>;
+  /** Parts not drawn right now (the drone's camera before it is bolted on). They stay in the parts list. */
+  hidden?: (s: ModelState) => ReadonlySet<string>;
+  /** Camera range for a scene much larger than the desk-sized ones (metres). Default: near 0.01, far 5, zoom 0.15–1.2. */
+  camera?: { far: number; minDistance: number; maxDistance: number };
+  /** The default viewing direction (towards the camera), if not the shared one: the tall drone stand is seen lower and more from the side. */
+  viewDir?: [number, number, number];
 }
 
 /** The servo parts' fills in the still picture and the loading placeholder (the 3D view uses the GLB's own materials). */
 const SERVO_FILL: Record<string, FillRole> = { horn: "expressive", "upper-case": "technical", "gear-train": "discovery", "motor-and-sensor": "explore", "board-and-cover": "technical" };
 const SERVO_INSIDE = new Set(["gear-train", "motor-and-sensor"]);
+/** The drone is Sky (--aili-fill-technical); the battery and height sensor Sage, the added camera Plum. */
+const DRONE_FILL: Record<string, FillRole> = { battery: "explore", "sensor-altitude": "explore", "payload-camera": "expressive" };
 /** The servo parts' names on stage: short ones from the scene manifest (the asset manifest's are longer). */
 const sceneName = (id: string) => servoArmManifest.parts.find((p) => p.id === id)!.name;
 
@@ -102,6 +114,18 @@ export const MODELS: Record<SceneId, SceneModel> = {
     layout: (s) => layoutServoArm(s.servo, s.servoPose),
     framing: () => servoFraming(),
     extraAnchors: (s) => eqAnchors(s.servo),
+  },
+  "drone-altitude": {
+    id: "drone-altitude",
+    title: "Generic drone on a test stand",
+    parts: droneManifest.parts.map(({ id, name }) => ({ id, name, fill: DRONE_FILL[id] ?? "technical" })),
+    note: `${contentLabel(droneManifest as LabelledItem).label}. Generic quadcopter drawn from simple shapes: not measured, not a named product. The guide post through its body lets it move only up and down.`,
+    explodable: true,
+    layout: (s, explode) => layoutDrone(s.drone, explode),
+    framing: (s) => droneFraming(s.drone),
+    hidden: (s) => hiddenDroneParts(s.drone),
+    camera: { far: 40, minDistance: 0.3, maxDistance: 14 },
+    viewDir: [0.42, 0.22, 1],
   },
 };
 

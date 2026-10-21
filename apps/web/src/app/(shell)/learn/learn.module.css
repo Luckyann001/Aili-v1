@@ -651,6 +651,16 @@
   font: 11px var(--aili-font-ui);
 }
 
+/* The drone's stand in the still picture: the mast is a surface with a control-boundary outline, the
+   set-height collar is Copper (focus), like the 3D view. */
+.fallbackMast {
+  fill: var(--aili-surface);
+}
+
+.fallbackCollar {
+  fill: var(--aili-accent);
+}
+
 /* Messages and captions sit in the stage's flow, between the scene and the bottom controls,
    so they can never cover a control. */
 .overlay {

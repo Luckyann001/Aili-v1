@@ -12,6 +12,7 @@ import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
 import { settingsOf } from "@/scene/handover";
 import { cornersOf, layoutBag, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
+import { CYLINDER_SEGMENTS, PROP_DISC_R, STAND, collarHeight_m, mastTicks } from "@/scene/drone";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
@@ -108,14 +109,17 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       )}
       {activeScene === "servo-arm" && <TorqueArrow colors={props.colors} />}
       {activeScene === "bag-hold" && <BagHandle colors={props.colors} />}
+      {activeScene === "drone-altitude" && <DroneStand colors={props.colors} />}
+      {activeScene === "drone-altitude" && <PropDiscs colors={props.colors} />}
+      <CameraLimits />
       {activeScene === "servo-arm" && props.spatialMs <= 0 && <OffsetLines colors={props.colors} />}
       {activeScene === "servo-arm" && <EquationMarks colors={props.colors} />}
       <OrbitControls
         makeDefault
         target={DEFAULT_VIEW.target}
         enableDamping={false}
-        minDistance={0.15}
-        maxDistance={1.2}
+        minDistance={MODELS[activeScene].camera?.minDistance ?? 0.15}
+        maxDistance={MODELS[activeScene].camera?.maxDistance ?? 1.2}
         onChange={(e) => {
           const cam = (e?.target as unknown as { object?: { position: Vector3 } } | undefined)?.object;
           if (cam) writeCamera(props.host, cam);
@@ -147,14 +151,18 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const leverDistance_m = useScene((s) => s.leverDistance_m);
   const bagReach_m = useScene((s) => s.bagReach_m);
   const servo = useScene((s) => s.servo);
+  const drone = useScene((s) => s.drone);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
-  const hidden = useServoAway() && HIDDEN_WHILE_APART.has(id);
+  const state = { params, leverDistance_m, bagReach_m, servo, drone };
+  const hidden = (useServoAway() && HIDDEN_WHILE_APART.has(id)) || !!MODELS[activeScene].hidden?.(state).has(id);
+  // The drone's downward rangefinder glows while it is pointed at (the "Measure" step, beat 1).
+  const glow = selected && activeScene === "drone-altitude" && id === "sensor-altitude";
 
-  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, bagReach_m, servo, hidden, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, bagReach_m, servo, drone, hidden, invalidate]);
 
   // Size depends on the scene settings; position also on the explode amount (set per frame).
-  const layoutAt = (k: number) => MODELS[activeScene].layout({ params, leverDistance_m, bagReach_m, servo }, k)[id]!;
+  const layoutAt = (k: number) => MODELS[activeScene].layout(state, k)[id]!;
   const { kind, size } = layoutAt(0);
   useFrame(() => {
     ref.current?.position.set(...layoutAt(anim.explode).position);
@@ -164,7 +172,7 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
     kind === "box" ? (
       <boxGeometry args={size.map((d) => d + 2 * inflate) as [number, number, number]} />
     ) : (
-      <cylinderGeometry args={[size[0] + inflate, size[0] + inflate, size[1] + 2 * inflate, 24]} />
+      <cylinderGeometry args={[size[0] + inflate, size[0] + inflate, size[1] + 2 * inflate, CYLINDER_SEGMENTS]} />
     );
   if (hidden) return null; // the servo is apart: the arm, load and base step out of the way
   return (
@@ -175,7 +183,7 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
       {...partEvents(id, select)}
     >
       {geometry(0)}
-      <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} />
+      <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} emissive={glow ? colors.accent : "#000000"} emissiveIntensity={glow ? 0.9 : 0} />
       {selected && (
         // Selection outline: an inverted shell OUTLINE_M larger on every side, drawn from inside.
         <mesh raycast={() => null}>
@@ -441,6 +449,88 @@ function AssetNode({ id, node, bounds, colors, ghost }: { id: string; node: Obje
 }
 
 /** The bag's handle: two thin straps from the hand down to the bag's top. Decoration, not a part. */
+/** The camera's clipping range follows the scene: the drone's stand is metres tall, the servo a few centimetres. */
+function CameraLimits() {
+  const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
+  const activeScene = useScene((s) => s.activeScene);
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    Object.assign(camera, { far: MODELS[activeScene].camera?.far ?? 5 });
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [camera, activeScene, invalidate]);
+  return null;
+}
+
+/**
+ * The drone's test stand (not parts: nothing here is selectable): a plate, the guide post through the
+ * drone's body (why it only moves up and down), the stop it rests on, and a measuring mast with a mark
+ * every half metre and a lit collar at the set height. Drawing only; the set height is the scene setting.
+ */
+function DroneStand({ colors }: { colors: SceneColors }) {
+  const drone = useScene((s) => s.drone);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [drone, colors, invalidate]);
+  const { plate, post, stop, mast, collar } = STAND;
+  const standMat = <meshStandardMaterial color={colors.stand} roughness={0.85} metalness={0} />;
+  const strongMat = <meshStandardMaterial color={colors.standStrong} roughness={0.6} metalness={0.1} />;
+  return (
+    <group name="drone-stand">
+      <mesh position={plate.centre} raycast={() => null}>
+        <boxGeometry args={plate.size} />
+        {standMat}
+      </mesh>
+      <mesh position={[0, post.height_m / 2, 0]} raycast={() => null}>
+        <cylinderGeometry args={[post.r, post.r, post.height_m, 12]} />
+        {strongMat}
+      </mesh>
+      <mesh position={[0, stop.h / 2, 0]} raycast={() => null}>
+        <cylinderGeometry args={[stop.r, stop.r, stop.h, CYLINDER_SEGMENTS]} />
+        {strongMat}
+      </mesh>
+      <mesh position={[mast.x, mast.height_m / 2, mast.z]} raycast={() => null}>
+        <boxGeometry args={[mast.width, mast.height_m, mast.width]} />
+        {standMat}
+      </mesh>
+      {mastTicks().map((t) => (
+        <mesh key={t.height_m} position={[mast.x + mast.width / 2 + (t.major ? 0.02 : 0.012), t.y_m, mast.z]} raycast={() => null}>
+          <boxGeometry args={[t.major ? 0.04 : 0.024, 0.006, 0.006]} />
+          {strongMat}
+        </mesh>
+      ))}
+      <mesh name="set-height-collar" position={[mast.x, collarHeight_m(drone), mast.z]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}>
+        <torusGeometry args={[collar.radius, collar.tube, 8, CYLINDER_SEGMENTS]} />
+        <meshStandardMaterial color={colors.accent} emissive={colors.accent} emissiveIntensity={0.6} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+/** The circle each propeller sweeps, faint and not selectable; it follows the drone (and the explode). */
+function PropDiscs({ colors }: { colors: SceneColors }) {
+  const drone = useScene((s) => s.drone);
+  const refs = useRef<Array<Mesh | null>>([]);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [drone, colors, invalidate]);
+  const at = (k: number) => MODELS["drone-altitude"].layout({ ...useScene.getState(), drone }, k);
+  useFrame(() => {
+    const l = at(anim.explode);
+    refs.current.forEach((m, i) => m?.position.set(...l[`rotor-${i + 1}`]!.position));
+  });
+  const l = at(anim.explode);
+  return (
+    <group name="prop-discs">
+      {[1, 2, 3, 4].map((n, i) => (
+        <mesh key={n} ref={(m) => void (refs.current[i] = m)} position={l[`rotor-${n}`]!.position} raycast={() => null}>
+          <cylinderGeometry args={[PROP_DISC_R, PROP_DISC_R, 0.002, CYLINDER_SEGMENTS]} />
+          <meshBasicMaterial color={colors.fills.technical} transparent opacity={0.28} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function BagHandle({ colors }: { colors: SceneColors }) {
   const reach = useScene((s) => s.bagReach_m);
   const invalidate = useThree((s) => s.invalidate);
@@ -571,7 +661,12 @@ function setCursor(target: EventTarget | null, cursor: string) {
 // Camera framing: fit the model's current bounds (they change with the arm length and the
 // explode) inside the safe area, width and height separately (the model is wide and flat).
 const MARGIN = 1.06;
-const defaultDir = new Vector3(...DEFAULT_VIEW.position).sub(new Vector3(...DEFAULT_VIEW.target)).normalize();
+const sharedDir = new Vector3(...DEFAULT_VIEW.position).sub(new Vector3(...DEFAULT_VIEW.target)).normalize();
+/** The default viewing direction of the scene on stage (the drone has its own). */
+const defaultDirOf = () => {
+  const d = MODELS[useScene.getState().activeScene].viewDir;
+  return d ? new Vector3(...d).normalize() : sharedDir;
+};
 /**
  * Anatomy view: from the front-left, a little above (the arm runs out to the right, so a view from
  * the right would look through it), framing the servo's parts as they will be (explode offsets
@@ -666,7 +761,7 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
       if (placed.current && !modelFits(camera, size, { x: el.offsetLeft, y: el.offsetTop, w: freeW, h: freeH })) refitCamera.current?.();
       if (!placed.current) {
         placed.current = true;
-        const g = fitGoal(defaultDir, anim.explode);
+        const g = fitGoal(defaultDirOf(), anim.explode);
         camera.position.copy(g.position);
         camera.lookAt(g.target);
         controls?.target.copy(g.target);
@@ -723,13 +818,14 @@ function LabelTracker({
   const servoFrom = useScene((s) => s.servoFrom);
   const servoView = useScene((s) => s.servoView);
   const servoMotion = useScene((s) => s.servoMotion);
+  const drone = useScene((s) => s.drone);
 
   // Shown or renamed labels change size, and settings move parts: render a frame to re-place them.
   // Also once the viewer is ready: the label layer mounts only then, after the first frame, and with
   // nothing else asking for a frame its labels stayed unplaced (found by the tap test under load).
   const equation = useScene((s) => s.equation);
   const viewer = useScene((s) => s.viewer);
-  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, bagReach_m, servo, servoView, servoMotion, activeScene, equation, viewer, invalidate]);
+  useEffect(() => invalidate(), [labelsOn, selectedId, params, leverDistance_m, bagReach_m, servo, servoView, servoMotion, drone, activeScene, equation, viewer, invalidate]);
 
   useFrame(() => {
     const area = safeArea.current;
@@ -739,7 +835,9 @@ function LabelTracker({
     const { takeW, takeH } = reservedSpace(area);
     const w = area.clientWidth - takeW;
     const h = area.clientHeight - takeH;
-    const layout = MODELS[activeScene].layout({ params, leverDistance_m, bagReach_m, servo, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) }, anim.explode);
+    const state = { params, leverDistance_m, bagReach_m, servo, drone, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) };
+    const layout = MODELS[activeScene].layout(state, anim.explode);
+    const hiddenParts = MODELS[activeScene].hidden?.(state);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
     // For tests: the free area (canvas px) and each servo part's box on screen (the size checks).
     writeData(host, "freeArea", [area.offsetLeft, area.offsetTop, w, h].map((n) => n.toFixed(1)).join(","));
@@ -751,6 +849,10 @@ function LabelTracker({
     for (const part of MODELS[activeScene].parts) {
       const el = labels.current.get(part.id);
       if (!el) continue;
+      if (hiddenParts?.has(part.id)) {
+        el.style.visibility = "hidden";
+        continue;
+      }
       const pl = layout[part.id]!;
       if (pl.kind === "asset" && el.offsetWidth > 0) {
         const [x0, y0, x1, y1] = screenBox(pl, camera, size);
@@ -794,7 +896,7 @@ function LabelTracker({
       });
     }
     // Labels that are not parts (the equation's steps), placed the same way; the latest step wins space.
-    const extra = MODELS[activeScene].extraAnchors?.({ params, leverDistance_m, bagReach_m, servo }) ?? {};
+    const extra = MODELS[activeScene].extraAnchors?.(state) ?? {};
     const latest = useScene.getState().equation.at(-1);
     for (const [id, anchor] of Object.entries(extra)) {
       const el = labels.current.get(id);
@@ -961,7 +1063,7 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
     const moveTo = (fromDefault: boolean) => {
       if (!controls) return;
       const anatomy = useScene.getState().cameraView === "anatomy";
-      const d = anatomy ? anatomyDir : fromDefault ? defaultDir : dir.copy(camera.position).sub(controls.target).normalize();
+      const d = anatomy ? anatomyDir : fromDefault ? defaultDirOf() : dir.copy(camera.position).sub(controls.target).normalize();
       const g = fitGoal(d, useScene.getState().exploded ? 1 : 0);
       goal.pos.copy(g.position);
       goal.target.copy(g.target);
@@ -1037,7 +1139,8 @@ function StageProbe({ host }: { host: RefObject<HTMLDivElement | null> }) {
   const servo = useScene((s) => s.servo);
   const lever = useScene((s) => s.leverDistance_m);
   const bag = useScene((s) => s.bagReach_m);
-  useEffect(() => writeData(host, "stage", JSON.stringify({ scene, settings: settingsOf(scene, { servo, leverDistance_m: lever, bagReach_m: bag }) })), [host, scene, servo, lever, bag]);
+  const drone = useScene((s) => s.drone);
+  useEffect(() => writeData(host, "stage", JSON.stringify({ scene, settings: settingsOf(scene, { servo, leverDistance_m: lever, bagReach_m: bag, drone }) })), [host, scene, servo, lever, bag, drone]);
   return null;
 }
 

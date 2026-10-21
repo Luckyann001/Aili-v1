@@ -19,6 +19,8 @@ type Shape = {
   leader?: [number, number, number, number];
   /** Hidden inside the assembled model: drawn as a dashed outline. */
   inside?: boolean;
+  /** Named only when selected (a part with many twins, like the drone's arms, would crowd the picture). */
+  quiet?: boolean;
 };
 
 const ARM: Record<string, Shape> = {
@@ -102,6 +104,46 @@ function ServoDecor({ servo }: { servo: ServoParams }) {
   );
 }
 
+/**
+ * The drone, side view, NOT to scale (it would be a few pixels across next to a metres-tall mast): it rests
+ * on its stand; the arms, motors and propellers pointing at and away from you are dashed behind the body.
+ */
+function droneSide(): Record<string, Shape> {
+  const s: Record<string, Shape> = {
+    body: { x: 149, y: 135, w: 42, h: 15, label: [170, 175] },
+    "arm-1": { x: 191, y: 139, w: 42, h: 6, label: [212, 160], quiet: true },
+    "arm-3": { x: 107, y: 139, w: 42, h: 6, label: [128, 160], quiet: true },
+    "motor-1": { x: 227, y: 130, w: 11, h: 9, label: [250, 128], anchor: "start" },
+    "motor-3": { x: 102, y: 130, w: 11, h: 9, label: [107, 160], quiet: true },
+    "rotor-1": { x: 203, y: 124, w: 60, h: 3, label: [233, 116] },
+    "rotor-3": { x: 78, y: 124, w: 60, h: 3, label: [108, 116], quiet: true },
+    "sensor-altitude": { x: 180, y: 150, w: 9, h: 6, label: [200, 190], leader: [196, 184, 186, 157] },
+    battery: { x: 155, y: 126, w: 30, h: 9, label: [170, 104], leader: [170, 107, 170, 126] },
+    "payload-camera": { x: 186, y: 140, w: 12, h: 12, label: [240, 150], anchor: "start" },
+  };
+  for (const n of [2, 4]) {
+    s[`arm-${n}`] = { x: 167, y: 139, w: 6, h: 6, label: [170, 160], inside: true, quiet: true };
+    s[`motor-${n}`] = { x: 165, y: 130, w: 11, h: 9, label: [170, 128], inside: true, quiet: true };
+    s[`rotor-${n}`] = { x: 167, y: 124, w: 6, h: 3, label: [170, 120], inside: true, quiet: true };
+  }
+  return s;
+}
+
+/** The stand behind the drone: plate, guide post, and the mast with the set-height collar (not to scale). */
+function DroneStandDecor() {
+  return (
+    <g aria-hidden="true">
+      <rect x={30} y={156} width={270} height={6} className={styles.fill_technical} fillOpacity={0.35} />
+      <line x1={170} y1={14} x2={170} y2={156} className={styles.fallbackLeader} strokeWidth={2} />
+      <rect x={30} y={14} width={8} height={142} className={styles.fallbackMast} />
+      <rect x={26} y={40} width={16} height={5} rx={2} className={styles.fallbackCollar} />
+      <text x={46} y={44} className={styles.fallbackText}>
+        Set height (not to scale)
+      </text>
+    </g>
+  );
+}
+
 /** Drawing order for the servo + arm: what is behind first, the horn and arm on top. */
 const SERVO_ORDER = ["base", "board-and-cover", "upper-case", "gear-train", "motor-and-sensor", "horn", "arm-link", "load"];
 
@@ -112,10 +154,13 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
   const distance = useScene((s) => s.leverDistance_m);
   const servo = useScene((s) => s.servo);
   const bagReach = useScene((s) => s.bagReach_m);
+  const drone = useScene((s) => s.drone);
   const model = MODELS[activeScene];
-  const shapes = activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : activeScene === "bag-hold" ? bagHold(bagReach) : ARM;
+  const shapes =
+    activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : activeScene === "bag-hold" ? bagHold(bagReach) : activeScene === "drone-altitude" ? droneSide() : ARM;
+  const hidden = model.hidden?.({ ...useScene.getState(), drone }) ?? new Set<string>();
   const names = model.parts.map((p) => p.name.toLowerCase()).join(", ");
-  const parts = activeScene === "servo-arm" ? SERVO_ORDER.map((id) => model.parts.find((p) => p.id === id)!) : model.parts;
+  const parts = (activeScene === "servo-arm" ? SERVO_ORDER.map((id) => model.parts.find((p) => p.id === id)!) : model.parts).filter((p) => !hidden.has(p.id));
   return (
     <div className={styles.fallback} data-fallback={loading ? "loading" : "no-webgl"}>
       <p className={styles.fallbackNote}>
@@ -125,6 +170,7 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
       </p>
       <svg viewBox="0 0 320 200" className={styles.fallbackSvg} role="img" aria-label={`Still side view of the ${model.title.toLowerCase()}: ${names}.`}>
         {activeScene === "servo-arm" && <ServoDecor servo={servo} />}
+        {activeScene === "drone-altitude" && <DroneStandDecor />}
         {parts.map(({ id, name, fill }) => {
           const s = shapes[id]!;
           const selected = selectedId === id;
@@ -142,9 +188,11 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
                 strokeWidth={selected ? 3 : 1}
               />
               {s.leader && <line x1={s.leader[0]} y1={s.leader[1]} x2={s.leader[2]} y2={s.leader[3]} className={styles.fallbackLeader} strokeWidth={selected ? 1.5 : 0.75} />}
-              <text x={s.label[0]} y={s.label[1]} textAnchor={s.anchor ?? "middle"} className={styles.fallbackText} fontWeight={selected ? 700 : 400}>
-                {selected ? `Selected: ${name}` : name}
-              </text>
+              {(!s.quiet || selected) && (
+                <text x={s.label[0]} y={s.label[1]} textAnchor={s.anchor ?? "middle"} className={styles.fallbackText} fontWeight={selected ? 700 : 400}>
+                  {selected ? `Selected: ${name}` : name}
+                </text>
+              )}
             </g>
           );
         })}

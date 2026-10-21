@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { frameStats, readoutText, usePerf } from "@/scene/perfReadout";
 import { isRecognitionSupported } from "@/voice/recognition";
 import { useConsent } from "@/voice/consent";
 import { DEMO_TOOLS } from "@/turn/flags";
 import { useVoice } from "@/voice/store";
+import { useScene } from "@/scene/sceneStore";
 import type { VoiceStatus } from "@/voice/machine";
 import { FAKE_CASES, type FakeCase } from "@aili/schemas";
 import styles from "./learn.module.css";
@@ -30,9 +31,13 @@ export function DemoControls({ onPlay, onFakeTurn }: { onPlay: () => void; onFak
   const mode = useVoice((s) => s.mode);
   const consent = useConsent();
   const supported = useSyncExternalStore(() => () => {}, isRecognitionSupported, () => false);
+  const setScene = useScene((s) => s.setScene);
+  const panel = useRef<HTMLDetailsElement>(null);
+  // Direct access so Next inlines it: the drone scene is a draft, offered only where drafts are shown.
+  const drafts = process.env.NEXT_PUBLIC_AILI_INCLUDE_DRAFTS === "1";
 
   return (
-    <details className={styles.demo}>
+    <details ref={panel} className={styles.demo}>
       <summary>Demo controls (testing only)</summary>
       <p className={styles.demoNote}>Not part of the product. Sets the voice state directly so each look can be checked.</p>
       <div className={styles.demoButtons}>
@@ -44,6 +49,21 @@ export function DemoControls({ onPlay, onFakeTurn }: { onPlay: () => void; onFak
         <button type="button" className={styles.demoButton} onClick={onPlay}>
           Play prepared reply
         </button>
+        {drafts && (
+          // Step 3a of docs/drone-pid-plan.md: a way to look at the drone before the lesson is wired (step 4).
+          <button
+            type="button"
+            className={styles.demoButton}
+            onClick={() => {
+              // Close this panel first: the camera frames the new scene in the stage's free area, which the
+              // open panel would otherwise take up (the drone came out framed from 14 m away).
+              if (panel.current) panel.current.open = false;
+              requestAnimationFrame(() => requestAnimationFrame(() => setScene("drone-altitude")));
+            }}
+          >
+            Show the drone scene (draft)
+          </button>
+        )}
       </div>
       {onFakeTurn && (
         <div className={styles.demoButtons} role="group" aria-label="Fake director turns (testing only)">

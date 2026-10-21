@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { BAG_REACH, DEFAULT_PARAMS, LEVER_LENGTH_M, PARAMS, clampParam, type ParamId, type Params } from "./layout";
 import type { AssetPose, AssetView } from "./assetPose";
 import { MODELS, type SceneId } from "./models";
+import { applyStageSetting } from "@aili/engine";
+import droneManifest from "../../../../content/robotics/scenes/drone-altitude.json";
+import { DEFAULT_DRONE, type DroneState } from "./drone";
 import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type EqStep, type ServoParamId, type ServoParams } from "./servoArm";
 
 /** Who changed the stage: Aili (a turn's action) or the learner (a control). Shown, never colour alone. */
@@ -25,6 +28,13 @@ export interface SceneState {
   /** Servo + arm settings (SI). The torque shown comes from the solver, never from the drawing. */
   servo: ServoParams;
   setServoParam: (id: ServoParamId, value: number) => void;
+  /**
+   * The drone's settings (through the shared stage function: bounds and steps from its manifest) and its
+   * height. The height is set only from a solver run (step 3b); until then the drone rests on its stand.
+   */
+  drone: DroneState;
+  setDroneSetting: (id: string, value: number) => void;
+  setDroneHeight: (height_m: number) => void;
   /** The servo's rated torque, N·m, as the learner typed it from their datasheet; null until then. */
   ratedTorque_nm: number | null;
   /** Out-of-bounds values are refused (returns false) and nothing changes. */
@@ -107,6 +117,9 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   setLeverDistance: (d) => set(() => ({ leverDistance_m: Math.min(LEVER_LENGTH_M, Math.max(0, d)) })),
   servo: DEFAULT_SERVO_PARAMS,
   setServoParam: (id, value) => set((s) => ({ servo: setServoParam(s.servo, id, value) })),
+  drone: DEFAULT_DRONE,
+  setDroneSetting: (id, value) => set((s) => ({ drone: { ...s.drone, settings: applyStageSetting(droneManifest, s.drone.settings, id, value) } })),
+  setDroneHeight: (height_m) => set((s) => ({ drone: { ...s.drone, height_m: Number.isFinite(height_m) ? Math.max(0, height_m) : s.drone.height_m } })),
   ratedTorque_nm: null,
   setRatedTorque: (value) => {
     const v = value === null ? null : parseRating(value);

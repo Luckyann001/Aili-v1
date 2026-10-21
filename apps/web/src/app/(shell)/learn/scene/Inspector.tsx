@@ -106,6 +106,9 @@ export function Inspector({ onClosed }: { onClosed: () => void }) {
           )}
           <MarginLine r={servoReadout(servo, rating)} />
         </>
+      ) : activeScene === "drone-altitude" ? (
+        // The drone's settings belong to the whole drone, not to a part: its controls are step 3b.
+        <p className={styles.inspectorNote}>No settings for this part. The drone&apos;s controls (P, I, D and the set height) are coming next.</p>
       ) : (
         <>
           <p className={styles.inspectorNote}>Placeholder settings. They change the drawing only; nothing is calculated yet.</p>

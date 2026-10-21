@@ -12,8 +12,9 @@ import type { ServoParams } from "./servoArm";
 const SCENES = Object.values(MANIFESTS) as unknown as StageScene[];
 
 /** The settings of a scene on stage, as the shared function names them. */
-export function settingsOf(id: SceneId, s: Pick<SceneState, "servo" | "leverDistance_m" | "bagReach_m">): StageSettings {
+export function settingsOf(id: SceneId, s: Pick<SceneState, "servo" | "leverDistance_m" | "bagReach_m"> & Partial<Pick<SceneState, "drone">>): StageSettings {
   if (id === "servo-arm") return { ...s.servo };
+  if (id === "drone-altitude") return { ...(s.drone?.settings ?? {}) };
   if (id === "lever-analogy") return { weight_distance_m: s.leverDistance_m };
   if (id === "bag-hold") return { reach_m: s.bagReach_m };
   return {};

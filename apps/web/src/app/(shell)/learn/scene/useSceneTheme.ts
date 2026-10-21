@@ -8,6 +8,11 @@ export interface SceneColors {
   fills: Record<FillRole, string>;
   outline: string;
   background: string;
+  /** Copper: the drone's set-height collar and the rangefinder's glow (focus, not a fill). */
+  accent: string;
+  /** The drone's test stand: the surface colour, and the control-boundary colour for its post and marks. */
+  stand: string;
+  standStrong: string;
 }
 
 // 3D materials use the brand fill tokens; the selection outline uses the text colour. Read from
@@ -26,6 +31,9 @@ function read(): string {
       },
       outline: get("--aili-text"),
       background: get("--aili-bg-recessed"),
+      accent: get("--aili-accent"),
+      stand: get("--aili-surface"),
+      standStrong: get("--aili-border-strong"),
     },
     spatialMs: cssDurationMs(get("--aili-duration-spatial")), // 0 under reduced motion
   });
