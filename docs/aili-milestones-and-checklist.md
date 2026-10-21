@@ -37,11 +37,18 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
   highlight rule and the one-ask prompt line not yet exercised by the real model beyond the checks so
   far; slice 7 (full live walkthrough) not run.
 
-**M4 — Robotics Lab 1 (servo torque) end to end**
-- [ ] Concept graph seed (~40 concepts, 3 labelled "lab")
-- [ ] Servo + arm asset with named parts; load/torque sim (arm mass included)
-- [ ] 1–2 analogies with "where it breaks down"
-- [ ] 5 reading items with human-written guides; study planner v1 with editable table of contents
+**M4 — Robotics Lab 1 (feedback control: a drone holding its altitude with PID) end to end** — changed from servo torque on Oct 21 2026; spec `docs/lesson-drone-pid.md`
+- [ ] Altitude PID solver (`solver.pid-altitude-1d`) with tests for every fact in the spec
+- [ ] Content as drafts: `ctl.*` concepts, simulation manifest with presets, cruise-control analogy, candidate reading items, the eight lesson beats
+- [ ] Coded generic quadcopter with named parts; stage: target line, ruler, error bracket, arrows, P/I/D bars, plot with ghost run, sliders, presets, checks
+- [ ] Lesson flow in the prepared/live system (chips-only prepared mode; typed answers and graded teach-back live only)
+- [ ] Cruise-control analogy scene (P and I; D introduced on the drone) and the full test suites
+- [ ] Founder review, phone dry run, demo recording
+
+**Lab 2 (servo torque), partly built in M4 before Oct 21 2026; kept working as a second lesson and backup demo**
+- [ ] Servo + arm asset with named parts; load/torque sim (arm mass included) (built as drafts, not reviewed)
+- [ ] Shopping-bag analogy with "where it breaks down" (built as a draft, not reviewed)
+- [ ] Concept graph seed (~40 concepts, 3 labelled "lab"); 5 reading items with human-written guides; study planner v1 with editable table of contents
 - [ ] Beginner journey works end to end
 
 **M5 — Build Workbench v1 (parametric)**
@@ -53,7 +60,7 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Pan-tilt camera project template
 
 **M6 — Labs 2–3 and library**
-- [ ] Inside-the-servo/gearing lab; feedback-control lab
+- [ ] Servo torque lab finished; inside-the-servo/gearing lab
 - [ ] Reference library UI, 30–40 verified items
 
 **Deferred stage (after M6, before M7, and before any public deployment)** — decided Oct 11 2026. A real AI key may be used on Lucky's laptop only, never deployed and never on any hosting service, until this stage is done (Oct 12 2026).

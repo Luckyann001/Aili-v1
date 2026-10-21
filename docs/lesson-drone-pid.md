@@ -17,7 +17,9 @@ The MVP is one lesson, about 12 to 15 minutes long: **a drone holding its altitu
 
 **How this doc is organised:** the teaching model (what the solver computes), the lesson script beat by beat with its visual, the visual spec, the reading guide, then the build steps and the Claude Code prompts.
 
-**Fidelity label for the whole lesson:** *Simplified teaching model.* The drone moves only up and down, and the doc states what that leaves out.
+**Fidelity label for the whole lesson:** *Simplified teaching model* (registry value `simplified_teaching`). The drone moves only up and down, and the doc states what that leaves out.
+
+**Corrections after the plan review (Oct 21 2026):** drag raised to 1.0 N·s/m so the bounce dies out within a run; overshoot, settling and stability defined; standard gravity; max thrust fixed at the base mass; clamping anti-windup; wind and "start at hover" inputs; the car analogy covers P and I only; key claim 6 reworded; kebab-case part IDs; a procedural (coded) asset format; reading items are drafts; `overshoot_ratio` instead of `overshoot_pct`; chips-only prepared mode. The sections below already include them.
 
 ## The teaching model
 
@@ -35,33 +37,44 @@ m \frac{dv}{dt} = T - m g - c\,v - F_{wind}, \qquad \frac{dz}{dt} = v
 e = z_{target} - z, \qquad u = K_p\,e + K_i \int e\,dt - K_d\,v, \qquad T = \mathrm{clamp}(u,\ 0,\ T_{max})
 ```
 
-In words: z is height (m), v is vertical speed (m/s), m is mass (kg), g is 9.81 m/s², c is a linear drag coefficient (N·s/m), and T is thrust (N), which can't go below zero or above the motors' maximum. The D term uses the drone's measured speed rather than the change in error, which avoids a jolt when the target moves.
+In words: z is height (m), v is vertical speed (m/s), m is mass (kg), g is standard gravity, 9.80665 m/s² (the app-wide value, decided Oct 15 2026), c is a linear drag coefficient (N·s/m), and T is thrust (N), which can't go below zero or above the motors' maximum. F_wind is a downward push (N).
+
+**Drag** is a fixed scene constant, c = 1.0 N·s/m, not a slider, labelled *drag is simplified and exaggerated so the bounce dies out quickly*. (At c = 0.4 the bounce takes about 2m/c = 5 s to shrink by e, so a P-only drone is still swinging at the end of a 15 s run.)
+
+**Maximum thrust** is T_max = (thrust-to-weight ratio) × m_base × g, with the base mass m_base being the drone without the camera; adding the camera does not make the motors stronger. Default thrust-to-weight ratio: 2. The D term uses the drone's measured speed rather than the change in error, which avoids a jolt when the target moves.
 
 **Solver rules**
 
 - Fixed time step of 2 ms, semi-implicit Euler, 15 s per run. The ground is at z = 0 and the drone can't go below it.
-- Anti-windup: the I term stops adding up while thrust is at its limit.
-- Inputs with bounds: mass 0.5–2 kg, Kp 0–40 N/m, Ki 0–100 N/(m·s), Kd 0–15 N·s/m, target 0.5–5 m, thrust-to-weight ratio 1.5–3, optional wind push for a set time.
-- Outputs: height, thrust and the three P/I/D contributions over time; final error; overshoot %; settling time; whether thrust hit its limit; and a stability flag (settled, still oscillating, or growing).
+- Anti-windup (clamping): the I term stops adding up while thrust is at a limit (T_max or 0 N) and the error would push it further past that limit, and while the drone rests on the ground with thrust below its weight.
+- Inputs with bounds: mass 0.5–2 kg, Kp 0–40 N/m, Ki 0–100 N/(m·s), Kd 0–15 N·s/m, target 0.5–5 m, thrust-to-weight ratio 1.5–3 (default 2), optional wind push 0–5 N with a start time and a duration (no duration means a steady wind), and a start state: on the ground (default) or *start at hover* (at the target, at rest, with the I term already holding the weight; needs Ki > 0).
+- Outputs: height, thrust and the three P/I/D contributions over time; final error (at the end of the run); `overshoot_ratio`; settling time; whether thrust hit its limit; and a stability flag (settled, still oscillating, or not dying out).
+
+**Definitions**
+
+- **Overshoot** is measured from the drone's own resting height, not the target: `overshoot_ratio` = (peak height − final height) ÷ (final height − start height), shown as a percentage at the edge. A P-only drone can overshoot its resting height without ever reaching the target line.
+- **Settling time** is the first time after which the height stays within ±2% of the final height until the end of the run.
+- **Stability flag:** *settled* if a settling time exists; *not dying out* if the swing (max − min height) over the last 3 s is no smaller than over the 3 s before; otherwise *still oscillating*. With thrust limits a truly growing oscillation is impossible; it becomes a steady one, hence "not dying out".
 
 **Facts the tests must confirm** (I checked these in a quick simulation; Claude Code's tests are the real proof):
 
 | Case | What happens | Test |
 | --- | --- | --- |
 | No gains | Drone stays on the ground | thrust is 0 throughout |
-| P only | Bounces, then settles **below** the target | final error ≈ m·g / Kp (0.98 m for m = 1 kg, Kp = 10) |
-| Bigger P | Smaller gap, more bounce | Kp = 30 leaves ≈ 0.33 m and overshoots |
+| P only | Bounces, then settles **below** the target | final error ≈ m·g / Kp (0.98 m for m = 1 kg, Kp = 10); settled within the run |
+| Bigger P | Smaller gap, more bounce | Kp = 30 leaves ≈ 0.33 m, with a larger `overshoot_ratio` than Kp = 10 (and it rises past the target line) |
 | P + D | Bounce gone, gap still there | same final error as P only, no overshoot |
 | P + I + D | Reaches the target exactly | final error ≈ 0 |
-| Too much I | Overshoots and rings; past the limit it never settles | linear model is stable only while (Kd + c)·Kp > m·Ki |
+| Too much I | Overshoots and rings; past the limit it never settles | linear model (no thrust limits) is stable only while (Kd + c)·Kp > m·Ki; with the presets the limit is Ki = 70, so Ki = 40 rings but is stable |
 | Heavier drone, P + D | Bigger gap | m = 1.5 kg, Kp = 10 leaves ≈ 1.47 m |
 
-Starting presets for the lesson (m = 1 kg, c = 0.4 N·s/m, target 2 m): P only Kp = 10; P + D adds Kd = 6; full PID adds Ki = 4; "too much I" uses Ki = 40. These are configuration, never words in Aili's narration.
+Starting presets for the lesson (m = 1 kg, c = 1.0 N·s/m, target 2 m): P only Kp = 10; P + D adds Kd = 6; full PID adds Ki = 4; "too much I" uses Ki = 40. These are configuration, never words in Aili's narration.
 
 **Where the model stops** (Aili says this at the end of the lesson):
 
 - Real drones also tilt and move sideways. This model is height only.
 - Real motors take time to speed up; here thrust changes instantly.
+- Air drag here is a simple straight-line rule and deliberately exaggerated so the bounce dies out quickly.
 - Real height sensors are noisy, and D amplifies noise, so real controllers filter it.
 - Real flight controllers usually add a "hover thrust" estimate and run several loops inside each other.
 - The numbers teach the idea. They are not settings for tuning a real drone.
@@ -87,8 +100,8 @@ Eight beats, about 12 to 15 minutes. Each beat follows the behaviour spec: at mo
 - **Learner:** presses **Run**.
 - **On stage:** the drone rises, bobs, and settles **below** the line. The error bracket stays open and shows `{{final_error_m}}`. Weight arrow (down) and thrust arrow (up) end the same length.
 - **Aili explains the mechanism:** "To hover, thrust must equal the drone's weight. But P only pushes when there's a gap. So the drone sinks until the gap is just big enough to make that thrust. No gap, no push." The equation `Kp × gap = weight` lights up, each term highlighted with its arrow.
-- **Analogy (about 40 s):** cruise control on a hill (see the visual spec). The car settles a little slower than the set speed, just as the drone settles a little low.
-- **Learner:** drags the **P** slider higher and runs again. The previous run stays as a faint ghost line on the plot. The gap shrinks to `{{final_error_m}}`, but the bounce gets bigger (`{{overshoot_pct}}`).
+- **Analogy (about 40 s):** cruise control on a hill (see the visual spec). The car settles a little slower than the set speed, just as the drone settles a little low. The analogy shows P and I only; D is introduced on the drone in beat 3.
+- **Learner:** drags the **P** slider higher and runs again. The previous run stays as a faint ghost line on the plot. The gap shrinks to `{{final_error_m}}`, but the bounce gets bigger (`{{overshoot_ratio}}`, shown as a percentage).
 - **Check:** "So why not just make P huge?" Aili takes the answer, then explains: more P means harder pushes, so more overshoot, and the motors have a maximum.
 
 ### Beat 3: D, the brake (about 2 min)
@@ -101,7 +114,7 @@ Eight beats, about 12 to 15 minutes. Each beat follows the behaviour spec: at mo
 
 ### Beat 4: I, the memory (about 3 min)
 
-- **Probe:** "The drone has been too low for a while now. What kind of rule would notice that?" Learner types or picks a chip.
+- **Probe:** "The drone has been too low for a while now. What kind of rule would notice that?" Learner picks a chip (prepared mode is chips only); in live mode they may also type.
 - **Explain:** "I, for integral, keeps a running total of the gap over time. While the drone stays low, the total keeps growing and adds more thrust, until the gap is closed."
 - **Learner:** adds I and runs. The drone reaches the line. The error bracket closes.
 - **On stage, the key moment:** at rest, the P and D bars shrink to zero and the **I bar alone holds up the weight**. Aili points it out: "Now the memory is doing the holding, so the gap can be zero."
@@ -116,13 +129,14 @@ Eight beats, about 12 to 15 minutes. Each beat follows the behaviour spec: at mo
 ### Beat 6: Teach-back (about 1 min)
 
 - **Aili:** "Tell me in one sentence each what P, I and D do."
-- Graded against the reading guide's key claims. A vague answer gets one follow-up. No mastery claim either way; the result is saved as evidence.
+- **Live mode:** the learner types; Aili grades it against the reading guide's key claims. A vague answer gets one follow-up. No mastery claim either way; the result is saved as evidence.
+- **Prepared mode (chips only):** a self-check: the learner compares their own sentence with the key claims, labelled as a self-check, not graded.
 
 ### Beat 7: Limits, further reading, what's next (about 1 min)
 
 - **Aili:** states where the model stops (from the teaching model), in two or three short lines.
 - **Library:** one verified reading item opens in the drawer (see the reading guide).
-- **Teaser:** "You just tuned a controller by hand, the way engineers do. Some robots now learn their controllers through practice. That's a later lesson." A *Tell me when it's ready* chip logs interest as demand.
+- **Teaser:** "You just tuned a controller by hand, the way engineers do. Some robots now learn their controllers through practice. That's a later lesson." A *Tell me when it's ready* chip logs interest as demand. Until the database stage this goes to the local dev turn log only, and the UI says so ("Noted on this computer only for now").
 
 **Pacing rule for the whole lesson:** no more than about 30 seconds of narration or animation without the learner doing something.
 
@@ -130,17 +144,17 @@ Eight beats, about 12 to 15 minutes. Each beat follows the behaviour spec: at mo
 
 The stage shows one side view of one drone, with the plot and the P/I/D bars beside it. Everything that moves is driven by the solver's output; nothing is animated by hand.
 
-**Drone asset** (`asset.quadcopter-generic`, coded in Three.js, labelled *generic, simplified teaching model*):
+**Drone asset** (`asset.quadcopter-generic`, coded in Three.js, asset format `procedural`: a code module with a triangle budget checked by a test, no GLB file; labelled *generic, simplified teaching model*; part IDs are kebab-case):
 
 | Part ID | What it is | Used in |
 | --- | --- | --- |
 | `body` | central frame | all beats |
-| `arm.1`–`arm.4` | four arms | exploded view |
-| `rotor.1`–`rotor.4` | propellers; spin speed follows thrust (illustrative) | beats 0–5 |
-| `motor.1`–`motor.4` | motors under the rotors | label only |
-| `sensor.altitude` | height sensor under the body; glows on "Measure" | beat 1 |
-| `battery` | battery pack | label only; mass changes with the camera in beat 5 |
-| `payload.camera` | added camera | beat 5 |
+| `arm-1`–`arm-4` | four arms | exploded view |
+| `rotor-1`–`rotor-4` | propellers; spin speed follows thrust (illustrative) | beats 0–5 |
+| `motor-1`–`motor-4` | motors under the rotors | label only |
+| `sensor-altitude` | height sensor under the body; glows on "Measure" | beat 1 |
+| `battery` | battery pack | label only |
+| `payload-camera` | added camera; adds mass in beat 5 (max thrust does not change) | beat 5 |
 
 **Stage elements**
 
@@ -154,12 +168,12 @@ The stage shows one side view of one drone, with the plot and the P/I/D bars bes
 | Feedback loop overlay | Measure → Compare → Correct ring | beat 1 only |
 | Height plot | height over time, target line, faint ghost of the previous run | solver trace |
 | Sliders | Kp, Ki, Kd with units and bounds; presets *P only*, *P + D*, *PID*, *Too much I* | simulation manifest |
-| Checks strip | final error, overshoot, settling time, stability; Pass / Warn / Fail with icon and label | solver outputs |
+| Checks strip | final error, overshoot, settling time, stability; Pass / Warn / Fail with icon and label (thresholds in `config/teaching-thresholds.json`, a design choice labelled as such) | solver outputs |
 | Badges | *Simplified teaching model* and *Prepared* or *Live* | registry + session |
 
 **Analogy animation: cruise control on a hill** (`analogy.cruise-control-hill`)
 
-A car with cruise control set to a speed drives onto a hill. With P-like control it settles slightly slower than the set speed; a driver who notices "I've been slow for a while" (I) closes the gap; one who eases off as the speed rushes up (D) avoids overshooting. The scene then dissolves into the drone in the same frame, with the mapping labelled. I chose this over the shower knob because the hill pulling the car back maps directly onto gravity pulling the drone down, which is the exact cause of the P-only gap.
+A car with cruise control set to a speed drives onto a hill. With P-like control it settles slightly slower than the set speed; a driver who notices "I've been slow for a while" (I) closes the gap. The analogy covers P and I only: D is introduced on the drone, not the car. The scene then dissolves into the drone in the same frame, with the mapping labelled. I chose this over the shower knob because the hill pulling the car back maps directly onto gravity pulling the drone down, which is the exact cause of the P-only gap.
 
 | In the car | In the drone |
 | --- | --- |
@@ -169,9 +183,8 @@ A car with cruise control set to a speed drives onto a hill. With P-like control
 | accelerator | motor thrust |
 | "slower, so press harder" | P |
 | "slow for a while, keep adding" | I |
-| "speeding up fast, ease off" | D |
 
-**Where it breaks down** (Aili says this): a car controls speed while the drone controls height, which adds one more step between push and result. A human driver also sees the hill coming and presses early; a basic PID only reacts to the gap it already has.
+**Where it breaks down** (Aili says this): a car controls speed while the drone controls height, which adds one more step between push and result. That extra step is why the drone bounces and the P-only car does not, so the car has no bounce for D to fix: D belongs to the drone. A human driver also sees the hill coming and presses early; a basic PID only reacts to the gap it already has.
 
 The cast follows the brand doc: geometric figures in Sage, Sky, Gold and Plum with Ink outlines on Canvas, no mascot.
 
@@ -181,7 +194,7 @@ The cast follows the brand doc: geometric figures in Sage, Sky, Gold and Plum wi
 - Pass / Warn / Fail always carry an icon and a word, never colour alone.
 - Reduced motion: no animation; the stage shows the final state and the plot draws in one step.
 - Phone: stage on top, plot and sliders in the bottom sheet, touch targets at least 44 px.
-- Every visual carries its provenance badge, and a "report a problem with this visual" action.
+- Every visual carries its provenance badge. A "report a problem with this visual" action is marked *coming* (not built yet).
 
 ## Reading guide
 
@@ -194,7 +207,7 @@ This is the human-written guide Aili grades teach-backs against. It is yours to 
 3. With gravity, P alone leaves the drone below the target, because it needs a gap to make the thrust that holds it up.
 4. D pushes against the speed of change, which damps the bounce. At rest it adds nothing.
 5. I adds up the gap over time, so it keeps increasing thrust until the gap is zero. At rest it holds the weight.
-6. Too much of any term causes problems: overshoot, ringing, or never settling.
+6. Too much P or I causes overshoot and ringing (too much I can stop it settling at all); too much D makes it sluggish, and on real drones amplifies sensor noise.
 
 **Common misconceptions to watch for**
 
@@ -267,7 +280,7 @@ Then stop and wait for my approval.
 **Prompt 2: solver and tests**
 
 ```text
-Implement step 1 of the approved plan: the drone altitude PID solver (solver.pid-altitude-1d) in the shared TypeScript solver package, exactly as in docs/lesson-drone-pid.md, section "The teaching model": the equations, 2 ms semi-implicit Euler, ground clamp, thrust clamp, anti-windup, D on measured speed, input bounds, optional wind, and all listed outputs (traces, P/I/D contributions, final error, overshoot, settling time, saturation flag, stability flag).
+Implement step 1 of the approved plan: the drone altitude PID solver (solver.pid-altitude-1d) in the shared TypeScript solver package, exactly as in docs/lesson-drone-pid.md, section "The teaching model": the equations, 2 ms semi-implicit Euler, ground clamp, thrust clamp with max thrust fixed at the base mass, clamping anti-windup, D on measured speed, input bounds, optional wind, start at hover, and all listed outputs with the stated definitions (traces, P/I/D contributions, final error, overshoot_ratio, settling time, saturation flag, stability flag).
 
 Write tests for every row of the "facts the tests must confirm" table, plus the linear stability boundary (Kd + c)·Kp > m·Ki with saturation turned off, bounds rejection, and unit checks. Tests must compare against the analytic values (m·g/Kp), not just snapshots.
 
@@ -278,10 +291,10 @@ Run lint, typecheck and tests. Small commits. Report what was built, test result
 
 ```text
 Implement step 2: the content for the drone PID lesson as draft registry items in git, following the existing schemas:
-- concept nodes: control.feedback-loop, control.pid.proportional, control.pid.derivative, control.pid.integral, control.steady-state-error (prerequisites, L1/L2/L3 levels, misconceptions from the reading guide);
-- sim.pid-altitude-1d manifest (inputs with units and bounds, presets P only / P + D / PID / Too much I, outputs, assumptions, exclusions from "Where the model stops", fidelity simplified_teaching_model);
+- concept nodes using the ctl.* IDs from docs/m4-plan.md: ctl.open-vs-closed-loop, ctl.error, ctl.proportional, ctl.overshoot, ctl.steady-state-error, plus ctl.derivative and ctl.integral (prerequisites, L1/L2/L3 levels, misconceptions from the reading guide); none safety-critical;
+- sim.pid-altitude-1d manifest (inputs with units and bounds, presets P only / P + D / PID / Too much I, outputs, assumptions, exclusions from "Where the model stops", fidelity simplified_teaching);
 - analogy.cruise-control-hill with the mapping table and the "where it breaks down" note;
-- reading items as candidates (status candidate, verified null) with the reading guide's key claims, misconceptions, teach-back prompt and application question; links out only;
+- reading items as drafts (review_status draft; their sources verified null) with the reading guide's key claims, misconceptions, teach-back prompt and application question; links out only;
 - the eight lesson beats from "Lesson script", with numbers only as solver placeholders.
 All review_status draft. Do not mark anything verified or reviewed. Run the content checks. Report, then stop.
 ```
@@ -289,7 +302,7 @@ All review_status draft. Do not mark anything verified or reviewed. Run the cont
 **Prompt 4: drone and stage**
 
 ```text
-Implement step 3: asset.quadcopter-generic as coded Three.js geometry with the named parts in the "Visual spec" table, labelled generic, simplified teaching model, in metres. Then the stage elements in that section's table: target line, height ruler, error bracket, thrust and weight arrows to scale, P/I/D bars, height plot with a ghost of the previous run, Kp/Ki/Kd sliders with units and bounds, the four presets, and the checks strip with Pass/Warn/Fail icon plus word. Everything that moves reads from the solver output; nothing is hand-animated. Follow the brand tokens, reduced-motion still state, phone layout and 44 px targets. Keep the asset small for mid-range Android.
+Implement step 3: asset.quadcopter-generic as coded Three.js geometry (asset format procedural) with the named kebab-case parts in the "Visual spec" table, labelled generic, simplified teaching model, in metres. Then the stage elements in that section's table: target line, height ruler, error bracket, thrust and weight arrows to scale, P/I/D bars, height plot with a ghost of the previous run, Kp/Ki/Kd sliders with units and bounds, the four presets, and the checks strip with Pass/Warn/Fail icon plus word. Everything that moves reads from the solver output; nothing is hand-animated. Follow the brand tokens, reduced-motion still state, phone layout and 44 px targets. Keep the asset small for mid-range Android.
 
 Run lint, typecheck, unit tests and e2e on desktop, tablet and phone. Tell me exactly how to open it in demo mode and what to try. Report, then stop.
 ```

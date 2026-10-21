@@ -123,6 +123,8 @@ Success is a learner who can predict, explain, test, revise, and apply an idea i
 
 ## 8. Example V1 experience
 
+> **Note (Oct 21 2026):** the MVP lesson is now a drone holding its altitude with PID (`docs/lesson-drone-pid.md`). This section stays the long-term acceptance target.
+
 A beginner arrives and says: “I want to understand robotics and eventually build a small robot.”
 
 Aili asks one useful baseline question. A recognizable robot appears, with its sensing, decision/control, and actuation relationships visible. Narration is short and interactive. The learner can select a part and ask how it works. Aili may use a familiar analogy, then connect it back to the actual system.

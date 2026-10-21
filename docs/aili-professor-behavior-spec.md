@@ -174,6 +174,8 @@ Test sessions, not single replies. Run each scenario against the professor model
 16. **Return after reading:** an open assignment is resumed without replaying old narration or nagging.
 17. **Different analogy on request:** "use another example" produces a second analogy with its own mapping and its own breakdown note.
 
+**Drone PID lesson variants (Oct 21 2026):** the servo wording above stays, and each test also runs in the drone lesson where it applies, for example test 1 as "Will P alone hold it at 2 m?", test 3 as "What is PID?" and test 5 as "the controller knows the drone's weight".
+
 **Metrics to track:** move distribution, ratio of explanation to questions, number of consecutive questions, how often the learner says "just tell me", challenge-to-resolution rate, validator pass rate, latency, and cost per session.
 
 ---
@@ -207,7 +209,7 @@ Interactive visuals are a strong tool inside the teaching loop. They are not a m
 - Each analogy is stored with a mapping table (what corresponds to what) and a "where it breaks down" note, and the professor states both.
 - The cast is a small, reusable set of geometric figures and props in Aili's brand palette (see `aili-brand-design-language.md`: Sage, Sky, Gold and Plum fills with Ink outlines on a Canvas background; Copper for emphasis). The AI composes from the cast and does not invent new characters at runtime. New characters are authored and reviewed. There is no mascot.
 - Signature moment: the analogy figure dissolves into the real system in the same camera frame, with the mapping labeled.
-- Start with two polished analogies (a bag held at arm's length for torque, and a thermostat for feedback) and prove they help before building more.
+- Start with two polished analogies (a bag held at arm's length for torque, and cruise control on a hill for feedback: the hill pulling the car back maps onto gravity pulling the drone down; decided Oct 21 2026) and prove they help before building more.
 - Optional presentation: a lesson can play as short "beats" (camera, actors, motion, one line of voice, pause points). Beats are short explanations that lead into a check, not long lectures.
 
 ### B5. Accessibility and performance

@@ -1,5 +1,10 @@
 # M4 plan: a true beginner's first lab, in 3D (servo torque, end to end)
 
+> **Superseded as the MVP lesson (Oct 21 2026).** The MVP lesson is now the drone altitude PID lesson in
+> `docs/lesson-drone-pid.md`. The servo slices built here stay working as a second lesson and backup demo;
+> they are not extended further for now. The `ctl.*` concept IDs below are kept and used by the drone lesson,
+> which adds `ctl.derivative` and `ctl.integral`.
+
 **Status:** PLAN ONLY, for Lucky's approval. Nothing is built. **Date:** 14 Oct 2026.
 **Branch:** `m1/learn-stage-shell` (local commits only). Read with `docs/aili-architecture.md` §9–11,
 `docs/aili-visuals-curriculum-billing.md` §1–2 and §4, `docs/aili-stage-layout.md` §1, `docs/m3-report.md`.
@@ -83,7 +88,7 @@ Coverage: **lab** (tested solver, reviewed), **guided** (explained with labelled
 | ctl.error | Target minus actual | ctl.open-vs-closed-loop | lab |
 | ctl.proportional | Push harder the bigger the error | ctl.error | lab |
 | ctl.overshoot | Going past the target | ctl.proportional | lab |
-| ctl.steady-state-error | Never quite arriving under load | ctl.proportional, mech.torque.static | lab |
+| ctl.steady-state-error | Never quite arriving under load | ctl.proportional, mech.mass-vs-weight | lab |
 | ctl.pid-overview | Adding memory and damping | ctl.overshoot | guided |
 | sense.encoder | Counting turns | sense.position-sensor | discussion |
 
