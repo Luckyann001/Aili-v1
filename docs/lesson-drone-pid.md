@@ -19,7 +19,7 @@ The MVP is one lesson, about 12 to 15 minutes long: **a drone holding its altitu
 
 **Fidelity label for the whole lesson:** *Simplified teaching model* (registry value `simplified_teaching`). The drone moves only up and down, and the doc states what that leaves out.
 
-**Corrections after the plan review (Oct 21 2026):** drag raised to 1.0 N·s/m so the bounce dies out within a run; overshoot, settling and stability defined; standard gravity; max thrust fixed at the base mass; clamping anti-windup; wind and "start at hover" inputs; the car analogy covers P and I only; key claim 6 reworded; kebab-case part IDs; a procedural (coded) asset format; reading items are drafts; `overshoot_ratio` instead of `overshoot_pct`; chips-only prepared mode. The sections below already include them.
+**Corrections after the plan review (Oct 21 2026):** drag raised to 1.0 N·s/m so the bounce dies out within a run; overshoot, settling and stability defined; standard gravity; max thrust fixed at the base mass; clamping anti-windup; wind and "start at hover" inputs; the car analogy covers P and I only; key claim 6 reworded; kebab-case part IDs; a procedural (coded) asset format; reading items are drafts; `overshoot_m` (metres) in narration, with `overshoot_ratio` kept as a solver output only; chips-only prepared mode. The sections below already include them.
 
 ## The teaching model
 
@@ -101,7 +101,7 @@ Eight beats, about 12 to 15 minutes. Each beat follows the behaviour spec: at mo
 - **On stage:** the drone rises, bobs, and settles **below** the line. The error bracket stays open and shows `{{final_error_m}}`. Weight arrow (down) and thrust arrow (up) end the same length.
 - **Aili explains the mechanism:** "To hover, thrust must equal the drone's weight. But P only pushes when there's a gap. So the drone sinks until the gap is just big enough to make that thrust. No gap, no push." The equation `Kp × gap = weight` lights up, each term highlighted with its arrow.
 - **Analogy (about 40 s):** cruise control on a hill (see the visual spec). The car settles a little slower than the set speed, just as the drone settles a little low. The analogy shows P and I only; D is introduced on the drone in beat 3.
-- **Learner:** drags the **P** slider higher and runs again. The previous run stays as a faint ghost line on the plot. The gap shrinks to `{{final_error_m}}`, but the bounce gets bigger (`{{overshoot_ratio}}`, shown as a percentage).
+- **Learner:** drags the **P** slider higher and runs again. The previous run stays as a faint ghost line on the plot. The gap shrinks to `{{final_error_m}}`, but the drone now shoots higher past where it ends up, by `{{overshoot_m}}`, and this time it crosses the target line before settling back below it. (`overshoot_ratio` stays a solver output but is never used in narration: with the motors at full thrust it can shrink while the bounce in metres grows.)
 - **Check:** "So why not just make P huge?" Aili takes the answer, then explains: more P means harder pushes, so more overshoot, and the motors have a maximum.
 
 ### Beat 3: D, the brake (about 2 min)
