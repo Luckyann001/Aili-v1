@@ -12,5 +12,9 @@
   { "id": "act.motor-basics", "title": "A motor turns electricity into turning", "review_status": "draft" },
   { "id": "act.gear-ratio", "title": "Teeth counts set the ratio", "review_status": "draft", "prerequisites": ["act.servo-parts"] },
   { "id": "act.torque-speed-tradeoff", "title": "More torque, less speed", "review_status": "draft", "prerequisites": ["act.gear-ratio"] },
-  { "id": "sense.position-sensor", "title": "The servo knows its angle", "review_status": "draft", "prerequisites": ["act.servo-parts"] }
+  { "id": "sense.position-sensor", "title": "The servo knows its angle", "review_status": "draft", "prerequisites": ["act.servo-parts"] },
+  { "id": "ctl.proportional", "title": "Push harder the bigger the error", "review_status": "draft" },
+  { "id": "ctl.derivative", "title": "Push against the speed of change", "review_status": "draft", "prerequisites": ["ctl.proportional"] },
+  { "id": "ctl.integral", "title": "Add up the error over time", "review_status": "draft", "prerequisites": ["ctl.proportional"] },
+  { "id": "ctl.steady-state-error", "title": "Never quite arriving under load", "review_status": "draft", "prerequisites": ["ctl.proportional", "mech.mass-vs-weight"] }
 ]

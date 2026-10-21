@@ -31,6 +31,12 @@ export const UNIT_SUFFIX = {
   "N·m": "_nm",
   N: "_n",
   "kgf·cm": "_kgf_cm",
+  // Controller gains and time (drone altitude PID, Oct 21 2026).
+  "N/m": "_n_per_m",
+  "N/(m·s)": "_n_per_m_s",
+  "N·s/m": "_n_s_per_m",
+  s: "_s",
+  "m/s": "_m_per_s",
   ratio: null,
 } as const;
 export const Unit = z.enum(Object.keys(UNIT_SUFFIX) as [keyof typeof UNIT_SUFFIX, ...Array<keyof typeof UNIT_SUFFIX>]);

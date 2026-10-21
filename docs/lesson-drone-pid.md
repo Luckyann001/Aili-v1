@@ -46,15 +46,15 @@ In words: z is height (m), v is vertical speed (m/s), m is mass (kg), g is stand
 **Solver rules**
 
 - Fixed time step of 2 ms, semi-implicit Euler, 15 s per run. The ground is at z = 0 and the drone can't go below it.
-- Anti-windup (clamping): the I term stops adding up while thrust is at a limit (T_max or 0 N) and the error would push it further past that limit, and while the drone rests on the ground with thrust below its weight.
-- Inputs with bounds: mass 0.5–2 kg, Kp 0–40 N/m, Ki 0–100 N/(m·s), Kd 0–15 N·s/m, target 0.5–5 m, thrust-to-weight ratio 1.5–3 (default 2), optional wind push 0–5 N with a start time and a duration (no duration means a steady wind), and a start state: on the ground (default) or *start at hover* (at the target, at rest, with the I term already holding the weight; needs Ki > 0).
-- Outputs: height, thrust and the three P/I/D contributions over time; final error (at the end of the run); `overshoot_ratio`; settling time; whether thrust hit its limit; and a stability flag (settled, still oscillating, or not dying out).
+- Anti-windup (clamping): the I term stops adding up while thrust is at a limit (T_max or 0 N) and the error would push it further past that limit. On the ground below its weight it keeps adding: that is what lifts a drone whose P term alone is too weak (a ground freeze would leave it there for ever; found while building the solver).
+- Inputs with bounds: mass 0.5–2 kg, Kp 0–40 N/m, Ki 0–100 N/(m·s), Kd 0–15 N·s/m, target 0.5–5 m, thrust-to-weight ratio 1.5–3 (default 2), payload 0–1 kg with the total mass inside 0.5–2 kg, drag 0–5 N·s/m for checks (the lesson fixes it at 1.0), optional wind push 0–5 N with a start time (0–15 s) and a duration (0–15 s; no duration means a steady wind), and a start state: on the ground (default) or *start at hover* (at the target, at rest, with the I term already holding the weight; needs Ki > 0).
+- Outputs: height, thrust and the three P/I/D contributions over time; final error (at the end of the run); `overshoot_ratio` and `overshoot_m` (peak − final height, the bounce in metres); settling time; whether thrust hit its limit; and a stability flag (settled, still oscillating, or not dying out).
 
 **Definitions**
 
 - **Overshoot** is measured from the drone's own resting height, not the target: `overshoot_ratio` = (peak height − final height) ÷ (final height − start height), shown as a percentage at the edge. A P-only drone can overshoot its resting height without ever reaching the target line.
-- **Settling time** is the first time after which the height stays within ±2% of the final height until the end of the run.
-- **Stability flag:** *settled* if a settling time exists; *not dying out* if the swing (max − min height) over the last 3 s is no smaller than over the 3 s before; otherwise *still oscillating*. With thrust limits a truly growing oscillation is impossible; it becomes a steady one, hence "not dying out".
+- **Settling time** is the first time after which the height stays within ±2% of the final height until the end of the run. It counts only if the drone has stayed in the band for at least the last 3 s; otherwise the last sample alone would always count as settled.
+- **Stability flag:** *settled* if a settling time exists; *not dying out* if the swing (max − min height) over the last 3 s is no smaller than over the 3 s before; otherwise *still oscillating*. With thrust limits a truly growing oscillation is impossible; it becomes a steady one, hence "not dying out". "No smaller than" allows 2%: two 3 s windows of a steady swing differ by a few tenths of a percent (measured 0.996–1.002), while a dying bounce at the presets is at most about 0.88.
 
 **Facts the tests must confirm** (I checked these in a quick simulation; Claude Code's tests are the real proof):
 
@@ -62,7 +62,7 @@ In words: z is height (m), v is vertical speed (m/s), m is mass (kg), g is stand
 | --- | --- | --- |
 | No gains | Drone stays on the ground | thrust is 0 throughout |
 | P only | Bounces, then settles **below** the target | final error ≈ m·g / Kp (0.98 m for m = 1 kg, Kp = 10); settled within the run |
-| Bigger P | Smaller gap, more bounce | Kp = 30 leaves ≈ 0.33 m, with a larger `overshoot_ratio` than Kp = 10 (and it rises past the target line) |
+| Bigger P | Smaller gap, more bounce | Kp = 30 leaves ≈ 0.33 m, with a larger `overshoot_m` than Kp = 10, and it rises past the target line. Its `overshoot_ratio` is *smaller* (0.51 against 0.61): the motors sit at maximum thrust for about 1.8 s, which caps the climb |
 | P + D | Bounce gone, gap still there | same final error as P only, no overshoot |
 | P + I + D | Reaches the target exactly | final error ≈ 0 |
 | Too much I | Overshoots and rings; past the limit it never settles | linear model (no thrust limits) is stable only while (Kd + c)·Kp > m·Ki; with the presets the limit is Ki = 70, so Ki = 40 rings but is stable |

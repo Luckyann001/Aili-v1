@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { itemLabel, loadRegistry, shortlist, validateRegistry, type RegistryInput } from "./index";
+import { PID_ALTITUDE_BOUNDS } from "@aili/solvers";
+import { SOLVERS } from "./turn";
 
 // Real content comes from content/robotics. Everything "published" below is a test fixture
 // (docs/m2-plan.md, decision 5): no review record, so no reviewer name is ever invented.
@@ -99,7 +101,7 @@ describe("capability registry: the files in content/robotics", () => {
     const r = loadRegistry(real(), PROD);
     expect(r.errors).toEqual([]);
     expect(r.registry.simulations.map((s) => s.id)).toEqual(["sim.servo-static-load"]);
-    expect(r.registry.solvers.map((s) => s.id)).toEqual(["solver.static-torque-single-link"]);
+    expect(r.registry.solvers.map((s) => s.id).sort()).toEqual(["solver.pid-altitude-1d", "solver.static-torque-single-link"]);
     expect(r.registry.sources.map((s) => s.id).sort()).toEqual(["src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
     expect(r.registry.scenes.map((s) => s.id).sort()).toEqual(["bag-hold", "base-joint-arm", "lever-analogy", "servo-arm"]);
   });
@@ -118,7 +120,7 @@ describe("capability registry: the files in content/robotics", () => {
     const s = loadRegistry(real(), PROD).registry.simulations[0]!;
     expect(s.inputs.arm_kg_per_m!.min).toBeGreaterThan(0);
     expect(s.assumptions.join(" ")).toMatch(/from horizontal/);
-    const solver = loadRegistry(real(), PROD).registry.solvers[0]!;
+    const solver = loadRegistry(real(), PROD).registry.solvers.find((x) => x.id === "solver.static-torque-single-link")!;
     expect(solver.worked_examples.filter((w) => w.kind === "textbook").map((w) => w.source)).toEqual(["src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
     expect(solver.worked_examples.some((w) => w.kind === "hand_derivation" && /not textbook/.test(w.location))).toBe(true);
   });
@@ -350,5 +352,29 @@ describe("content/robotics/test-fixtures", () => {
     expect(strip(readJson("test-fixtures/scene.fx-servo-arm.json"), ["title", "asset", "solver", "review"])).toEqual(strip(readJson("scenes/servo-arm.json"), ["title", "asset", "solver", "review"]));
     expect(readJson("scenes/servo-arm.json").asset).toBe("asset.servo-generic-anatomy");
     expect(readJson("test-fixtures/scene.fx-servo-arm.json").asset).toBe("asset.fx-servo-generic-anatomy");
+  });
+});
+
+describe("solver.pid-altitude-1d: the manifest and the code agree", () => {
+  const manifest = readJson("capabilities/solver.pid-altitude-1d.json");
+
+  it("loads as a draft in the real registry", () => {
+    const { registry, errors } = loadRegistry(real(), PROD);
+    expect(errors).toEqual([]);
+    expect(registry.solvers.find((s) => s.id === "solver.pid-altitude-1d")?.review_status).toBe("draft");
+  });
+
+  it("declares exactly the solver's input bounds", () => {
+    const { total_mass_kg: _total, ...inputs } = PID_ALTITUDE_BOUNDS;
+    expect(Object.keys(manifest.inputs).sort()).toEqual(Object.keys(inputs).sort());
+    for (const [k, b] of Object.entries(inputs)) expect({ min: manifest.inputs[k].min, max: manifest.inputs[k].max }).toEqual(b);
+  });
+
+  it("is runnable by the engine, and its numeric outputs are the manifest's outputs", () => {
+    const out = SOLVERS["solver.pid-altitude-1d"]!({ base_mass_kg: 1, target_m: 2, kp_n_per_m: 10, ki_n_per_m_s: 4, kd_n_s_per_m: 6 });
+    expect(Object.keys(out).sort()).toEqual(Object.keys(manifest.outputs).sort());
+    // Unsettled: no settling time is reported, never a made-up one.
+    const ringing = SOLVERS["solver.pid-altitude-1d"]!({ base_mass_kg: 1, target_m: 2, kp_n_per_m: 10, ki_n_per_m_s: 90, kd_n_s_per_m: 6 });
+    expect(ringing).not.toHaveProperty("settling_time_s");
   });
 });

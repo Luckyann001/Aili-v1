@@ -1,5 +1,5 @@
 import type { DirectorResponse, LevelQuestion, SessionHistory } from "@aili/schemas";
-import { staticTorqueSingleLink } from "@aili/solvers";
+import { pidAltitude1d, staticTorqueSingleLink } from "@aili/solvers";
 import type { Registry, Shortlist } from "./capabilities";
 import { shortlist } from "./capabilities";
 import { dropStrayActionFields, EXPLAIN_WITHOUT_CHECK, levelFromReply, NARRATION_SPLIT_MAX_SEGMENTS, normalizeActionBinding, salvageProbeQuestion, supplyLevelQuestion, splitLongNarration, substituteGuideQuestion, toWirePaths, validateDirectorResponse } from "./director";
@@ -161,8 +161,21 @@ const singleLink: SolverFn = (inputs) => {
   return out;
 };
 
+/**
+ * The drone altitude run as a calculation: its single-number results only. The traces are for the page,
+ * which runs the same solver itself; a settling time exists only when the run settled. Always from the
+ * ground: "start at hover" is the page's choice, not the director's.
+ */
+const pidAltitude: SolverFn = (inputs) => {
+  const r = pidAltitude1d(inputs as unknown as Parameters<typeof pidAltitude1d>[0]);
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(r)) if (typeof v === "number") out[k] = v;
+  return out;
+};
+
 /** Solver implementations by registry ID. Test-fixture copies point at the same code. */
 export const SOLVERS: Record<string, SolverFn> = {
+  "solver.pid-altitude-1d": pidAltitude,
   "solver.static-torque-single-link": singleLink,
   "solver.fx-torque": singleLink,
 };
