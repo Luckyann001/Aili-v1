@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Action, Move, Narration } from "./beats";
+import { DirectorAction, Move, Narration } from "./beats";
 import { AnalogyId, ReadingId, SimulationId, SolverId } from "./capabilities";
 import { KebabId } from "./scene";
 import { ConceptId } from "./base";
@@ -41,11 +41,11 @@ export const DirectorPrompt = z
  */
 const at = { at: KebabId };
 export const BoundAction = z.discriminatedUnion("type", [
-  Action.options[0].extend(at),
-  Action.options[1].extend(at),
-  Action.options[2].extend(at),
-  Action.options[3].extend(at),
-  Action.options[4].extend(at),
+  DirectorAction.options[0].extend(at),
+  DirectorAction.options[1].extend(at),
+  DirectorAction.options[2].extend(at),
+  DirectorAction.options[3].extend(at),
+  DirectorAction.options[4].extend(at),
 ]);
 export type BoundAction = z.infer<typeof BoundAction>;
 
@@ -100,7 +100,7 @@ export const DirectorResponse = z
 export type DirectorResponse = z.infer<typeof DirectorResponse>;
 
 /** A narration segment as the model writes it: its text and the stage actions that go with it. */
-export const DirectorSegment = Narration.extend({ actions: z.array(Action).default([]) }).strict();
+export const DirectorSegment = Narration.extend({ actions: z.array(DirectorAction).default([]) }).strict();
 
 /**
  * What the MODEL writes (the provider's output schema): actions nested under the narration segment

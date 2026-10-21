@@ -7,7 +7,7 @@ import { KebabId } from "./scene";
 
 const ChoiceId = KebabId;
 
-export const Action = z.discriminatedUnion("type", [
+const STAGE_ACTIONS = [
   z.object({ type: z.literal("select_scene"), scene: KebabId }).strict(),
   z.object({ type: z.literal("highlight_part"), part: KebabId }).strict(),
   z.object({ type: z.literal("set_parameter"), param: z.string().min(1), value: z.number() }).strict(),
@@ -18,6 +18,21 @@ export const Action = z.discriminatedUnion("type", [
       choices: z.array(z.object({ id: ChoiceId, label: z.string().min(1) }).strict()).min(2).max(4),
     })
     .strict(),
+] as const;
+
+/** The actions a live turn (the director) may send. The drone's preset and run actions are not among them yet (step 4). */
+export const DirectorAction = z.discriminatedUnion("type", [...STAGE_ACTIONS]);
+export type DirectorAction = z.infer<typeof DirectorAction>;
+
+/** The actions a prepared beat may use: the director's, plus the drone altitude scene's (Oct 21 2026). */
+export const Action = z.discriminatedUnion("type", [
+  ...STAGE_ACTIONS,
+  z.object({ type: z.literal("apply_preset"), preset: KebabId }).strict(),
+  /**
+   * Run the scene's simulation. "learner": the lesson waits for the learner's Run press. "hover": start
+   * at the target with the I term already holding the weight (needs Ki > 0), else at rest on the ground.
+   */
+  z.object({ type: z.literal("run_simulation"), by: z.enum(["learner", "aili"]), start: z.enum(["ground", "hover"]).default("ground") }).strict(),
 ]);
 export type Action = z.infer<typeof Action>;
 

@@ -1,5 +1,6 @@
 import { BeatScript, MOVES_FOR_KIND, NOT_SURE, type SceneManifest } from "@aili/schemas";
 import { checkNarration } from "./narration";
+import { applyStageSetting, stageDefaults, type StageSettings } from "./stage";
 
 // Validates a scripted beat sequence against the scene registry, before anything plays:
 // - every scene, part, setting and animation ID exists (in the scene active at that point);
@@ -9,7 +10,12 @@ import { checkNarration } from "./narration";
 //   row without a reveal or link beat that gives something back in between;
 // - a commit beat follows a beat that offered choices; feedback refers to real choices;
 // - each beat's move fits its kind (behavior spec A3); framing beats ask no question;
-// - every choice list offers "Not sure", and feedback about it has its own wording.
+// - every choice list offers "Not sure", and feedback about it has its own wording;
+// - a preset exists in the scene on stage; a run needs a scene with a solver, and a run that starts at
+//   hover needs an I gain above zero in the settings at that point (the I term holds the weight).
+
+/** Solvers that run over time, so a beat can press Run on them. The others are single calculations. */
+export const RUNNABLE_SOLVERS: ReadonlySet<string> = new Set(["solver.pid-altitude-1d"]);
 
 export interface BeatContext {
   scenes: SceneManifest[];
@@ -26,6 +32,7 @@ export function validateBeats(raw: unknown, ctx: BeatContext): { script: BeatScr
   const errors: string[] = [];
   const byId = new Map(ctx.scenes.map((s) => [s.id, s]));
   let scene: SceneManifest | undefined;
+  let settings: StageSettings = {};
   let questionPending = false;
   const choicesByBeat = new Map<string, string[]>();
   const seen = new Set<string>();
@@ -42,6 +49,7 @@ export function validateBeats(raw: unknown, ctx: BeatContext): { script: BeatScr
       if (a.type === "select_scene") {
         scene = byId.get(a.scene);
         if (!scene) errors.push(`${at}: unknown scene "${a.scene}"`);
+        else settings = stageDefaults(scene);
         continue;
       }
       if (a.type === "show_choices") {
@@ -65,6 +73,16 @@ export function validateBeats(raw: unknown, ctx: BeatContext): { script: BeatScr
         const p = scene.params.find((x) => x.id === a.param);
         if (!p) errors.push(`${at}: setting "${a.param}" is not in scene "${scene.id}"`);
         else if (a.value < p.min || a.value > p.max) errors.push(`${at}: ${a.param} = ${a.value} is outside ${p.min}–${p.max} ${p.unit}`);
+        else settings = applyStageSetting(scene, settings, a.param, a.value);
+      }
+      if (a.type === "apply_preset") {
+        const preset = scene.presets.find((x) => x.id === a.preset);
+        if (!preset) errors.push(`${at}: preset "${a.preset}" is not in scene "${scene.id}" (presets: ${scene.presets.map((x) => x.id).join(", ") || "none"})`);
+        else for (const [k, v] of Object.entries(preset.values)) settings = applyStageSetting(scene, settings, k, v);
+      }
+      if (a.type === "run_simulation") {
+        if (!scene.solver || !RUNNABLE_SOLVERS.has(scene.solver.id)) errors.push(`${at}: scene "${scene.id}" has no simulation to run`);
+        else if (a.start === "hover" && !((settings.ki_n_per_m_s ?? 0) > 0)) errors.push(`${at}: a run that starts at hover needs ki_n_per_m_s above 0 (the I term holds the weight)`);
       }
     }
 

@@ -13,14 +13,26 @@ export const Provenance = z.enum(["authored", "commissioned", "open_licensed", "
 export const ScenePart = z.object({ id: KebabId, name: z.string().min(1) }).strict();
 
 /** Each setting unit and the suffix its ID must end with (newton-metres: `_nm`). */
-export const PARAM_UNIT_SUFFIX = { m: "_m", kg: "_kg", deg: "_deg", "N·m": "_nm" } as const;
+export const PARAM_UNIT_SUFFIX = {
+  m: "_m",
+  kg: "_kg",
+  deg: "_deg",
+  "N·m": "_nm",
+  // The drone altitude scene (Oct 21 2026): controller gains, a push, and times.
+  N: "_n",
+  "N/m": "_n_per_m",
+  "N/(m·s)": "_n_per_m_s",
+  "N·s/m": "_n_s_per_m",
+  s: "_s",
+} as const;
+const PARAM_UNITS = Object.keys(PARAM_UNIT_SUFFIX) as [keyof typeof PARAM_UNIT_SUFFIX, ...Array<keyof typeof PARAM_UNIT_SUFFIX>];
 
 /** A setting a scene allows, with unit and bounds. The unit is part of the ID (arm_length_m). */
 export const SceneParam = z
   .object({
-    id: z.string().regex(/^[a-z][a-z0-9_]*_(m|kg|deg|nm)$/, "setting IDs end with their unit: _m, _kg, _deg or _nm"),
+    id: z.string().regex(/^[a-z][a-z0-9_]*_(m|kg|deg|nm|n|s)$/, "setting IDs end with their unit: _m, _kg, _deg, _nm, _n, _n_per_m, _n_per_m_s, _n_s_per_m or _s"),
     label: z.string().min(1),
-    unit: z.enum(["m", "kg", "deg", "N·m"]),
+    unit: z.enum(PARAM_UNITS),
     min: z.number(),
     max: z.number(),
     step: z.number().positive(),
@@ -76,6 +88,15 @@ export const SceneHandover = z
 export const ReviewRole = z.enum(["founder", "expert"]);
 export const Review = z.object({ by: z.string().min(2), on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), role: ReviewRole.optional() }).strict();
 
+/**
+ * A named set of settings (drone altitude scene, Oct 21 2026): "P only", "P + D". A beat or a turn names
+ * the preset; the values are written here by a person, never sent by the model.
+ */
+export const ScenePreset = z
+  .object({ id: KebabId, label: z.string().min(1), values: z.record(z.string().min(1), z.number()) })
+  .strict()
+  .refine((p) => Object.keys(p.values).length > 0, "a preset sets at least one setting");
+
 /** A 3D asset's ID (asset manifests live in the capability registry). */
 export const AssetId = z.string().regex(/^asset\.[a-z0-9]+(-[a-z0-9]+)*$/, "IDs look like asset.some-name");
 
@@ -97,6 +118,7 @@ export const SceneManifest = z
     parts: z.array(ScenePart).min(1),
     params: z.array(SceneParam).default([]),
     animations: z.array(SceneAnimation).default([]),
+    presets: z.array(ScenePreset).default([]),
     /** The 3D asset this scene draws, if any (its manifest is in the capability registry). */
     asset: AssetId.optional(),
     /**
@@ -108,7 +130,7 @@ export const SceneManifest = z
     /** Human-written handovers to other scenes: which settings and parts carry across. */
     handover: z.array(SceneHandover).default([]),
     /** Fixed inputs for the scene's solver (SI, unit in the name). Never shown as results. */
-    solver: z.object({ id: z.string().min(1), constants: z.record(z.string().regex(/_(m|kg|deg|m_per_s2)$/), z.number()) }).strict().optional(),
+    solver: z.object({ id: z.string().min(1), constants: z.record(z.string().regex(/_(m|kg|deg|m_per_s2|n_s_per_m|ratio)$/), z.number()) }).strict().optional(),
   })
   .strict()
   .superRefine((s, ctx) => {
@@ -117,6 +139,7 @@ export const SceneManifest = z
       ["part", s.parts.map((p) => p.id)],
       ["setting", s.params.map((p) => p.id)],
       ["animation", s.animations.map((a) => a.id)],
+      ["preset", s.presets.map((p) => p.id)],
     ] as const) {
       const dup = ids.find((id, i) => ids.indexOf(id) !== i);
       if (dup) ctx.addIssue({ code: "custom", message: `${s.id}: duplicate ${what} ID "${dup}"` });
@@ -126,6 +149,13 @@ export const SceneManifest = z
       for (const e of a.sets) {
         const p = s.params.find((x) => x.id === e.param);
         if (!p || p.learner_supplied) ctx.addIssue({ code: "custom", message: `${s.id}: animation "${a.id}" sets "${e.param}", which is not one of this scene's settings` });
+      }
+    // A preset sets this scene's own settings, inside their bounds, never the learner's rating.
+    for (const pr of s.presets)
+      for (const [k, v] of Object.entries(pr.values)) {
+        const p = s.params.find((x) => x.id === k);
+        if (!p || p.learner_supplied) ctx.addIssue({ code: "custom", message: `${s.id}: preset "${pr.id}" sets "${k}", which is not one of this scene's settings` });
+        else if (v < p.min || v > p.max) ctx.addIssue({ code: "custom", message: `${s.id}: preset "${pr.id}" sets ${k} = ${v}, outside ${p.min}–${p.max} ${p.unit}` });
       }
     // A handover names this scene's own settings and parts (the target's are checked by the registry loader).
     for (const h of s.handover) {
@@ -145,6 +175,12 @@ export const ConceptSeed = z
     safety_critical: z.boolean().default(false),
     /** Concepts to understand first (docs/m4-plan.md §1); each must exist in the graph. */
     prerequisites: z.array(ConceptId).default([]),
+    /** How far Aili can go with it (architecture §10). Absent: not decided yet. */
+    coverage: z.enum(["lab", "guided", "discussion"]).optional(),
+    /** What the learner should take away at each level (L1 intuition, L2 quantitative, L3 design and limits). */
+    levels: z.object({ L1: z.string().min(1), L2: z.string().min(1), L3: z.string().min(1) }).strict().optional(),
+    /** Misconceptions to watch for (from a human-written reading guide). */
+    misconceptions: z.array(z.string().min(1)).default([]),
   })
   .strict();
 export type ConceptSeed = z.infer<typeof ConceptSeed>;
