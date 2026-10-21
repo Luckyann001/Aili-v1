@@ -84,7 +84,7 @@ Coverage: **lab** (tested solver, reviewed), **guided** (explained with labelled
 | ID | Concept | Prerequisites | Coverage |
 |---|---|---|---|
 | sense.position-sensor | The servo knows its angle | act.servo-parts | guided |
-| ctl.open-vs-closed-loop | Acting with or without checking | sense.position-sensor | lab |
+| ctl.open-vs-closed-loop | Acting with or without checking | none (changed Oct 21 2026: the drone lesson starts here, with no servo first) | lab |
 | ctl.error | Target minus actual | ctl.open-vs-closed-loop | lab |
 | ctl.proportional | Push harder the bigger the error | ctl.error | lab |
 | ctl.overshoot | Going past the target | ctl.proportional | lab |
