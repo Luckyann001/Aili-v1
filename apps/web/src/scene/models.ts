@@ -50,6 +50,12 @@ export interface SceneModel {
   camera?: { far: number; minDistance: number; maxDistance: number };
   /** The default viewing direction (towards the camera), if not the shared one: the tall drone stand is seen lower and more from the side. */
   viewDir?: [number, number, number];
+  /**
+   * When this changes, the camera reframes (keeping its direction): the drone's set height or a new run's
+   * height range. Also refit when the free area grows (`refitOnGrow`), not only when the model stops fitting.
+   */
+  refitKey?: (s: ModelState) => string;
+  refitOnGrow?: true;
 }
 
 /** The servo parts' fills in the still picture and the loading placeholder (the 3D view uses the GLB's own materials). */
@@ -126,6 +132,8 @@ export const MODELS: Record<SceneId, SceneModel> = {
     hidden: (s) => hiddenDroneParts(s.drone),
     camera: { far: 40, minDistance: 0.3, maxDistance: 14 },
     viewDir: [0.42, 0.22, 1],
+    refitKey: (s) => `${s.drone.settings.target_m}|${s.drone.range?.low_m.toFixed(2) ?? ""}|${s.drone.range?.high_m.toFixed(2) ?? ""}`,
+    refitOnGrow: true,
   },
 };
 

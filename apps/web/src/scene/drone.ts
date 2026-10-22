@@ -17,31 +17,33 @@ export const DEFAULT_DRONE_SETTINGS: DroneSettings = stageDefaults(droneManifest
 
 export interface DroneState {
   settings: DroneSettings;
-  /** The drone's height above its rest, metres: 0 on the stand. Set only from a solver run (step 3b). */
+  /** The drone's height above its rest, metres: 0 on the stand. Set only from a solver run. */
   height_m: number;
+  /** The heights the current run passes through (from the solver, known before it plays), for framing. */
+  range?: { low_m: number; high_m: number };
 }
 export const DEFAULT_DRONE: DroneState = { settings: DEFAULT_DRONE_SETTINGS, height_m: 0 };
 
 type Vec3 = [number, number, number];
 
-/** Drawing sizes, metres. Roughly a 1 kg quadcopter: 0.42 m motor to motor. */
+/** Drawing sizes, metres. Roughly a 1 kg quadcopter: a 450 mm frame (motor to motor) with 10-inch propellers. */
 const BODY: Vec3 = [0.14, 0.05, 0.14];
 /** The body's underside sits on the post's stop, this high above the stand plate. */
 const REST_M = 0.02;
-const ARM_REACH_M = 0.21; // body centre to motor centre
+const ARM_REACH_M = 0.225; // body centre to motor centre
 const ARM_T = 0.02;
 const MOTOR = { r: 0.018, h: 0.03 };
-const ROTOR = { length: 0.2, thick: 0.006, chord: 0.018 };
+const ROTOR = { length: 0.254, thick: 0.006, chord: 0.02 };
 const SENSOR: Vec3 = [0.03, 0.02, 0.03];
 const BATTERY: Vec3 = [0.1, 0.03, 0.05];
 const CAMERA: Vec3 = [0.04, 0.04, 0.04];
 
-/** The stand: plate, guide post, measuring mast (drawing only). The mast reaches past the highest target. */
+/** The stand: plate, guide post, measuring mast (drawing only). Only the part the lesson uses: the set height goes to 3 m. */
 export const STAND = {
   plate: { size: [1.0, 0.02, 0.7] as Vec3, centre: [-0.15, -0.01, 0] as Vec3 },
-  post: { r: 0.01, height_m: 5.6 },
+  post: { r: 0.01, height_m: 3.8 },
   stop: { r: 0.025, h: REST_M },
-  mast: { x: -0.5, z: 0, width: 0.04, height_m: 5.6 },
+  mast: { x: -0.5, z: 0, width: 0.04, height_m: 3.8 },
   /** A mark every half metre on the mast; every metre a longer one (scene units, not results). */
   tick_every_m: 0.5,
   collar: { radius: 0.036, tube: 0.008 },
@@ -100,11 +102,12 @@ const region = (min: Vec3, max: Vec3): PartLayout => {
  * rest and at that height. The view does not chase the drone during a run: it frames the range it can fly.
  */
 export function droneFraming(s: DroneState): Array<Record<string, PartLayout>> {
-  const flight = Math.max(s.settings.target_m ?? 2, s.height_m);
+  const low = Math.max(0, Math.min(s.range?.low_m ?? 0, s.height_m));
+  const flight = Math.max(s.settings.target_m ?? 2, s.height_m, s.range?.high_m ?? 0);
   const top = REST_M + flight + 0.2;
   // The mast from its foot to just above the collar, and the drone at rest and at the set height. The plate's
   // far corners are left out: they would only shrink the drone.
-  return [{ mast: region([STAND.mast.x - 0.02, 0, -0.02], [STAND.mast.x + 0.02, top, 0.02]) }, layoutDrone({ ...s, height_m: 0 }), layoutDrone({ ...s, height_m: flight })];
+  return [{ mast: region([STAND.mast.x - 0.02, low, -0.02], [STAND.mast.x + 0.02, top, 0.02]) }, layoutDrone({ ...s, height_m: low }), layoutDrone({ ...s, height_m: flight })];
 }
 
 /** Propeller discs: the circle each propeller sweeps, drawn faintly so the drone reads at a distance. Radius, metres. */

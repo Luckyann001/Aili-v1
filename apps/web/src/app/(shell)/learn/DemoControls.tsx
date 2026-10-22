@@ -7,6 +7,7 @@ import { useConsent } from "@/voice/consent";
 import { DEMO_TOOLS } from "@/turn/flags";
 import { useVoice } from "@/voice/store";
 import { useScene } from "@/scene/sceneStore";
+import { useStageContent } from "@/turn/stageContent";
 import type { VoiceStatus } from "@/voice/machine";
 import { FAKE_CASES, type FakeCase } from "@aili/schemas";
 import styles from "./learn.module.css";
@@ -58,7 +59,13 @@ export function DemoControls({ onPlay, onFakeTurn }: { onPlay: () => void; onFak
               // Close this panel first: the camera frames the new scene in the stage's free area, which the
               // open panel would otherwise take up (the drone came out framed from 14 m away).
               if (panel.current) panel.current.open = false;
-              requestAnimationFrame(() => requestAnimationFrame(() => setScene("drone-altitude")));
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  setScene("drone-altitude");
+                  // In live mode the stage stays dimmed until a scene is picked: this is one.
+                  useStageContent.getState().setScenePicked(true);
+                }),
+              );
             }}
           >
             Show the drone scene (draft)

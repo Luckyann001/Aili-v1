@@ -40,6 +40,7 @@ import { ExplanationSpace } from "./scene/ExplanationSpace";
 import { EquationLabels } from "./scene/EquationLabels";
 import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
+import { useDronePlayback } from "@/scene/useDronePlayback";
 import styles from "./learn.module.css";
 
 // Focus targets where Space already means something (typing, pressing, switching tabs).
@@ -51,6 +52,13 @@ const SPACE_OWNERS =
 // instead: demo mode A, a centred "What do you want to learn?" over the dimmed stage, no prepared
 // lesson offered, and no stage badge until a turn puts a scene on stage.
 const LIVE_NOTE = "Live AI: your message goes to a real AI model, on test-fixture content only.";
+/** Live mode on the drone scene, until step 4 wires the professor to it: a prepared line, said plainly. */
+export const DRONE_PLACEHOLDER = [
+  "This is a prepared placeholder line, not a live answer.",
+  "Aili's live replies for the drone lesson come in a later build step.",
+  "For now, switch P, I and D on or off and press Run.",
+];
+
 export function LearnStage() {
   const side = useLearnUi((s) => s.side);
   const captionsOn = useLearnUi((s) => s.captionsOn);
@@ -103,6 +111,8 @@ export function LearnStage() {
   }, []);
   const voice = useVoiceController({ onTranscript, onUnsupported: focusInput, askConsent });
   useLessonPlayer(voice);
+  // The drone's runs play in real time from the solver's trace, whichever view is showing.
+  useDronePlayback();
   // Live mode, from the server (null until it answers). It takes over the text box, so the
   // fake-director demo's case buttons are off (in live mode they would reach the real model).
   const live = useLiveMode();
@@ -334,7 +344,11 @@ export function LearnStage() {
         text={text}
         onText={setText}
         onSubmit={
-          live
+          live && activeScene === "drone-altitude"
+            ? // The live professor is wired to the drone in step 4; until then it would answer about the
+              // servo (its only published content), so a short prepared line says so instead.
+              () => void voice.say(DRONE_PLACEHOLDER, () => {})
+            : live
             ? (t) => void demoTurn.start("valid", t) // the case is ignored by the live route
             : fakeDemo
               ? (t) => void demoTurn.start("valid", t)

@@ -60,8 +60,8 @@ describe("the drone on its stand", () => {
     const mark = mastTicks().find((t) => t.height_m === 3)!;
     expect(mark.major).toBe(true);
     expect(mark.y_m).toBeCloseTo(collarHeight_m({ settings, height_m: 0 }), 12);
-    // Marks every half metre, past the highest target the scene allows.
-    expect(mastTicks().at(-1)!.height_m).toBeGreaterThanOrEqual(5);
+    // Marks every half metre, past the highest set height the scene allows (3 m).
+    expect(mastTicks().at(-1)!.height_m).toBeGreaterThanOrEqual(3.5);
   });
 
   it("the downward rangefinder is under the body, beside the guide post", () => {
@@ -106,7 +106,7 @@ describe("the store keeps the drone's settings in their bounds", () => {
     const s = store();
     expect(s.get().drone.settings).toMatchObject({ kp_n_per_m: 10, target_m: 2, payload_kg: 0 });
     s.get().setDroneSetting("target_m", 9);
-    expect(s.get().drone.settings.target_m).toBe(5);
+    expect(s.get().drone.settings.target_m).toBe(3);
     s.get().setDroneSetting("not_a_setting_m", 1);
     expect(s.get().drone.settings).not.toHaveProperty("not_a_setting_m");
   });

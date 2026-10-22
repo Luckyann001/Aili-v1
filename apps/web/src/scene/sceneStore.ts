@@ -5,6 +5,7 @@ import { MODELS, type SceneId } from "./models";
 import { applyStageSetting } from "@aili/engine";
 import droneManifest from "../../../../content/robotics/scenes/drone-altitude.json";
 import { DEFAULT_DRONE, type DroneState } from "./drone";
+import { DRONE_PRESETS, runDrone, runLength_s, sampleAt, SWITCH_ON, SWITCHES, type DroneRun, type RunKind } from "./droneRun";
 import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type EqStep, type ServoParamId, type ServoParams } from "./servoArm";
 
 /** Who changed the stage: Aili (a turn's action) or the learner (a control). Shown, never colour alone. */
@@ -35,6 +36,20 @@ export interface SceneState {
   drone: DroneState;
   setDroneSetting: (id: string, value: number) => void;
   setDroneHeight: (height_m: number) => void;
+  /** A beginner switch: its gain to the PID preset's value, or to zero. */
+  setDroneSwitch: (id: (typeof SWITCHES)[number]["id"], on: boolean) => void;
+  applyDronePreset: (id: string) => void;
+  /**
+   * The latest run (the solver's result for the settings at the time) and the one before it (the plot's
+   * ghost). The playback time runs from 0 to the run's end; `snap` (reduced motion) shows the end at once.
+   */
+  droneRun: DroneRun | null;
+  droneGhost: DroneRun | null;
+  droneT_s: number;
+  dronePlaying: boolean;
+  startDroneRun: (kind: RunKind, opts?: { snap?: boolean }) => void;
+  /** A playback step, ignored unless `seq` is the current run. Reaching the end stops it. */
+  setDroneT: (seq: number, t_s: number) => void;
   /** The servo's rated torque, N·m, as the learner typed it from their datasheet; null until then. */
   ratedTorque_nm: number | null;
   /** Out-of-bounds values are refused (returns false) and nothing changes. */
@@ -120,6 +135,43 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   drone: DEFAULT_DRONE,
   setDroneSetting: (id, value) => set((s) => ({ drone: { ...s.drone, settings: applyStageSetting(droneManifest, s.drone.settings, id, value) } })),
   setDroneHeight: (height_m) => set((s) => ({ drone: { ...s.drone, height_m: Number.isFinite(height_m) ? Math.max(0, height_m) : s.drone.height_m } })),
+  setDroneSwitch: (id, on) =>
+    set((s) => {
+      const sw = SWITCHES.find((x) => x.id === id);
+      return sw ? { drone: { ...s.drone, settings: applyStageSetting(droneManifest, s.drone.settings, sw.gain, on ? SWITCH_ON[sw.gain]! : 0) } } : {};
+    }),
+  applyDronePreset: (id) =>
+    set((s) => {
+      const p = DRONE_PRESETS.find((x) => x.id === id);
+      if (!p) return {};
+      let settings = s.drone.settings;
+      for (const [k, v] of Object.entries(p.values)) settings = applyStageSetting(droneManifest, settings, k, v);
+      return { drone: { ...s.drone, settings } };
+    }),
+  droneRun: null,
+  droneGhost: null,
+  droneT_s: 0,
+  dronePlaying: false,
+  startDroneRun: (kind, opts = {}) =>
+    set((s) => {
+      const run = runDrone(s.drone.settings, kind, (s.droneRun?.seq ?? 0) + 1);
+      const h = run.result.trace.height_m;
+      const t_s = opts.snap ? runLength_s(run.result) : 0;
+      return {
+        droneRun: run,
+        droneGhost: s.droneRun,
+        droneT_s: t_s,
+        dronePlaying: !opts.snap,
+        drone: { ...s.drone, height_m: sampleAt(run.result, t_s).height_m, range: { low_m: Math.min(...h), high_m: Math.max(...h) } },
+      };
+    }),
+  setDroneT: (seq, t_s) =>
+    set((s) => {
+      if (!s.droneRun || s.droneRun.seq !== seq) return {};
+      const end = runLength_s(s.droneRun.result);
+      const t = Math.min(Math.max(0, t_s), end);
+      return { droneT_s: t, dronePlaying: t < end };
+    }),
   ratedTorque_nm: null,
   setRatedTorque: (value) => {
     const v = value === null ? null : parseRating(value);
@@ -200,6 +252,11 @@ export const gearsInView = (s: Pick<SceneState, "activeScene" | "servoView" | "s
 export const servoPoseOf = (s: Pick<SceneState, "servoFrom" | "servoView" | "servoMotion">): AssetPose => ({ from: s.servoFrom, to: s.servoView, k: s.servoMotion });
 
 /** Next part in list order for arrow keys; wraps at both ends. */
+/** The drone as it is right now: its height from the current run at the playback time (0 before any run). */
+export function droneNow(s: Pick<SceneState, "drone" | "droneRun" | "droneT_s">): DroneState {
+  return s.droneRun ? { ...s.drone, height_m: sampleAt(s.droneRun.result, s.droneT_s).height_m } : s.drone;
+}
+
 export function stepPart(ids: readonly string[], current: string | null, delta: 1 | -1): string {
   if (!ids.length) throw new Error("no parts");
   const i = current === null ? -1 : ids.indexOf(current);

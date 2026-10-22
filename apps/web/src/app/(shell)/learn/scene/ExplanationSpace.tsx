@@ -9,6 +9,7 @@ import { useStageContent } from "@/turn/stageContent";
 import { RATIO_NOTE, RATIO_TEXT } from "@/scene/gears";
 import { partNameIn } from "@/scene/models";
 import { EQ_STEPS, eqLine, eqText, GRAVITY_TEXT, MARGIN, RATING_DEF, SERVO_PARTS, servoReadout, type EqStep, type MarginStatus, type ServoReadout } from "@/scene/servoArm";
+import { DroneAdvanced, DroneChecks, DroneFootnote, DroneHeightPlot, DronePidBars, DroneRunButtons, DroneRunNote, DroneSwitches, DroneThrustGauge } from "./DronePanel";
 import styles from "../learn.module.css";
 
 // The stage's explanation space (docs/m4-plan.md, 16 Oct 2026): a column at the stage's right,
@@ -272,7 +273,30 @@ export const SPACE_BLOCKS: Partial<Record<SceneId, Array<{ id: string; render: (
     { id: "equation", render: () => <EquationBlock key="equation" /> },
     { id: "torque", render: () => <TorqueBlock key="torque" /> },
   ],
+  // The drone (step 3b): the beginner controls first, then what the run shows, then the advanced panel.
+  "drone-altitude": [
+    { id: "controls", render: () => <DroneControlsBlock key="controls" /> },
+    { id: "note", render: () => <DroneRunNote key="note" /> },
+    { id: "plot", render: () => <DroneHeightPlot key="plot" /> },
+    { id: "gauge", render: () => <DroneThrustGauge key="gauge" /> },
+    { id: "bars", render: () => <DronePidBars key="bars" /> },
+    { id: "checks", render: () => <DroneChecks key="checks" /> },
+    { id: "advanced", render: () => <DroneAdvanced key="advanced" /> },
+    { id: "footnote", render: () => <DroneFootnote key="footnote" /> },
+  ],
 };
+
+/** The space's heading for each scene. */
+const SPACE_TITLE: Partial<Record<SceneId, string>> = { "servo-arm": "Torque at the joint", "drone-altitude": "Drone controls" };
+
+function DroneControlsBlock() {
+  return (
+    <div className={styles.droneBlock}>
+      <DroneSwitches />
+      <DroneRunButtons />
+    </div>
+  );
+}
 
 /** The one-line summary for the strip (narrow screens): the current step, else the total. */
 function Summary() {
@@ -331,12 +355,14 @@ export function ExplanationSpace() {
   if (!blocks || inspectorOpen) return null;
   const tag = contentLabelOf(scene);
   const content = blocks.map((b) => b.render());
+  // On narrow screens the drone's switches and Run are in the strip itself, so the sheet leaves them out.
+  const sheetContent = blocks.filter((b) => !(scene === "drone-altitude" && b.id === "controls")).map((b) => b.render());
 
   if (wide)
     return (
       <section className={styles.space} data-reserve="auto" aria-label="Explanation space" data-space="column">
         <div className={styles.spaceHead}>
-          <span>Torque at the joint</span>
+          <span>{SPACE_TITLE[scene]}</span>
           <span className={styles.gaugeTag} title={tag.detail}>{tag.label}</span>
         </div>
         {content}
@@ -360,17 +386,25 @@ export function ExplanationSpace() {
       }}
     >
       <div className={styles.stripRow}>
-        <Summary />
+        {/* The drone's switches and Run stay in the strip, so the drone stays in view while they are used. */}
+        {scene === "drone-altitude" ? (
+          <div className={styles.droneStrip}>
+            <DroneSwitches compact />
+            <DroneRunButtons />
+          </div>
+        ) : (
+          <Summary />
+        )}
         <button id={`${sheetId}-button`} type="button" className={styles.linkButton} aria-expanded={open} aria-controls={sheetId} onClick={() => setOpen(!open)}>
           {open ? "Close the explanation space" : "Explanation space"}
         </button>
       </div>
       <div id={sheetId} className={styles.spaceSheet} hidden={!open}>
         <div className={styles.spaceHead}>
-          <span>Torque at the joint</span>
+          <span>{SPACE_TITLE[scene]}</span>
           <span className={styles.gaugeTag} title={tag.detail}>{tag.label}</span>
         </div>
-        {content}
+        {sheetContent}
       </div>
     </section>
   );

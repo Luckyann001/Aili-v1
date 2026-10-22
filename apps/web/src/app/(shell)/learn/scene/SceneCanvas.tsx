@@ -6,20 +6,21 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { BackSide, BufferGeometry, EdgesGeometry, Euler, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3, type Camera, type Material, type Object3D } from "three";
+import { BackSide, BoxGeometry, BufferGeometry, ConeGeometry, CylinderGeometry, EdgesGeometry, Euler, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, type Group, PerspectiveCamera, Vector3, type Camera, type Material, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
 import { settingsOf } from "@/scene/handover";
 import { cornersOf, layoutBag, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
-import { CYLINDER_SEGMENTS, PROP_DISC_R, STAND, collarHeight_m, mastTicks } from "@/scene/drone";
+import { CYLINDER_SEGMENTS, PROP_DISC_R, STAND, collarHeight_m, layoutDrone, mastTicks } from "@/scene/drone";
+import { sampleAt } from "@/scene/droneRun";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
 import { usePerf } from "@/scene/perfReadout";
 import { partOffsetGltf, settled } from "@/scene/assetPose";
 import { GEAR_NODES, PINION_RAD_PER_S } from "@/scene/gears";
 import { LEADER_LAYER } from "./SceneLabels";
-import { caseSeeThrough, HIDDEN_WHILE_APART, servoPoseOf, useScene } from "@/scene/sceneStore";
+import { caseSeeThrough, droneNow, HIDDEN_WHILE_APART, servoPoseOf, useScene } from "@/scene/sceneStore";
 import { HORN_TURN_RAD, JOINT, SERVO_GLB_URL, SERVO_ORIGIN, SERVO_PARTS, SERVO_POSE_MANIFEST, SERVO_ROTATION, SERVO_ROTATION_ORDER, arrowSweep, layoutServoParts, servoReadout, type EqStep } from "@/scene/servoArm";
 import type { SceneColors } from "./useSceneTheme";
 
@@ -111,6 +112,8 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       {activeScene === "bag-hold" && <BagHandle colors={props.colors} />}
       {activeScene === "drone-altitude" && <DroneStand colors={props.colors} />}
       {activeScene === "drone-altitude" && <PropDiscs colors={props.colors} />}
+      {activeScene === "drone-altitude" && <DroneArrows colors={props.colors} />}
+      {activeScene === "drone-altitude" && <DroneDriver reducedMotion={props.spatialMs <= 0} />}
       <CameraLimits />
       {activeScene === "servo-arm" && props.spatialMs <= 0 && <OffsetLines colors={props.colors} />}
       {activeScene === "servo-arm" && <EquationMarks colors={props.colors} />}
@@ -161,11 +164,16 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
 
   useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, bagReach_m, servo, drone, hidden, invalidate]);
 
-  // Size depends on the scene settings; position also on the explode amount (set per frame).
-  const layoutAt = (k: number) => MODELS[activeScene].layout(state, k)[id]!;
+  // Size depends on the scene settings; position also on the explode amount (set per frame). The drone's
+  // height is read live each frame from the run being played, so its parts never re-render to move.
+  const isDrone = activeScene === "drone-altitude";
+  const live = () => (isDrone ? { ...state, drone: droneNow(useScene.getState()) } : state);
+  const layoutAt = (k: number) => MODELS[activeScene].layout(live(), k)[id]!;
   const { kind, size } = layoutAt(0);
+  const spins = isDrone && id.startsWith("rotor-");
   useFrame(() => {
     ref.current?.position.set(...layoutAt(anim.explode).position);
+    if (spins && ref.current) ref.current.rotation.y = droneSpin.angle * (id === "rotor-1" || id === "rotor-3" ? 1 : -1);
   });
 
   const geometry = (inflate: number) =>
@@ -184,6 +192,8 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
     >
       {geometry(0)}
       <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} emissive={glow ? colors.accent : "#000000"} emissiveIntensity={glow ? 0.9 : 0} />
+      {/* The drone's figures carry Ink outlines (brand doc: fills with Ink outlines), so they read on the stage. */}
+      {isDrone && <InkEdges kind={kind === "box" ? "box" : "cylinder"} dims={size} color={colors.outline} />}
       {selected && (
         // Selection outline: an inverted shell OUTLINE_M larger on every side, drawn from inside.
         <mesh raycast={() => null}>
@@ -192,6 +202,27 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
         </mesh>
       )}
     </mesh>
+  );
+}
+
+/**
+ * Ink outlines (brand doc: figures in fills with Ink outlines) as plain 1 px WebGL lines: no triangles, so
+ * the phone's budget is untouched. `dims` is [w, h, d] for a box and [radius, height, radius] otherwise;
+ * only creases sharper than 20° are drawn (a cylinder's rims, not every side seam).
+ */
+function InkEdges({ kind, dims, segments = CYLINDER_SEGMENTS, color }: { kind: "box" | "cylinder" | "cone"; dims: readonly number[]; segments?: number; color: string }) {
+  const [a = 0, b = 0, c = 0] = dims;
+  const geometry = useMemo(() => {
+    const g = kind === "box" ? new BoxGeometry(a, b, c) : kind === "cone" ? new ConeGeometry(a, b, segments) : new CylinderGeometry(a, a, b, segments);
+    const e = new EdgesGeometry(g, 20);
+    g.dispose();
+    return e;
+  }, [kind, a, b, c, segments]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <lineSegments geometry={geometry} raycast={() => null}>
+      <lineBasicMaterial color={color} />
+    </lineSegments>
   );
 }
 
@@ -480,6 +511,7 @@ function DroneStand({ colors }: { colors: SceneColors }) {
       <mesh position={plate.centre} raycast={() => null}>
         <boxGeometry args={plate.size} />
         {standMat}
+        <InkEdges kind="box" dims={plate.size} color={colors.outline} />
       </mesh>
       <mesh position={[0, post.height_m / 2, 0]} raycast={() => null}>
         <cylinderGeometry args={[post.r, post.r, post.height_m, 12]} />
@@ -492,6 +524,7 @@ function DroneStand({ colors }: { colors: SceneColors }) {
       <mesh position={[mast.x, mast.height_m / 2, mast.z]} raycast={() => null}>
         <boxGeometry args={[mast.width, mast.height_m, mast.width]} />
         {standMat}
+        <InkEdges kind="box" dims={[mast.width, mast.height_m, mast.width]} color={colors.outline} />
       </mesh>
       {mastTicks().map((t) => (
         <mesh key={t.height_m} position={[mast.x + mast.width / 2 + (t.major ? 0.02 : 0.012), t.y_m, mast.z]} raycast={() => null}>
@@ -503,6 +536,85 @@ function DroneStand({ colors }: { colors: SceneColors }) {
         <torusGeometry args={[collar.radius, collar.tube, 8, CYLINDER_SEGMENTS]} />
         <meshStandardMaterial color={colors.accent} emissive={colors.accent} emissiveIntensity={0.6} roughness={0.5} />
       </mesh>
+      {/* The target line: dashes in Copper from the collar across to the guide post, at the set height. */}
+      {Array.from({ length: TARGET_DASHES }, (_, i) => (
+        <mesh key={i} name="target-line" position={[mast.x + mast.width / 2 + (i + 0.5) * TARGET_DASH_PITCH_M, collarHeight_m(drone), mast.z]} raycast={() => null}>
+          <boxGeometry args={[TARGET_DASH_PITCH_M * 0.6, 0.008, 0.008]} />
+          <meshBasicMaterial color={colors.accent} toneMapped={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+const TARGET_DASHES = 8;
+const TARGET_DASH_PITCH_M = (-STAND.mast.x - STAND.mast.width / 2 - STAND.post.r) / TARGET_DASHES;
+
+/** The propellers' angle (illustrative): it advances with thrust while a run plays, never from a number of its own. */
+const droneSpin = { angle: 0 };
+/** Top spin rate at full thrust, rad/s: an animation rate for the eye, not a motor speed. */
+const SPIN_AT_MAX_RAD_S = 30;
+
+/** While a run plays: a frame per playback step, and the propellers turning with the thrust (not under reduced motion). */
+function DroneDriver({ reducedMotion }: { reducedMotion: boolean }) {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => useScene.subscribe((s, prev) => (s.droneT_s !== prev.droneT_s || s.droneRun !== prev.droneRun ? invalidate() : undefined)), [invalidate]);
+  useFrame((_, dt) => {
+    const s = useScene.getState();
+    if (reducedMotion || !s.dronePlaying || !s.droneRun) return;
+    const thrust = sampleAt(s.droneRun.result, s.droneT_s).thrust_n;
+    droneSpin.angle = (droneSpin.angle + SPIN_AT_MAX_RAD_S * Math.sqrt(Math.max(0, thrust) / s.droneRun.result.max_thrust_n) * Math.min(dt, 0.1)) % (2 * Math.PI);
+  });
+  return null;
+}
+
+/** Newtons to metres for the force arrows: the same scale for both, so they are equal at hover. */
+const ARROW_M_PER_N = 0.025;
+const ARROW_X_M = 0.42;
+
+/**
+ * Thrust (up) and weight (down) beside the drone, to scale, from the run being played (the solver's
+ * thrust and weight); before any run, thrust is zero and only the weight shows. Lifted off the plate if
+ * the weight arrow would go through it.
+ */
+function DroneArrows({ colors }: { colors: SceneColors }) {
+  const up = useRef<Group>(null);
+  const down = useRef<Group>(null);
+  const place = () => {
+    const s = useScene.getState();
+    const now = droneNow(s);
+    const body = layoutDrone(now).body!;
+    const weight_n = s.droneRun?.result.weight_n ?? 0;
+    const thrust_n = s.droneRun ? sampleAt(s.droneRun.result, s.droneT_s).thrust_n : 0;
+    const wLen = weight_n * ARROW_M_PER_N;
+    const y = Math.max(body.position[1], wLen + 0.02);
+    up.current?.position.set(ARROW_X_M, y, 0);
+    up.current?.scale.set(1, Math.max(thrust_n * ARROW_M_PER_N, 1e-4), 1);
+    if (up.current) up.current.visible = thrust_n > 0.05;
+    down.current?.position.set(ARROW_X_M, y, 0);
+    down.current?.scale.set(1, Math.max(wLen, 1e-4), 1);
+    if (down.current) down.current.visible = wLen > 0;
+  };
+  useFrame(place);
+  // Unit arrows (length 1 along +y), scaled to their force; the head is a fixed share of the length.
+  const arrow = (dir: 1 | -1, name: string, ref: RefObject<Group | null>) => (
+    <group ref={ref} name={name} rotation={[dir === 1 ? 0 : Math.PI, 0, 0]}>
+      <mesh position={[0, 0.42, 0]} raycast={() => null}>
+        <cylinderGeometry args={[0.008, 0.008, 0.84, 8]} />
+        <meshStandardMaterial color={colors.fills.technical} />
+        <InkEdges kind="cylinder" dims={[0.008, 0.84, 0.008]} segments={8} color={colors.outline} />
+      </mesh>
+      <mesh position={[0, 0.92, 0]} raycast={() => null}>
+        <coneGeometry args={[0.022, 0.16, 12]} />
+        <meshStandardMaterial color={colors.fills.technical} />
+        <InkEdges kind="cone" dims={[0.022, 0.16, 0.022]} segments={12} color={colors.outline} />
+      </mesh>
+    </group>
+  );
+  return (
+    <group name="force-arrows">
+      {arrow(1, "thrust-arrow", up)}
+      {arrow(-1, "weight-arrow", down)}
     </group>
   );
 }
@@ -513,7 +625,7 @@ function PropDiscs({ colors }: { colors: SceneColors }) {
   const refs = useRef<Array<Mesh | null>>([]);
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => invalidate(), [drone, colors, invalidate]);
-  const at = (k: number) => MODELS["drone-altitude"].layout({ ...useScene.getState(), drone }, k);
+  const at = (k: number) => MODELS["drone-altitude"].layout({ ...useScene.getState(), drone: droneNow(useScene.getState()) }, k);
   useFrame(() => {
     const l = at(anim.explode);
     refs.current.forEach((m, i) => m?.position.set(...l[`rotor-${i + 1}`]!.position));
@@ -678,7 +790,7 @@ const anatomyDir = new Vector3(-0.72, 0.4, 0.57).normalize();
 const ANATOMY_FILL = 0.8;
 const marginFor = () => (useScene.getState().cameraView === "anatomy" ? 1 / ANATOMY_FILL : MARGIN);
 /** Last known screen shape, kept by Framing. */
-const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1 };
+const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1, fittedArea: 0 };
 
 const worldUp = new Vector3(0, 1, 0);
 const right = new Vector3();
@@ -739,6 +851,7 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const placed = useRef(false);
   const lastReserve = useRef(reserveKey);
 
+
   useLayoutEffect(() => {
     const el = safeArea.current;
     if (!el || !(camera instanceof PerspectiveCamera)) return;
@@ -758,9 +871,16 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
       Object.assign(frame, { fov: camera.fov, canvasH: size.height, areaW: freeW, areaH: freeH });
       // If the free area shrank (a caption appeared, the screen is zoomed) and the model no longer
       // fits in it, refit from the current direction. A model that still fits is left alone.
-      if (placed.current && !modelFits(camera, size, { x: el.offsetLeft, y: el.offsetTop, w: freeW, h: freeH })) refitCamera.current?.();
+      if (placed.current && !modelFits(camera, size, { x: el.offsetLeft, y: el.offsetTop, w: freeW, h: freeH })) {
+        refitCamera.current?.();
+      } else if (placed.current && MODELS[useScene.getState().activeScene].refitOnGrow && freeW * freeH > frame.fittedArea * 1.15) {
+        // The drone: a panel or the live welcome went away and the stage has room again. Fill it, rather
+        // than leave the drone framed for a smaller stage (found on Lucky's laptop, 22 Oct 2026).
+        refitCamera.current?.();
+      }
       if (!placed.current) {
         placed.current = true;
+        frame.fittedArea = freeW * freeH;
         const g = fitGoal(defaultDirOf(), anim.explode);
         camera.position.copy(g.position);
         camera.lookAt(g.target);
@@ -835,7 +955,7 @@ function LabelTracker({
     const { takeW, takeH } = reservedSpace(area);
     const w = area.clientWidth - takeW;
     const h = area.clientHeight - takeH;
-    const state = { params, leverDistance_m, bagReach_m, servo, drone, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) };
+    const state = { params, leverDistance_m, bagReach_m, servo, drone: activeScene === "drone-altitude" ? droneNow(useScene.getState()) : drone, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) };
     const layout = MODELS[activeScene].layout(state, anim.explode);
     const hiddenParts = MODELS[activeScene].hidden?.(state);
     writeData(host, "modelBox", projectedBox(layout, camera, size));
@@ -1051,11 +1171,13 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
   const exploded = useScene((s) => s.exploded);
   const activeScene = useScene((s) => s.activeScene);
   const cameraToken = useScene((s) => s.cameraToken);
+  // The drone reframes for a new set height or a new run's height range (keeping the viewing direction).
+  const fitKey = useScene((s) => MODELS[s.activeScene].refitKey?.(s) ?? "");
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const invalidate = useThree((s) => s.invalidate);
   const tween = useRef<{ t0: number; ms: number } | null>(null);
-  const seen = useRef({ resetToken, exploded, activeScene, cameraToken });
+  const seen = useRef({ resetToken, exploded, activeScene, cameraToken, fitKey });
 
   useEffect(() => writeCamera(host, camera), [camera, host]);
 
@@ -1065,6 +1187,8 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
       const anatomy = useScene.getState().cameraView === "anatomy";
       const d = anatomy ? anatomyDir : fromDefault ? defaultDirOf() : dir.copy(camera.position).sub(controls.target).normalize();
       const g = fitGoal(d, useScene.getState().exploded ? 1 : 0);
+      // The free area this fit is for (a scene with refitOnGrow refits when it grows a lot).
+      frame.fittedArea = frame.areaW * frame.areaH;
       goal.pos.copy(g.position);
       goal.target.copy(g.target);
       if (spatialMs <= 0) {
@@ -1083,16 +1207,16 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
     refitCamera.current = () => moveTo(false);
 
     const prev = seen.current;
-    seen.current = { resetToken, exploded, activeScene, cameraToken };
+    seen.current = { resetToken, exploded, activeScene, cameraToken, fitKey };
     // Reset, a new scene, or a camera view change (the servo opened, exploded or went back together):
     // frame from that view's direction. The placeholder's explode keeps the current direction.
     const fromDefault = prev.resetToken !== resetToken || prev.activeScene !== activeScene || prev.cameraToken !== cameraToken;
-    if (fromDefault || prev.exploded !== exploded) moveTo(fromDefault);
+    if (fromDefault || prev.exploded !== exploded || prev.fitKey !== fitKey) moveTo(fromDefault);
     writeData(host, "cameraView", useScene.getState().cameraView);
     return () => {
       refitCamera.current = null;
     };
-  }, [resetToken, exploded, activeScene, cameraToken, spatialMs, camera, controls, host, invalidate]);
+  }, [resetToken, exploded, activeScene, cameraToken, fitKey, spatialMs, camera, controls, host, invalidate]);
 
   useFrame(() => {
     const tw = tween.current;
