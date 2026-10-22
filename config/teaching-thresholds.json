@@ -1,8 +1,20 @@
 {
-  "_about": "Torque margin bands for the servo + arm scene: margin = the learner's rated torque divided by the solver's needed torque. Teaching thresholds chosen by Lucky (2026-10-14), not a design standard; to be reviewed by a roboticist.",
+  "_about": "Torque margin bands for the servo + arm scene: margin = the learner's rated torque divided by the solver's needed torque. Teaching thresholds chosen by Lucky (2026-10-14), not a design standard; to be reviewed by a roboticist. drone_checks: the drone altitude scene's checks strip (gap at the end as a share of the set height; bounce in metres); proposed by Claude Code on 2026-10-22 for Lucky to change, not a design standard.",
   "torque_margin": {
     "fail_below": 1.0,
     "pass_at_or_above": 2.0,
+    "label": "Teaching thresholds, not a design standard",
+    "review_status": "draft"
+  },
+  "drone_checks": {
+    "gap_share": {
+      "pass_at_or_below": 0.02,
+      "fail_above": 0.25
+    },
+    "bounce_m": {
+      "pass_at_or_below": 0.05,
+      "fail_above": 0.5
+    },
     "label": "Teaching thresholds, not a design standard",
     "review_status": "draft"
   }

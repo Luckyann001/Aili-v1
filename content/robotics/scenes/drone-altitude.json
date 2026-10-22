@@ -114,7 +114,7 @@
       "label": "Target height",
       "unit": "m",
       "min": 0.5,
-      "max": 5,
+      "max": 3,
       "step": 0.1,
       "default": 2
     },
@@ -190,6 +190,15 @@
         "kp_n_per_m": 10,
         "ki_n_per_m_s": 40,
         "kd_n_s_per_m": 6
+      }
+    },
+    {
+      "id": "gust",
+      "label": "Gust",
+      "values": {
+        "wind_force_n": 3,
+        "wind_start_s": 1,
+        "wind_duration_s": 0.5
       }
     }
   ],

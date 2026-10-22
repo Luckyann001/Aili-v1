@@ -62,6 +62,8 @@ describe("drone content: the registry", () => {
       "p-d": { kp_n_per_m: 10, ki_n_per_m_s: 0, kd_n_s_per_m: 6 },
       pid: { kp_n_per_m: 10, ki_n_per_m_s: 4, kd_n_s_per_m: 6 },
       "too-much-i": { kp_n_per_m: 10, ki_n_per_m_s: 40, kd_n_s_per_m: 6 },
+      // The Gust button's push (step 3b): a moment of wind, from where the controller holds the drone.
+      gust: { wind_force_n: 3, wind_start_s: 1, wind_duration_s: 0.5 },
     });
     expect(scene.solver?.constants).toEqual({ base_mass_kg: 1, drag_n_s_per_m: 1, thrust_to_weight_ratio: 2 });
     expect(scene.params.map((p) => p.id)).not.toContain("drag_n_s_per_m");

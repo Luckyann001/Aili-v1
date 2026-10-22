@@ -79,10 +79,13 @@ export interface PidAltitudeInput {
   wind_start_s?: number;
   wind_duration_s?: number;
   /**
+   * "settled": at rest where this controller holds the drone with no wind, ready for a gust (Oct 22 2026):
+   * with an I term, at hover; with P alone (or P + D), the gap m·g/Kp below the target, integral empty; with
+   * no P either (or a gap below the ground), on the ground.
    * "ground" (default): at rest on the ground, integral empty. "hover": at the target, at rest, with
    * the integral already holding the weight (needs Ki > 0). Set by the page, not by the director.
    */
-  start?: "ground" | "hover";
+  start?: "ground" | "hover" | "settled";
 }
 
 /**
@@ -170,10 +173,12 @@ export function pidAltitude1d(input: PidAltitudeInput, options: PidAltitudeRunOp
   const max_thrust_n = twr * base_mass_kg * g;
   const steps = Math.round(duration / dt);
 
-  let z = start === "hover" ? target_m : 0;
+  const hovering = start === "hover" || (start === "settled" && ki > 0);
+  const settledLow = start === "settled" && !(ki > 0) && kp > 0 ? Math.max(0, target_m - (m * STANDARD_GRAVITY_M_PER_S2) / kp) : 0;
+  let z = hovering ? target_m : settledLow;
   let v = 0;
   // The integral of the error, m·s. At hover it already holds the weight: Ki·∫e = m·g.
-  let integral = start === "hover" ? weight_n / ki : 0;
+  let integral = hovering ? weight_n / ki : 0;
   const z0 = z;
 
   const trace: PidAltitudeTrace = { t_s: [], height_m: [], speed_m_per_s: [], error_m: [], thrust_n: [], p_n: [], i_n: [], d_n: [] };

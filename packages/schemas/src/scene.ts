@@ -204,6 +204,20 @@ export const TeachingThresholds = z
       })
       .strict()
       .refine((t) => t.fail_below < t.pass_at_or_above, "fail_below must be below pass_at_or_above"),
+    /**
+     * The drone altitude scene's checks strip (Oct 22 2026): the gap at the end of a run as a share of the
+     * set height, and the bounce in metres; between the two numbers is Warn. The stability flag maps
+     * settled → Pass, still oscillating → Warn, not dying out → Fail. A design choice, labelled as such.
+     */
+    drone_checks: z
+      .object({
+        gap_share: z.object({ pass_at_or_below: z.number().positive(), fail_above: z.number().positive() }).strict(),
+        bounce_m: z.object({ pass_at_or_below: z.number().positive(), fail_above: z.number().positive() }).strict(),
+        label: z.string().min(1),
+        review_status: ReviewStatus,
+      })
+      .strict()
+      .refine((t) => t.gap_share.pass_at_or_below < t.gap_share.fail_above && t.bounce_m.pass_at_or_below < t.bounce_m.fail_above, "each pass bound must be below its fail bound"),
   })
   .strict();
 export type TeachingThresholds = z.infer<typeof TeachingThresholds>;

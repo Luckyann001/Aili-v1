@@ -201,6 +201,22 @@ describe("wind and start at hover", () => {
     expect(r.overshoot_ratio).toBe(0);
   });
 
+  it("settled start: P + D rests the gap m·g/Kp below the target and stays; PID rests at the target; P too weak rests on the ground", () => {
+    const pd = run({ ...P_D, start: "settled" });
+    expect(pd.trace.height_m[0]).toBeCloseTo(2 - G / 10, 9);
+    expect(Math.max(...pd.trace.height_m) - Math.min(...pd.trace.height_m)).toBeLessThan(1e-9);
+    expect(run({ ...PID, start: "settled" }).trace.height_m.every((z) => Math.abs(z - 2) < 1e-9)).toBe(true);
+    expect(run({ ...LESSON, kp_n_per_m: 2, start: "settled" }).trace.height_m.every((z) => z === 0)).toBe(true);
+  });
+
+  it("a gust from settled, P + D: dips and returns to the same gap; PID returns to the target", () => {
+    const gust = { start: "settled" as const, wind_force_n: 3, wind_start_s: 1, wind_duration_s: 0.5 };
+    const pd = run({ ...P_D, ...gust });
+    expect(Math.min(...pd.trace.height_m)).toBeLessThan(2 - G / 10 - 0.05);
+    expect(Math.abs(pd.final_error_m - G / 10)).toBeLessThan(NEAR_M);
+    expect(Math.abs(run({ ...PID, ...gust }).final_error_m)).toBeLessThan(NEAR_M);
+  });
+
   it("start at hover needs Ki > 0", () => {
     expect(() => run({ ...P_D, start: "hover" })).toThrow(/needs ki_n_per_m_s/);
   });
