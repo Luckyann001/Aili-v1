@@ -43,6 +43,9 @@ test.describe("drone PID lesson, prepared", () => {
     expect((await stageOf(page)).settings).toMatchObject({ kp_n_per_m: 10, ki_n_per_m_s: 4, kd_n_s_per_m: 6 });
     await answer(page, "Push harder");
     await said(page, "Yes: too low means push harder.");
+    // Beat 1: the feedback loop's ring and its three named steps (all at once under reduced motion).
+    await expect(page.getByRole("list", { name: "The feedback loop" })).toContainText("Measure", { timeout: 20000 });
+    await expect(page.getByRole("list", { name: "The feedback loop" })).toContainText("Correct");
 
     // Beat 2: P only. The lesson waits for Run, then says the solver's gap.
     await answer(page, "Below it");
@@ -80,6 +83,9 @@ test.describe("drone PID lesson, prepared", () => {
     await said(page, "Compare your sentences with these. This is a self-check, not a grade.");
     await said(page, "The numbers teach the idea. They are not settings for tuning a real drone.");
     await expect(replies(page).getByRole("button", { name: "Tell me when it's ready" })).toBeVisible({ timeout: 20000 });
+    // The demand log is dev only: this test build answers without writing, and the page says so.
+    await replies(page).getByRole("button", { name: "Tell me when it's ready" }).click();
+    await expect(page.getByText("Noted (a test build: nothing was written).")).toBeVisible({ timeout: 10000 });
 
     // No number in anything Aili said was typed into the script: each came from a run (spot check above),
     // and the narration never names overshoot_ratio or a percentage.

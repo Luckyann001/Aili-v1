@@ -1,4 +1,5 @@
 import { DirectorResponseWire } from "@aili/schemas";
+import { RUNNABLE_SOLVERS } from "./beats";
 import { z } from "zod";
 import type { Shortlist } from "./capabilities";
 import { openPrompt } from "./pedagogy";
@@ -43,6 +44,14 @@ type Item = { id: string; kind: string; rank: number; keep: boolean; data: unkno
  * the scene on stage, and any item that carries safety notes. Kept items always keep their bounds:
  * whole items are dropped, never fields.
  */
+/**
+ * How a scene that flies a simulation is run (the drone, step 4 session 2): sent with that scene only, so
+ * the shared template (and every other prompt's budget) is unchanged. The server cannot see the learner's
+ * switches, so a run always follows a preset in the same turn (Lucky's decision 2026-10-23).
+ */
+export const RUN_RULE =
+  'actions apply_preset (one of presets), then {"type":"run_simulation","by":"aili","start":"ground"} in the same turn; its numbers only via a calculation of its simulation';
+
 function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
   const items: Item[] = [];
   const hasSafety = (x: object) => Array.isArray((x as { safety_notes?: unknown[] }).safety_notes) && (x as { safety_notes: unknown[] }).safety_notes.length > 0;
@@ -53,7 +62,7 @@ function compactItems(sl: Shortlist, activeScene: string | undefined): Item[] {
       rank: s.id === activeScene ? 100 : 30,
       keep: s.id === activeScene || hasSafety(s),
       // No title (Lucky's decision 2026-10-17, option 1): the ID and part names say what the scene is; titles stay in the UI.
-      data: { id: s.id, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.filter((p) => !p.learner_supplied).map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id) },
+      data: { id: s.id, level: s.level, on_stage: s.id === activeScene, parts: s.parts.map((p) => ({ id: p.id, name: p.name })), settings: s.params.filter((p) => !p.learner_supplied).map((p) => ({ id: p.id, unit: p.unit, min: p.min, max: p.max })), animations: s.animations.map((a) => a.id), ...(s.presets.length ? { presets: s.presets.map((p) => p.id) } : {}), ...(s.solver && RUNNABLE_SOLVERS.has(s.solver.id) ? { run: RUN_RULE } : {}) },
     });
   const usedSolvers = new Set(sl.simulations.map((s) => s.solver.id));
   // The learner's rating never reaches the model: no rated-torque inputs, no rating share (Lucky's decision 2026-10-15).

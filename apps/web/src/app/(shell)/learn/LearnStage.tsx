@@ -25,6 +25,7 @@ import { useLiveMode } from "@/turn/useLiveMode";
 import { CaptionText } from "./CalcText";
 import { CommandBar, type ChipOffer } from "./CommandBar";
 import { EffortGauge } from "./scene/EffortGauge";
+import { DroneLoopSteps } from "./scene/DroneLoopSteps";
 import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
 import { IconTool } from "./IconTool";
@@ -42,6 +43,7 @@ import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
 import { useDronePlayback } from "@/scene/useDronePlayback";
 import { DEFAULT_LESSON, LESSONS, lessonFromSearch } from "@/lesson/lessons";
+import { noteDemand } from "@/lesson/demand";
 import styles from "./learn.module.css";
 
 // Focus targets where Space already means something (typing, pressing, switching tabs).
@@ -53,11 +55,14 @@ const SPACE_OWNERS =
 // instead: demo mode A, a centred "What do you want to learn?" over the dimmed stage, no prepared
 // lesson offered, and no stage badge until a turn puts a scene on stage.
 const LIVE_NOTE = "Live AI: your message goes to a real AI model, on test-fixture content only.";
-/** Live mode on the drone scene, until step 4 wires the professor to it: a prepared line, said plainly. */
+/**
+ * Live mode with the drone put on stage by the testing button: the server never saw that, so a live turn
+ * would answer about another scene. A prepared line says so; a live turn puts the drone up itself.
+ */
 export const DRONE_PLACEHOLDER = [
   "This is a prepared placeholder line, not a live answer.",
-  "Aili's live replies for the drone lesson come in a later build step.",
-  "For now, switch P, I and D on or off and press Run.",
+  "The testing button put this drone on stage, so Aili can't see it yet.",
+  "Ask about the drone, for example how a drone holds its height, and Aili will put it on stage herself.",
 ];
 
 export function LearnStage() {
@@ -168,7 +173,15 @@ export function LearnStage() {
   // answers, the prepared page shows as usual, so a normal page load never shifts).
   const offer: ChipOffer | null =
     lessonStatus === "awaiting" && lessonChoices
-      ? { group: "Suggested replies", items: lessonChoices, onPick: (id) => useLesson.getState().dispatch({ type: "choose", rev: lessonRev, choice: id }) }
+      ? {
+          group: "Suggested replies",
+          items: lessonChoices,
+          onPick: (id) => {
+            useLesson.getState().dispatch({ type: "choose", rev: lessonRev, choice: id });
+            // The drone lesson's "Tell me when it's ready": interest in a lesson that does not exist yet.
+            if (lessonId === "drone-pid" && id === "tell-me") void noteDemand().then((text) => useVoice.getState().setHint({ text, kind: "info" }));
+          },
+        }
       : voicePrompt || busy || lessonStatus === "playing" || live === true
         ? null
         : lessonStatus === "stopped"
@@ -214,6 +227,8 @@ export function LearnStage() {
             <div className={styles.topLeft}>
               {sceneUi && <PlaceholderBadge />}
               {sceneUi && <PartsMenu />}
+              {/* Testing only: a small button in the toolbar; opened, its panel drops over the stage. */}
+              {demo && <DemoControls onPlay={() => voice.submit("demo")} onFakeTurn={fakeDemo ? (c) => void demoTurn.start(c, "") : undefined} />}
             </div>
             <div className={styles.sceneTools} role="group" aria-label="View">
               {sceneUi && <IconTool label="Labels" icon={<LabelIcon />} aria-pressed={labelsOn} onClick={toggleLabels} />}
@@ -233,7 +248,6 @@ export function LearnStage() {
           {sceneUi && activeScene === "servo-arm" && <ServoControls />}
         </div>
 
-        {demo && <DemoControls onPlay={() => voice.submit("demo")} onFakeTurn={fakeDemo ? (c) => void demoTurn.start(c, "") : undefined} />}
 
         {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
         <div ref={safeArea} className={styles.scene} data-safe-area="">
@@ -249,6 +263,7 @@ export function LearnStage() {
               {viewer === "ready" && <EquationLabels labels={labelEls} />}
               <Inspector onClosed={focusParts} />
               <EffortGauge />
+              <DroneLoopSteps />
               <ExplanationSpace />
             </>
           )}
@@ -347,9 +362,8 @@ export function LearnStage() {
         text={text}
         onText={setText}
         onSubmit={
-          live && activeScene === "drone-altitude"
-            ? // The live professor is wired to the drone in step 4; until then it would answer about the
-              // servo (its only published content), so a short prepared line says so instead.
+          live && activeScene === "drone-altitude" && useStageContent.getState().sceneId !== "fx-drone-altitude"
+            ? // The drone came from the testing button, not a live turn: the server does not know it is on stage.
               () => void voice.say(DRONE_PLACEHOLDER, () => {})
             : live
             ? (t) => void demoTurn.start("valid", t) // the case is ignored by the live route

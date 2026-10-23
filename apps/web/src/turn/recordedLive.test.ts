@@ -212,3 +212,23 @@ describe("recorded live path (test builds only)", () => {
     expect(() => readdirSync(s.logDir)).toThrow(); // no session log for recorded turns
   });
 });
+
+describe("recorded live path: the drone lesson's conversation (step 4 session 2)", () => {
+  const DRONE = "theme=dark; aili-e2e-live=drone";
+  const narrated = (events: TurnEvent[]) =>
+    events
+      .filter((e) => e.type === "narration")
+      .map((e) => (e as unknown as { parts: Array<{ text?: string; value?: string }> }).parts.map((p) => p.text ?? p.value).join(""))
+      .join(" ");
+
+  it("a drone question puts the drone on stage, applies P only, runs it, and says the solver's gap; the answer gets PID and the weight", async () => {
+    const { handleTurn } = await load();
+    const t1 = await readAll(await handleTurn(post(body(3, "how does a drone hold its height?", "recorded-drone-0001"), { cookie: DRONE })));
+    expect(t1.at(-1)!.type, JSON.stringify(t1.at(-1))).toBe("turn.done");
+    expect(t1.filter((e) => e.type === "action").map((e) => (e as unknown as { action: { type: string } }).action.type)).toEqual(["select_scene", "highlight_part", "play_animation", "apply_preset", "run_simulation"]);
+    expect(narrated(t1)).toContain("short of the line by 0.98 metres");
+    const t2 = await readAll(await handleTurn(post(body(4, "Because it needs a gap to push", "recorded-drone-0001"), { cookie: DRONE })));
+    expect(t2.at(-1)!.type, JSON.stringify(t2.at(-1))).toBe("turn.done");
+    expect(narrated(t2)).toContain("pushes up 9.81 newtons");
+  });
+});

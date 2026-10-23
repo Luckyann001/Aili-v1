@@ -46,6 +46,8 @@ export const BoundAction = z.discriminatedUnion("type", [
   DirectorAction.options[2].extend(at),
   DirectorAction.options[3].extend(at),
   DirectorAction.options[4].extend(at),
+  DirectorAction.options[5].extend(at),
+  DirectorAction.options[6].extend(at),
 ]);
 export type BoundAction = z.infer<typeof BoundAction>;
 

@@ -30,8 +30,9 @@ const nextConfig = (phase: string): NextConfig => {
   partialPrefetching: true,
   reactCompiler: true,
   allowedDevOrigins: lanHost ? [lanHost] : [],
-  // Live mode (`npm run dev:live`): no dev indicator over the input or in recordings.
-  ...(process.env.AILI_LIVE === "1" ? { devIndicators: false as const } : {}),
+  // No dev indicator over the input or in recordings: live mode (`dev:live`, `dev:demo`) and the prepared
+  // lessons recorded with `npm run dev:record` (Lucky, 23 Oct 2026). Errors still show (Next.js does that).
+  ...(process.env.AILI_LIVE === "1" || process.env.AILI_RECORDING === "1" ? { devIndicators: false as const } : {}),
   turbopack: {
     resolveAlias: {
       "aili-turn-fixtures": fixturesAllowed ? "./src/turn/fixtureRegistry.ts" : "./src/turn/noFixtureRegistry.ts",

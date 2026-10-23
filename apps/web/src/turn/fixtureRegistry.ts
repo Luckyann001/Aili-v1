@@ -22,6 +22,20 @@ import fxWrench from "../../../../content/robotics/test-fixtures/analogy.fx-long
 import fxBag from "../../../../content/robotics/test-fixtures/analogy.fx-shopping-bag.json";
 import fxRuler from "../../../../content/robotics/test-fixtures/analogy.fx-ruler-held-out.json";
 import fxServoAsset from "../../../../content/robotics/test-fixtures/asset.fx-servo-generic-anatomy.json";
+// The drone altitude lesson (step 4 session 2): its real drafts and their published fixture copies.
+import droneScene from "../../../../content/robotics/scenes/drone-altitude.json";
+import droneSolver from "../../../../content/robotics/capabilities/solver.pid-altitude-1d.json";
+import droneSim from "../../../../content/robotics/capabilities/sim.pid-altitude-1d.json";
+import droneAsset from "../../../../content/robotics/capabilities/asset.quadcopter-generic.json";
+import cruiseAnalogy from "../../../../content/robotics/capabilities/analogy.cruise-control-hill.json";
+import pidReading from "../../../../content/robotics/capabilities/read.pid-altitude-intro.json";
+import srcMit1630 from "../../../../content/robotics/capabilities/src.mit-16-30-feedback-control-2010.json";
+import srcMit1606 from "../../../../content/robotics/capabilities/src.mit-16-06-automatic-control-2003.json";
+import fxDroneScene from "../../../../content/robotics/test-fixtures/scene.fx-drone-altitude.json";
+import fxDroneSolver from "../../../../content/robotics/test-fixtures/solver.fx-pid-altitude-1d.json";
+import fxDroneSim from "../../../../content/robotics/test-fixtures/sim.fx-pid-altitude-1d.json";
+import fxDroneAsset from "../../../../content/robotics/test-fixtures/asset.fx-quadcopter-generic.json";
+import fxCruise from "../../../../content/robotics/test-fixtures/analogy.fx-cruise-control-hill.json";
 
 // The dev-only registry for the fake director and live dev turns: real content (all draft) plus
 // every test fixture (the same files as the bake-off's registry).
@@ -39,8 +53,10 @@ export function fixtureTurnRegistry() {
         { file: "test-fixtures/scene.fx-lever.json", data: fxScene },
         { file: "test-fixtures/scene.fx-servo-arm.json", data: fxServoArm },
         { file: "test-fixtures/scene.fx-bag-hold.json", data: fxBagHold },
+        { file: "drone-altitude.json", data: droneScene },
+        { file: "test-fixtures/scene.fx-drone-altitude.json", data: fxDroneScene },
       ],
-      capabilities: [solver, sim, srcUp1, srcCp2, servoAsset, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler, fxServoAsset].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
+      capabilities: [solver, sim, srcUp1, srcCp2, servoAsset, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler, fxServoAsset, droneSolver, droneSim, droneAsset, cruiseAnalogy, pidReading, srcMit1630, srcMit1606, fxDroneSolver, fxDroneSim, fxDroneAsset, fxCruise].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
     },
     { allowTestFixtures: true },
   );

@@ -67,7 +67,10 @@
 }
 
 .stageTop :is(button, a, [role="option"], [role="note"]),
-.stageBottom :is(button, a) {
+.stageBottom :is(button, a),
+/* The testing-only demo controls sit in the toolbar: their summary and whole open panel take pointers. */
+.stageTop .demo,
+.stageTop .demo * {
   pointer-events: auto;
 }
 
@@ -869,15 +872,29 @@
 
 /* ── Demo controls (only with ?demo=1) ── */
 
+/* Testing-only demo controls: a small dashed button in the stage toolbar; opened, the panel drops
+   over the stage below it, so it never takes a strip of the stage (Lucky, 23 Oct 2026). */
 .demo {
   position: relative;
-  z-index: 3;
-  margin: 0 var(--aili-space-3);
-  padding: var(--aili-space-2) var(--aili-space-3);
+  z-index: 5;
+  padding: 0 var(--aili-space-2);
   border: 2px dashed var(--aili-border-strong);
   border-radius: var(--aili-radius-md);
   background: var(--aili-surface);
   font-size: 0.875rem;
+}
+
+.demoBody {
+  position: absolute;
+  top: calc(100% + var(--aili-space-1));
+  left: 0;
+  width: min(640px, calc(100vw - 48px));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 2px dashed var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
 }
 
 .demo summary {
@@ -1775,8 +1792,14 @@
    Copper for the target, Ink for the run's line. Brand tokens only. */
 .droneBlock {
   display: grid;
-  gap: var(--aili-space-2);
-  margin-bottom: var(--aili-space-3);
+  gap: var(--aili-space-1);
+  margin-bottom: var(--aili-space-2);
+}
+
+.droneHeadNote {
+  font-weight: 400;
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
 }
 
 .droneBlockHead {
@@ -1787,7 +1810,7 @@
 .droneSwitches {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--aili-space-2);
+  gap: var(--aili-space-1);
 }
 
 .droneSwitch {
@@ -1796,7 +1819,7 @@
   gap: var(--aili-space-1);
   min-height: var(--aili-touch-target);
   min-width: var(--aili-touch-target);
-  padding: 0 var(--aili-space-2);
+  padding: 0 6px;
   border: 1px solid var(--aili-border-strong);
   border-radius: var(--aili-radius-sm);
   background: var(--aili-bg);
@@ -1832,9 +1855,20 @@
   font-weight: 700;
 }
 
+/* Name and On/Off on one line, the role word (push, memory, brake) small below, inside the 44 px button. */
+.droneSwitchText {
+  display: grid;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.droneSwitchRole {
+  color: var(--aili-text-muted);
+}
+
 .droneSwitchRole,
 .droneSwitchState {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
 .droneButtons {
@@ -1877,10 +1911,17 @@
 .droneGaugeText {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--aili-space-1) var(--aili-space-3);
+  gap: 0 var(--aili-space-2);
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
+}
+
+.droneGaugeRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--aili-space-2);
 }
 
 .droneBar {
@@ -2013,4 +2054,40 @@
 .droneSliderBounds {
   color: var(--aili-text-muted);
   font-size: 0.75rem;
+}
+
+/* Beat 1's feedback loop steps on the drone's stage: top centre of the safe area, small; the current
+   step has the word "Now" and a heavier border (never colour alone). */
+.loopSteps {
+  position: absolute;
+  z-index: 3;
+  top: var(--aili-space-2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--aili-space-1);
+  max-width: calc(100% - 2 * var(--aili-space-3));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.loopSteps > li {
+  padding: var(--aili-space-1) var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.8125rem;
+}
+
+.loopSteps > li[data-now] {
+  border: 2px solid var(--aili-accent);
+}
+
+.loopWhat {
+  color: var(--aili-text-muted);
 }

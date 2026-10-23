@@ -3,7 +3,7 @@ import { AiConfig, InterruptRequest, LevelQuestion, TurnRequest } from "@aili/sc
 import aiConfigJson from "../../../../config/ai.json";
 import levelQuestionJson from "../../../../content/level-question.json";
 import { FAKE_DIRECTOR } from "./flags";
-import { isLocalRequest, LIVE_CONCEPTS, LIVE_LEVEL, liveEnabled, liveTurnParts, loadTemplates, logCheck, recordedLiveRequested, summarizeAttempt } from "./live";
+import { isLocalRequest, liveConceptsFor, LIVE_LEVEL, liveEnabled, liveTurnParts, loadTemplates, logCheck, recordedLiveRequested, recordingFor, summarizeAttempt } from "./live";
 import { recordedLiveParts } from "aili-recorded-live";
 import { failureLine, logLiveTurn, type LoggedAttempt } from "./sessionLog";
 
@@ -95,7 +95,7 @@ export async function handleTurn(request: Request): Promise<Response> {
   // recording; no key checks, no terminal log and no session log, since no model is called.
   const real = m === "live";
   const liveParts = real ? liveTurnParts(aiConfig.data) : null;
-  const live = liveParts ?? (m === "recorded" ? recordedLiveParts!(aiConfig.data, req.session_id, loadTemplates()) : null);
+  const live = liveParts ?? (m === "recorded" ? recordedLiveParts!(aiConfig.data, req.session_id, loadTemplates(), recordingFor(request)) : null);
   // Live only: what the local session log keeps for this turn (slice 5).
   const startedAt = new Date();
   const attempts: LoggedAttempt[] = [];
@@ -109,7 +109,7 @@ export async function handleTurn(request: Request): Promise<Response> {
     ...(live ? {} : { solvers: fakeSolvers(req.case) }),
     router: live ? live.router : createFakeRouter(),
     state: start,
-    concepts: live ? LIVE_CONCEPTS : ["mech.torque.static"],
+    concepts: live ? liveConceptsFor(req.input.text, start.activeScene) : ["mech.torque.static"],
     level: live ? LIVE_LEVEL : "L2",
     startRev: req.state_rev - 1,
     ...(real

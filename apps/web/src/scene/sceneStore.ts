@@ -45,6 +45,12 @@ export interface SceneState {
    */
   droneRun: DroneRun | null;
   droneGhost: DroneRun | null;
+  /**
+   * Beat 1's feedback loop on the drone: 0 off, 1 Measure, 2 Compare, 3 Correct, 4 all three at once
+   * (reduced motion). A new scene clears it.
+   */
+  droneLoop: 0 | 1 | 2 | 3 | 4;
+  setDroneLoop: (step: 0 | 1 | 2 | 3 | 4) => void;
   droneT_s: number;
   dronePlaying: boolean;
   startDroneRun: (kind: RunKind, opts?: { snap?: boolean; start?: "ground" | "hover" }) => void;
@@ -124,7 +130,7 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
     set((s) =>
       s.activeScene === id
         ? {}
-        : { activeScene: id, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene", gearsTurning: false, gearsBy: null, gearsSeq: s.gearsSeq + 1 },
+        : { activeScene: id, droneLoop: 0, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene", gearsTurning: false, gearsBy: null, gearsSeq: s.gearsSeq + 1 },
     ),
   leverDistance_m: 0.05,
   bagReach_m: 0.1,
@@ -150,6 +156,8 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
     }),
   droneRun: null,
   droneGhost: null,
+  droneLoop: 0,
+  setDroneLoop: (droneLoop) => set(() => ({ droneLoop })),
   droneT_s: 0,
   dronePlaying: false,
   startDroneRun: (kind, opts = {}) =>

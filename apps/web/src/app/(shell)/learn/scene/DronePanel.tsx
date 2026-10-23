@@ -33,9 +33,12 @@ export function DroneSwitches({ compact = false }: { compact?: boolean }) {
         return (
           <button key={sw.id} type="button" role="switch" aria-checked={on} className={styles.droneSwitch} data-on={on} onClick={() => setSwitch(sw.id, !on)}>
             <span className={styles.droneLamp} aria-hidden="true" />
-            <span className={styles.droneSwitchName}>{sw.name}</span>
-            {!compact && <span className={styles.droneSwitchRole}>{sw.role}</span>}
-            <span className={styles.droneSwitchState}>{on ? "On" : "Off"}</span>
+            <span className={styles.droneSwitchText}>
+              <span>
+                <span className={styles.droneSwitchName}>{sw.name}</span> <span className={styles.droneSwitchState}>{on ? "On" : "Off"}</span>
+              </span>
+              {!compact && <span className={styles.droneSwitchRole}>{sw.role}</span>}
+            </span>
           </button>
         );
       })}
@@ -86,19 +89,21 @@ export function DroneThrustGauge() {
   const pct = (v: number) => `${Math.min(100, Math.max(0, (v / max) * 100)).toFixed(1)}%`;
   return (
     <div className={styles.droneBlock} aria-label="Thrust gauge" role="group">
-      <p className={styles.droneBlockHead}>Thrust</p>
-      <div className={styles.droneGauge}>
-        <span className={styles.droneGaugeFill} style={{ width: pct(now.thrust_n) }} />
-        <span className={styles.droneGaugeTick} style={{ left: pct(r.result.weight_n) }} aria-hidden="true" />
+      <div className={styles.droneGaugeRow}>
+        <span className={styles.droneBlockHead}>Thrust</span>
+        <div className={styles.droneGauge}>
+          <span className={styles.droneGaugeFill} style={{ width: pct(now.thrust_n) }} />
+          <span className={styles.droneGaugeTick} style={{ left: pct(r.result.weight_n) }} aria-hidden="true" />
+        </div>
       </div>
       <p className={styles.droneGaugeText}>
         <span>
-          ↑ Thrust <strong data-solver-value="thrust">{n1(now.thrust_n)}</strong>
+          ↑ thrust <strong data-solver-value="thrust">{n1(now.thrust_n)}</strong>
         </span>
         <span>
-          Hover tick: ↓ weight <strong data-solver-value="weight">{n1(r.result.weight_n)}</strong>
+          tick: ↓ weight <strong data-solver-value="weight">{n1(r.result.weight_n)}</strong>
         </span>
-        <span>Motors&apos; maximum {n1(max)}</span>
+        <span>max {n1(max)}</span>
       </p>
     </div>
   );
@@ -141,7 +146,8 @@ export function DronePidBars() {
   );
 }
 
-const PLOT = { w: 300, h: 170, left: 34, right: 8, top: 10, bottom: 22 };
+// Short enough that the drone, this plot and the thrust gauge fit together on a 1366×768 laptop.
+const PLOT = { w: 300, h: 100, left: 34, right: 8, top: 8, bottom: 18 };
 
 /** Height over the run: the target line, this run up to the playback time, the previous run as a ghost, and the gap now. */
 export function DroneHeightPlot() {
@@ -164,10 +170,17 @@ export function DroneHeightPlot() {
   const grid: number[] = [];
   for (let h = 0; h <= top + 1e-9; h += 0.5) grid.push(Number(h.toFixed(1)));
   const ghostTarget = ghost?.settings.target_m;
-  const summary = `Height over ${end.toFixed(0)} seconds (${usedTerms(r)}): at ${t.toFixed(1)} s it is ${m2(now.height_m)}, the target is ${m2(target)}${ghost ? `; the faint line is the previous run (${usedTerms(ghost)})` : ""}.`;
+  const summary = `${r.kind === "gust" ? "Gust" : "Run"} with ${usedTerms(r)}. Height over ${end.toFixed(0)} seconds: at ${t.toFixed(1)} s it is ${m2(now.height_m)}, the target is ${m2(target)}${ghost ? `; the faint line is the previous run (${usedTerms(ghost)})` : ""}.`;
   return (
     <div className={styles.droneBlock}>
-      <p className={styles.droneBlockHead}>Height</p>
+      {/* The readout in the heading line, so the plot and the thrust gauge fit with the drone on a laptop. */}
+      <p className={styles.droneBlockHead}>
+        Height{" "}
+        <span className={styles.droneHeadNote} aria-live="off">
+          {t.toFixed(1)} s · <strong data-solver-value="height">{m2(now.height_m)}</strong> · gap <strong data-solver-value="gap">{m2(Math.abs(now.error_m))}</strong>{" "}
+          {now.error_m > 0.005 ? "below" : now.error_m < -0.005 ? "above" : "on target"}
+        </span>
+      </p>
       <svg viewBox={`0 0 ${PLOT.w} ${PLOT.h}`} className={styles.dronePlot} role="img" aria-label={summary}>
         {grid.map((h) => (
           <g key={h}>
@@ -200,14 +213,6 @@ export function DroneHeightPlot() {
           </g>
         )}
       </svg>
-      <p className={styles.droneGaugeText} aria-live="off">
-        <span>
-          At {t.toFixed(1)} s: height <strong data-solver-value="height">{m2(now.height_m)}</strong>
-        </span>
-        <span>
-          Gap <strong data-solver-value="gap">{m2(Math.abs(now.error_m))}</strong> {now.error_m > 0.005 ? "below the target" : now.error_m < -0.005 ? "above the target" : "on the target"}
-        </span>
-      </p>
     </div>
   );
 }
@@ -242,9 +247,11 @@ export function DroneRunNote() {
   const r = useScene((s) => s.droneRun);
   const stale = useStale();
   if (!r) return <p className={styles.droneNote}>Switch terms on, then press Run to fly the drone.</p>;
+  // The run itself is named in the plot's heading; this line speaks up only when the settings changed since.
+  if (!stale) return null;
   return (
-    <p className={styles.droneNote} data-stale={stale || undefined}>
-      {r.kind === "gust" ? "Gust" : "Run"} with {usedTerms(r)}.{stale ? " You changed the settings since: these are the last run's results. Press Run to fly again." : ""}
+    <p className={styles.droneNote} data-stale="">
+      You changed the settings since: these are the last run&apos;s results. Press Run to fly again.
     </p>
   );
 }

@@ -122,9 +122,9 @@ describe("drone content: the beat script", () => {
     expect(broken((s) => (s.beats[0].actions = [{ type: "select_scene", scene: "lever-analogy" }, { type: "run_simulation", by: "aili" }]))).toMatch(/has no simulation to run/);
   });
 
-  it("the live director may not send the new actions yet (step 4)", () => {
-    expect(DirectorSegment.safeParse({ id: "s1", text: "Watch.", actions: [{ type: "apply_preset", preset: "pid" }] }).success).toBe(false);
-    expect(DirectorSegment.safeParse({ id: "s1", text: "Watch.", actions: [{ type: "run_simulation", by: "aili" }] }).success).toBe(false);
+  it("the live director may send the drone's actions since step 4 session 2 (its rules are in sessions-drone.test.ts)", () => {
+    expect(DirectorSegment.safeParse({ id: "s1", text: "Watch.", actions: [{ type: "apply_preset", preset: "pid" }] }).success).toBe(true);
+    expect(DirectorSegment.safeParse({ id: "s1", text: "Watch.", actions: [{ type: "run_simulation", by: "aili" }] }).success).toBe(true);
   });
 });
 

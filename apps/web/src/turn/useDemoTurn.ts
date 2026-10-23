@@ -6,6 +6,7 @@ import { createSseParser, type TurnEvent } from "@aili/engine";
 import type { FakeCase } from "@aili/schemas";
 import { MODELS, type SceneId } from "@/scene/models";
 import type { AssetView } from "@/scene/assetPose";
+import { prefersReducedMotion } from "@/scene/useDronePlayback";
 import { useScene, type Actor } from "@/scene/sceneStore";
 import { useVoice } from "@/voice/store";
 import type { CaptionPart } from "@/voice/machine";
@@ -45,7 +46,7 @@ export interface StageSnapshot {
 }
 
 /** Test-fixture scenes are copies of real scenes; the stage draws the original's model. */
-const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy", "fx-servo-arm": "servo-arm", "fx-bag-hold": "bag-hold" };
+const FIXTURE_SCENE_MODEL: Record<string, SceneId> = { "fx-lever": "lever-analogy", "fx-servo-arm": "servo-arm", "fx-bag-hold": "bag-hold", "fx-drone-altitude": "drone-altitude" };
 
 /** Live turns whose answer failed the checks twice: what the learner sees (their text is kept). */
 export const REJECTED_LIVE_MESSAGE = "I couldn't put a good answer together for that. Your message is back in the box: try rephrasing it, or send it again. Nothing on the stage changed.";
@@ -105,6 +106,7 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
       // learner's rating is never in this list (Aili may not set it).
       if (a.param === "weight_distance_m") s.setLeverDistance(a.value);
       else if (s.activeScene === "servo-arm" && isServoParam(a.param)) s.setServoParam(a.param, a.value);
+      else if (s.activeScene === "drone-altitude") s.setDroneSetting(a.param, a.value);
       else console.warn(`[turn] the page has no setting "${a.param}" on this scene`);
       break;
     case "play_animation": {
@@ -114,6 +116,14 @@ function applyAction(a: Extract<TurnEvent, { type: "action" }>["action"], live: 
       else console.warn(`[turn] the page has no animation "${a.animation}"`);
       break;
     }
+    case "apply_preset":
+      // The drone (the validator checked the preset is the scene's): the values are the manifest's.
+      s.applyDronePreset(a.preset);
+      break;
+    case "run_simulation":
+      // A live run is Aili's, from the ground, with the settings this turn's preset set (validator rules).
+      s.startDroneRun("run", { snap: prefersReducedMotion() });
+      break;
     // show_choices is for prepared lessons; the validator rejects it from the director.
   }
   useStageContent.getState().setFixture(true, live);

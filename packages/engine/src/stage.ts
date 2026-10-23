@@ -22,6 +22,8 @@ export interface StageScene {
   handover?: ReadonlyArray<{ to: string; settings: ReadonlyArray<{ from: string; to: string }> }>;
   /** What each animation leaves on stage (declared in the manifest): a setting at its min or max. */
   animations?: ReadonlyArray<{ id: string; sets?: ReadonlyArray<{ param: string; to: "min" | "max" }> }>;
+  /** Named sets of settings (the drone's "P only", "PID"…): a turn names one, the values are the manifest's. */
+  presets?: ReadonlyArray<{ id: string; values: Record<string, number> }>;
 }
 export type StageSettings = Record<string, number>;
 
@@ -85,7 +87,7 @@ export function settingsAfterAnimation(scene: StageScene, settings: StageSetting
 export function stageAfterActions(
   scenes: ReadonlyArray<StageScene>,
   start: { scene?: string; settings?: StageSettings },
-  actions: ReadonlyArray<{ type: string; scene?: string; param?: string; value?: number; animation?: string }>,
+  actions: ReadonlyArray<{ type: string; scene?: string; param?: string; value?: number; animation?: string; preset?: string }>,
 ): { scene?: string; settings?: StageSettings } {
   let scene = start.scene;
   let settings = start.settings ?? (scene ? defaultsOf(scenes, scene) : undefined);
@@ -102,8 +104,21 @@ export function stageAfterActions(
       const m = scenes.find((s) => s.id === scene);
       if (m) settings = applyStageSetting(m, settings ?? stageDefaults(m), a.param, a.value);
     }
+    if (a.type === "apply_preset" && scene && a.preset) {
+      const m = scenes.find((s) => s.id === scene);
+      const p = m?.presets?.find((x) => x.id === a.preset);
+      if (m && p) for (const [k, v] of Object.entries(p.values)) settings = applyStageSetting(m, settings ?? stageDefaults(m), k, v);
+    }
   }
   return { ...(scene ? { scene } : {}), ...(settings ? { settings } : {}) };
+}
+
+/** The drone's run inputs, as the page flies it: the stage's settings plus the scene's fixed constants (SI). */
+export const DRONE_SETTING_INPUTS = ["kp_n_per_m", "ki_n_per_m_s", "kd_n_s_per_m", "target_m", "payload_kg", "wind_force_n", "wind_start_s", "wind_duration_s"] as const;
+export function droneStageInputs(settings: StageSettings, constants: Record<string, number> = {}): Record<string, number> {
+  const out: Record<string, number> = { ...constants };
+  for (const k of DRONE_SETTING_INPUTS) if (settings[k] !== undefined) out[k] = settings[k]!;
+  return out;
 }
 
 const defaultsOf = (scenes: ReadonlyArray<StageScene>, id: string) => {

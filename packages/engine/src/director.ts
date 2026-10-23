@@ -1,5 +1,6 @@
 import { Action, DirectorResponse, type BoundedInput, type LevelQuestion, type SceneManifest } from "@aili/schemas";
 import type { Shortlist } from "./capabilities";
+import { RUNNABLE_SOLVERS } from "./beats";
 import { checkNarration } from "./narration";
 import { findPhrases, WARN_PHRASES } from "./pedagogy";
 
@@ -420,6 +421,16 @@ function validateBound(raw: unknown, ctx: TurnContext): { response: DirectorResp
     if (a.type === "highlight_part" && !scene.parts.some((p) => p.id === a.part)) errors.push(`${at}.part: "${a.part}" is not a part of scene "${scene.id}"`);
     if (a.type === "play_animation" && !scene.animations.some((x) => x.id === a.animation))
       errors.push(`${at}.animation: "${a.animation}" is not an animation of scene "${scene.id}"`);
+    if (a.type === "apply_preset" && !scene.presets.some((p) => p.id === a.preset))
+      errors.push(`${at}.preset: "${a.preset}" is not a preset of scene "${scene.id}" (presets: ${scene.presets.map((p) => p.id).join(", ") || "none"})`);
+    if (a.type === "run_simulation") {
+      // A live run is Aili's, from the ground, after a preset in the same turn: the page cannot tell the
+      // server which switches the learner moved, so the preset is what both sides fly (Lucky's step 4 rule).
+      if (!scene.solver || !RUNNABLE_SOLVERS.has(scene.solver.id)) errors.push(`${at}.type: scene "${scene.id}" has no simulation to run`);
+      if (a.by !== "aili") errors.push(`${at}.by: a live turn runs the simulation itself ("aili"); waiting for the learner's Run is for prepared lessons`);
+      if (a.start !== "ground") errors.push(`${at}.start: a live run starts on the ground`);
+      if (!r.actions.slice(0, i).some((b) => b.type === "apply_preset")) errors.push(`${at}: apply a preset earlier in this turn, so the run uses settings the server knows (presets: ${scene.presets.map((p) => p.id).join(", ") || "none"})`);
+    }
     if (a.type === "set_parameter") {
       const p = scene.params.find((x) => x.id === a.param);
       if (!p) errors.push(`${at}.param: "${a.param}" is not a setting of scene "${scene.id}" (settings: ${scene.params.filter((x) => !x.learner_supplied).map((x) => x.id).join(", ") || "none"})`);

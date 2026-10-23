@@ -39,6 +39,28 @@ export function isLocalRequest(request: Request, env: Env = process.env): boolea
  * gets the honest "not supported yet" path.
  */
 export const LIVE_CONCEPTS = ["mech.torque.static", "mech.moment-arm"];
+/**
+ * The drone altitude lesson's concepts (step 4 session 2, 23 Oct 2026). Without them a drone question
+ * reached a professor with nothing drone-related on its shortlist, and its answer failed the checks
+ * ("Aili's answer broke a teaching rule"). Offered as a group of their own: both groups together
+ * overflow the prompt budget and push the servo's scene off the shortlist.
+ */
+export const DRONE_LIVE_CONCEPTS = ["ctl.open-vs-closed-loop", "ctl.error", "ctl.proportional", "ctl.derivative", "ctl.integral", "ctl.steady-state-error", "ctl.overshoot"];
+
+const DRONE_WORDS = /\b(drones?|quadcopters?|pid|altitude|hover(?:ing|s)?|thrust|propellers?|feedback|controllers?|gains?|overshoot|integral|derivative|proportional|steady[- ]state)\b/i;
+const SERVO_WORDS = /\b(servos?|torque|arms?|levers?|ruler|bags?|gears?|load|joint)\b/i;
+
+/**
+ * Which concepts a live turn shortlists, until the planner exists: a keyword stand-in, not language
+ * understanding. Drone words pick the drone's concepts; with the drone on stage, so does anything that
+ * is not about the servo; otherwise the servo's, as before.
+ */
+export function liveConceptsFor(text: string, activeScene: string | undefined): string[] {
+  if (DRONE_WORDS.test(text)) return DRONE_LIVE_CONCEPTS;
+  const droneOnStage = activeScene === "fx-drone-altitude" || activeScene === "drone-altitude";
+  if (droneOnStage && !SERVO_WORDS.test(text)) return DRONE_LIVE_CONCEPTS;
+  return LIVE_CONCEPTS;
+}
 export const LIVE_LEVEL = "L2";
 
 /**
@@ -47,8 +69,11 @@ export const LIVE_LEVEL = "L2";
  * the test's cookie `aili-e2e-live=1` and only while the same variable is set at run time. No model.
  */
 export function recordedLiveRequested(request: Request, env: Env = process.env): boolean {
-  return env.AILI_E2E_RECORDED_LIVE === "1" && /(?:^|;\s*)aili-e2e-live=1(?:;|$)/.test(request.headers.get("cookie") ?? "");
+  return env.AILI_E2E_RECORDED_LIVE === "1" && /(?:^|;\s*)aili-e2e-live=(?:1|drone)(?:;|$)/.test(request.headers.get("cookie") ?? "");
 }
+
+/** Which recorded conversation: the main one (`aili-e2e-live=1`) or the drone lesson's (`=drone`, step 4 session 2). */
+export const recordingFor = (request: Request): "main" | "drone" => (/(?:^|;\s*)aili-e2e-live=drone(?:;|$)/.test(request.headers.get("cookie") ?? "") ? "drone" : "main");
 
 let templates: { professor: string; router: string } | null = null;
 /** The prompt templates, read once from content/prompts (the server runs in apps/web). */

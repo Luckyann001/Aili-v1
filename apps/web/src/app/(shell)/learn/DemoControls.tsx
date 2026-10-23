@@ -40,6 +40,7 @@ export function DemoControls({ onPlay, onFakeTurn }: { onPlay: () => void; onFak
   return (
     <details ref={panel} className={styles.demo}>
       <summary>Demo controls (testing only)</summary>
+      <div className={styles.demoBody}>
       <p className={styles.demoNote}>Not part of the product. Sets the voice state directly so each look can be checked.</p>
       <div className={styles.demoButtons}>
         {STATES.map((s) => (
@@ -90,6 +91,7 @@ export function DemoControls({ onPlay, onFakeTurn }: { onPlay: () => void; onFak
         <dt>Saved choice on this device</dt>
         <dd>{consent ? `${consent.choice}, ${consent.mode}` : "none"}</dd>
       </dl>
+      </div>
     </details>
   );
 }

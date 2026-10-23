@@ -7,7 +7,8 @@ import { givesBack, reoffersOpenQuestion, validatePedagogy } from "./pedagogy";
 import { ReplyClassification, type AiConfig, type RuntimeModel, type TeachingState } from "@aili/schemas";
 import { applyLearnerReply, applyResponse, fillTeachBackReading, OPEN_QUESTION_REOFFERED, selectSceneForConcept, unsupportedAttributions } from "./teaching";
 import { PROMPT_BUDGET_TOKENS } from "./prompt";
-import { isArmWithLoad, stageAfterActions, stageCalculation, type StageScene, type StageSettings } from "./stage";
+import { RUNNABLE_SOLVERS } from "./beats";
+import { droneStageInputs, isArmWithLoad, stageAfterActions, stageCalculation, type StageScene, type StageSettings } from "./stage";
 import { createFakeRouter, type Router, type RouterReply, type RouterRequest } from "./router";
 import { ProviderError, type Attempt, type ProviderErrorKind } from "./provider";
 import { isClarification, openPrompt, safetyQuestionOpen, supersedesOpenQuestion } from "./pedagogy";
@@ -176,6 +177,7 @@ const pidAltitude: SolverFn = (inputs) => {
 /** Solver implementations by registry ID. Test-fixture copies point at the same code. */
 export const SOLVERS: Record<string, SolverFn> = {
   "solver.pid-altitude-1d": pidAltitude,
+  "solver.fx-pid-altitude-1d": pidAltitude,
   "solver.static-torque-single-link": singleLink,
   "solver.fx-torque": singleLink,
 };
@@ -627,6 +629,18 @@ export function bindToStage(r: DirectorResponse, scenes: ReadonlyArray<StageScen
   const scene = scenes.find((x) => x.id === stage.scene);
   const ids = new Set<string>();
   const warnings: string[] = [];
+  // The drone: a run's numbers are the stage's (after this turn's preset), never inputs the model typed.
+  if (scene?.solver && stage.settings && RUNNABLE_SOLVERS.has(scene.solver.id)) {
+    const used = droneStageInputs(stage.settings, scene.solver.constants);
+    const calc_requests = r.calc_requests.map((c) => {
+      if (c.solver !== scene.solver!.id) return c;
+      ids.add(c.id);
+      const diffs = Object.entries(used).filter(([k, v]) => c.inputs[k] !== undefined && Math.abs(c.inputs[k]! - v) > 1e-9).map(([k, v]) => `${k} ${c.inputs[k]} → ${v}`);
+      if (diffs.length) warnings.push(`${STAGE_INPUTS_USED}: ${c.id} uses the stage's settings (${diffs.join("; ")})`);
+      return { ...c, inputs: used };
+    });
+    return { r: { ...r, calc_requests }, warnings, ids };
+  }
   if (!scene?.solver || !isArmWithLoad(stage.settings)) return { r, warnings, ids };
   const calc_requests = r.calc_requests.map((c) => {
     if (c.solver !== scene.solver!.id) return c;

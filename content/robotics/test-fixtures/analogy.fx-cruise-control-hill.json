@@ -1,0 +1,46 @@
+{
+  "id": "analogy.fx-cruise-control-hill",
+  "type": "analogy",
+  "title": "Cruise control on a hill (test fixture)",
+  "version": "0.1.0",
+  "teaches": [
+    "ctl.proportional",
+    "ctl.steady-state-error",
+    "ctl.integral"
+  ],
+  "levels": [
+    "L1"
+  ],
+  "fidelity": "illustrative",
+  "provenance": "authored",
+  "review_status": "published",
+  "mapping": [
+    {
+      "source": "set speed",
+      "target": "target height"
+    },
+    {
+      "source": "actual speed",
+      "target": "measured height"
+    },
+    {
+      "source": "hill pulling the car back",
+      "target": "gravity pulling the drone down"
+    },
+    {
+      "source": "accelerator",
+      "target": "motor thrust"
+    },
+    {
+      "source": "slower, so press harder",
+      "target": "P"
+    },
+    {
+      "source": "slow for a while, keep adding",
+      "target": "I"
+    }
+  ],
+  "breaks_down": "A car controls speed while the drone controls height, which adds one more step between push and result. That extra step is why the drone bounces and the P-only car does not, so the car has no bounce for D to fix: D belongs to the drone. A human driver also sees the hill coming and presses early; a basic PID only reacts to the gap it already has.",
+  "followed_by": "sim.fx-pid-altitude-1d",
+  "test_fixture": true
+}

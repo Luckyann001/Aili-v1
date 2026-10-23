@@ -32,9 +32,9 @@ choice, labelled as such).
 |---|---|---|---|
 | 1 | Solver and tests | 1 | done |
 | 2 | Content (drafts) | 1 | done |
-| 3a | Drone asset and scene: the coded quadcopter with named parts on a test stand | 1 | in progress |
-| 3b | Stage pieces: plot with ghost run, P/I/D bars, controls, thrust gauge, checks strip, Run | 1 | |
-| 4 | Lesson flow in the prepared/live system, fixture copies for demo mode, drone session tests | 2 | |
+| 3a | Drone asset and scene: the coded quadcopter with named parts on a test stand | 1 | done |
+| 3b | Stage pieces: plot with ghost run, P/I/D bars, controls, thrust gauge, checks strip, Run | 1 | done |
+| 4 | Lesson flow in the prepared/live system, fixture copies for demo mode, drone session tests | 2 | done |
 | 5 | Cruise-control analogy scene and the full test suites | 1–2 | |
 
 Each step stops for Lucky's review. Every step's report includes the servo suites.
@@ -97,6 +97,20 @@ with `?lesson=drone-pid` or `?lesson=lever` (the drone becomes the default only 
 servo work is recorded as Lab 2, built as drafts), the visuals doc §4, the behavior spec (cruise control
 for feedback; drone variants of the session tests), the stage layout (the drone's controls live in the
 explanation space), `docs/m4-plan.md` (superseded note, `ctl.*` prerequisites), and the master prompt §8 note.
+
+**Step 3b and 4 decisions (22–24 Oct 2026)**
+- Checks thresholds (drafts, Lucky approved 23 Oct): gap Pass ≤ 2% of the set height, Fail > 25%; bounce Pass ≤ 0.05 m, Fail > 0.5 m. The gust: 3 N for 0.5 s from rest where the controller holds the drone (solver start "settled").
+- The full view stays; the camera keeps the learner's own zoom or orbit through runs (for a recorded close-up) until Reset view or a new scene.
+- At 1366×768 the drone, the height plot and the thrust gauge are in view together without scrolling (tested, with 1920×1080).
+- The closed Demo controls are a small button in the stage toolbar.
+- `npm run dev:record` (prepared lessons) and `dev:demo` hide the Next.js dev indicator for recordings.
+- Step 4 session 1 is the prepared lesson (`?lesson=drone-pid`; the lever lesson stays the default); session 2 the live professor.
+- Live drone turns: the professor may send `apply_preset` and `run_simulation`; a run is Aili's, from the ground, after a preset in the same turn (the server cannot see the learner's switches); its numbers come from a calculation bound to the stage's settings. The run rule travels with the drone scene in the shortlist, not in the shared template (the servo prompt was at 4,995 of 5,000 tokens).
+- Until the planner exists, a live turn shortlists either the servo's concepts or the drone's `ctl.*` concepts, chosen by a keyword stand-in (both together overflow the prompt budget).
+- The drone scene is level L2 (it shows the solver's numbers; live turns shortlist at L2).
+- Published test-fixture copies of the drone (scene, solver, simulation, asset, analogy) for demo mode and the recorded live path; no founder review on them ("Prepared · not reviewed").
+- The "Tell me when it's ready" chip writes to `live-sessions/demand.md` on a dev server only (topic and place, nothing about the learner); test builds write nothing; production returns 404.
+- Beat 1's Measure → Compare → Correct: a dashed Copper ring around the drone and the three steps named on the stage ("Now" on the current one); all three at once under reduced motion.
 
 **Open for Lucky:** the reading item's lecture and time estimate; checking the MIT licences on the pages;
 the Pass/Warn/Fail thresholds (step 3b); the founder review record (step 4).

@@ -1,0 +1,283 @@
+{
+  "id": "asset.fx-quadcopter-generic",
+  "type": "asset",
+  "version": "0.1.0",
+  "title": "Test fixture: generic quadcopter on a test stand (published copy for the demo)",
+  "label": "Generic quadcopter, simplified teaching model: illustrative shapes, not measured, not a named product",
+  "fidelity": "illustrative",
+  "provenance": "authored",
+  "provenance_note": "procedural geometry written in code (boxes and cylinders), generic, not measured",
+  "license": "own work",
+  "review_status": "published",
+  "format": "procedural",
+  "file": "apps/web/src/scene/drone.ts",
+  "nodes": [
+    "body",
+    "arm-1",
+    "arm-2",
+    "arm-3",
+    "arm-4",
+    "rotor-1",
+    "rotor-2",
+    "rotor-3",
+    "rotor-4",
+    "motor-1",
+    "motor-2",
+    "motor-3",
+    "motor-4",
+    "sensor-altitude",
+    "battery",
+    "payload-camera"
+  ],
+  "size_kb": null,
+  "triangles": 528,
+  "budget": {
+    "triangles": 3000,
+    "glb_kb": null,
+    "status": "provisional: re-check on the real Android phone with the stage pieces (step 3b)"
+  },
+  "units": "metres",
+  "explode_note": "illustrative spacing for teaching; not an assembly sequence, not measured",
+  "parts": [
+    {
+      "id": "body",
+      "name": "Body",
+      "role": "central frame; the guide post runs through it",
+      "node": "body",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0
+      }
+    },
+    {
+      "id": "arm-1",
+      "name": "Arm 1",
+      "role": "carries a motor out from the body",
+      "node": "arm-1",
+      "explode": {
+        "direction_gltf": [
+          1,
+          0,
+          0
+        ],
+        "distance_m": 0.05
+      }
+    },
+    {
+      "id": "arm-2",
+      "name": "Arm 2",
+      "role": "carries a motor out from the body",
+      "node": "arm-2",
+      "explode": {
+        "direction_gltf": [
+          0,
+          0,
+          1
+        ],
+        "distance_m": 0.05
+      }
+    },
+    {
+      "id": "arm-3",
+      "name": "Arm 3",
+      "role": "carries a motor out from the body",
+      "node": "arm-3",
+      "explode": {
+        "direction_gltf": [
+          -1,
+          0,
+          0
+        ],
+        "distance_m": 0.05
+      }
+    },
+    {
+      "id": "arm-4",
+      "name": "Arm 4",
+      "role": "carries a motor out from the body",
+      "node": "arm-4",
+      "explode": {
+        "direction_gltf": [
+          0,
+          0,
+          -1
+        ],
+        "distance_m": 0.05
+      }
+    },
+    {
+      "id": "rotor-1",
+      "name": "Propeller 1",
+      "role": "pushes air down to make thrust",
+      "node": "rotor-1",
+      "explode": {
+        "direction_gltf": [
+          0.7071,
+          0.7071,
+          0.0
+        ],
+        "distance_m": 0.15
+      }
+    },
+    {
+      "id": "rotor-2",
+      "name": "Propeller 2",
+      "role": "pushes air down to make thrust",
+      "node": "rotor-2",
+      "explode": {
+        "direction_gltf": [
+          0.0,
+          0.7071,
+          0.7071
+        ],
+        "distance_m": 0.15
+      }
+    },
+    {
+      "id": "rotor-3",
+      "name": "Propeller 3",
+      "role": "pushes air down to make thrust",
+      "node": "rotor-3",
+      "explode": {
+        "direction_gltf": [
+          -0.7071,
+          0.7071,
+          0.0
+        ],
+        "distance_m": 0.15
+      }
+    },
+    {
+      "id": "rotor-4",
+      "name": "Propeller 4",
+      "role": "pushes air down to make thrust",
+      "node": "rotor-4",
+      "explode": {
+        "direction_gltf": [
+          0.0,
+          0.7071,
+          -0.7071
+        ],
+        "distance_m": 0.15
+      }
+    },
+    {
+      "id": "motor-1",
+      "name": "Motor 1",
+      "role": "spins a propeller",
+      "node": "motor-1",
+      "explode": {
+        "direction_gltf": [
+          0.8944,
+          0.4472,
+          0.0
+        ],
+        "distance_m": 0.1
+      }
+    },
+    {
+      "id": "motor-2",
+      "name": "Motor 2",
+      "role": "spins a propeller",
+      "node": "motor-2",
+      "explode": {
+        "direction_gltf": [
+          0.0,
+          0.4472,
+          0.8944
+        ],
+        "distance_m": 0.1
+      }
+    },
+    {
+      "id": "motor-3",
+      "name": "Motor 3",
+      "role": "spins a propeller",
+      "node": "motor-3",
+      "explode": {
+        "direction_gltf": [
+          -0.8944,
+          0.4472,
+          0.0
+        ],
+        "distance_m": 0.1
+      }
+    },
+    {
+      "id": "motor-4",
+      "name": "Motor 4",
+      "role": "spins a propeller",
+      "node": "motor-4",
+      "explode": {
+        "direction_gltf": [
+          0.0,
+          0.4472,
+          -0.8944
+        ],
+        "distance_m": 0.1
+      }
+    },
+    {
+      "id": "sensor-altitude",
+      "name": "Height sensor",
+      "role": "a downward rangefinder: measures the height (the Measure step)",
+      "node": "sensor-altitude",
+      "explode": {
+        "direction_gltf": [
+          0.7071,
+          0.0,
+          0.7071
+        ],
+        "distance_m": 0.08
+      }
+    },
+    {
+      "id": "battery",
+      "name": "Battery",
+      "role": "powers the motors",
+      "node": "battery",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.08
+      }
+    },
+    {
+      "id": "payload-camera",
+      "name": "Camera (added payload)",
+      "role": "added mass in beat 5; adds weight, not thrust",
+      "node": "payload-camera",
+      "explode": {
+        "direction_gltf": [
+          0,
+          0,
+          1
+        ],
+        "distance_m": 0.08
+      }
+    }
+  ],
+  "materials": {
+    "palette": {
+      "drone": "Sky (--aili-fill-technical)",
+      "battery and sensor": "Sage (--aili-fill-explore)",
+      "camera": "Plum (--aili-fill-expressive)",
+      "set-height collar and the sensor's glow": "Copper (--aili-accent)"
+    },
+    "exceptions": []
+  },
+  "teaches": [
+    "ctl.open-vs-closed-loop",
+    "ctl.error",
+    "ctl.proportional",
+    "ctl.steady-state-error"
+  ],
+  "test_fixture": true
+}

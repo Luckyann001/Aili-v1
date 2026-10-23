@@ -20,20 +20,23 @@ const STAGE_ACTIONS = [
     .strict(),
 ] as const;
 
-/** The actions a live turn (the director) may send. The drone's preset and run actions are not among them yet (step 4). */
-export const DirectorAction = z.discriminatedUnion("type", [...STAGE_ACTIONS]);
-export type DirectorAction = z.infer<typeof DirectorAction>;
-
-/** The actions a prepared beat may use: the director's, plus the drone altitude scene's (Oct 21 2026). */
-export const Action = z.discriminatedUnion("type", [
-  ...STAGE_ACTIONS,
+/** The drone altitude scene's actions (Oct 21 2026): a preset by ID (its values are the manifest's), and a run. */
+const DRONE_ACTIONS = [
   z.object({ type: z.literal("apply_preset"), preset: KebabId }).strict(),
   /**
    * Run the scene's simulation. "learner": the lesson waits for the learner's Run press. "hover": start
    * at the target with the I term already holding the weight (needs Ki > 0), else at rest on the ground.
+   * A live turn may only run it itself, from the ground (the validator checks).
    */
   z.object({ type: z.literal("run_simulation"), by: z.enum(["learner", "aili"]), start: z.enum(["ground", "hover"]).default("ground") }).strict(),
-]);
+] as const;
+
+/** The actions a live turn (the director) may send (the drone's since step 4 session 2, 23 Oct 2026). */
+export const DirectorAction = z.discriminatedUnion("type", [...STAGE_ACTIONS, ...DRONE_ACTIONS]);
+export type DirectorAction = z.infer<typeof DirectorAction>;
+
+/** The actions a prepared beat may use: the same set. */
+export const Action = DirectorAction;
 export type Action = z.infer<typeof Action>;
 
 export const Narration = z.object({ id: KebabId, text: z.string().min(1) }).strict();

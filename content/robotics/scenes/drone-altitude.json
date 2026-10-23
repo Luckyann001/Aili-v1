@@ -10,7 +10,7 @@
     "ctl.derivative",
     "ctl.integral"
   ],
-  "level": "L1",
+  "level": "L2",
   "fidelity": "simplified_teaching",
   "version": "0.1.0",
   "review_status": "draft",

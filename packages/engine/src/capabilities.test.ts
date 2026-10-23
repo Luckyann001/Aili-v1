@@ -245,7 +245,7 @@ describe("shortlist: published items only, by concept and level", () => {
     const { fixtureRegistry } = await import("./__fixtures__/registry");
     const r = fixtureRegistry();
     expect(r.errors).toEqual([]);
-    expect(r.registry.assets.map((a) => [a.id, a.review_status]).sort()).toEqual([["asset.fx-servo-generic-anatomy", "published"], ["asset.quadcopter-generic", "draft"], ["asset.servo-generic-anatomy", "draft"]]);
+    expect(r.registry.assets.map((a) => [a.id, a.review_status]).sort()).toEqual([["asset.fx-quadcopter-generic", "published"], ["asset.fx-servo-generic-anatomy", "published"], ["asset.quadcopter-generic", "draft"], ["asset.servo-generic-anatomy", "draft"]]);
     for (const c of r.registry.assets.flatMap((a) => a.teaches)) for (const level of ["L1", "L2", "L3"] as const) {
       const s = shortlist(r.registry, { concepts: [c], level });
       expect([...s.ids].filter((id) => id.startsWith("asset."))).toEqual([]);

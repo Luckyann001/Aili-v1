@@ -5,7 +5,7 @@ import { relativeEffort } from "@aili/solvers";
 import { LEVER_LENGTH_M } from "@/scene/layout";
 import { LEVER_SOLVER } from "@/scene/manifests";
 import type { SceneId } from "@/scene/models";
-import { slideWeightOut } from "@/scene/animations";
+import { ANIMATIONS, slideWeightOut } from "@/scene/animations";
 import { runPlaceholders } from "@/scene/droneRun";
 import { useScene } from "@/scene/sceneStore";
 import { prefersReducedMotion } from "@/scene/useDronePlayback";
@@ -135,6 +135,10 @@ export function useLessonPlayer(voice: Voice) {
                   // Keep the result visible before moving on, even if the narration finished first.
                   .then(() => new Promise<void>((done) => setTimeout(done, RESULT_HOLD_MS))),
               );
+            } else {
+              // Any other animation the stage knows (the drone's feedback loop), as a live turn plays it.
+              const play = ANIMATIONS[a.animation as string];
+              if (play) work.push(play(() => current(r)));
             }
             break;
           // show_choices is handled by the runner once the narration ends.

@@ -148,7 +148,43 @@ function tween(isCurrent: () => boolean, apply: (k: number) => void, still: Arra
 }
 
 /** The animations live turns can play, by the scene manifest's animation ID. */
+/** Each step of the drone's feedback loop stays this long (an animation rate for the eye, not a sensor rate). */
+export const LOOP_STEP_MS = 1600;
+/**
+ * Beat 1 on the drone: the Measure → Compare → Correct ring, one step at a time; under reduced motion all
+ * three at once. Holds the last step briefly, then clears (unless the lesson or turn moved on first).
+ */
+export function feedbackLoop(isCurrent: () => boolean): Promise<void> {
+  const s = useScene.getState();
+  const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+  if (spatialMs() <= 0) {
+    s.setDroneLoop(4);
+    return wait(LOOP_STEP_MS * 2).then(() => {
+      if (isCurrent()) useScene.getState().setDroneLoop(0);
+    });
+  }
+  return (async () => {
+    for (const step of [1, 2, 3] as const) {
+      if (!isCurrent()) return;
+      useScene.getState().setDroneLoop(step);
+      await wait(LOOP_STEP_MS);
+    }
+    await wait(LOOP_STEP_MS / 2);
+    if (isCurrent()) useScene.getState().setDroneLoop(0);
+  })();
+}
+
+/** The drone's exploded view (its scene declares these; offered to the professor only with a published asset). */
+const droneExploded = (on: boolean) => () => {
+  const s = useScene.getState();
+  if (s.exploded !== on) s.toggleExploded();
+  return Promise.resolve();
+};
+
 export const ANIMATIONS: Record<string, (isCurrent: () => boolean) => Promise<void>> = {
+  "feedback-loop": feedbackLoop,
+  "drone-explode": droneExploded(true),
+  "drone-assemble": droneExploded(false),
   "slide-weight-out": slideWeightOut,
   "slide-load-out": slideLoadOut,
   "bag-reach-out": bagReachOut,

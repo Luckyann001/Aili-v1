@@ -60,6 +60,8 @@ test("the fake-director routes return 404", async ({ request }) => {
   const turn = await request.post("/api/turn", { data: { session_id: "nodrafts-0001", state_rev: 1, input: { text: "x" } } });
   expect(turn.status()).toBe(404);
   expect((await request.post("/api/turn/interrupt", { data: { session_id: "nodrafts-0001", request_id: "turn_1", state_rev: 1 } })).status()).toBe(404);
+  // The local demand log (step 4 session 2) is dev only: a production build answers 404.
+  expect((await request.post("/api/demand", { data: { topic: "learned-controllers", from: "drone-pid lesson" } })).status()).toBe(404);
 });
 
 // Live turns are laptop-only dev (docs/m3-live-browser-plan.md): this server runs with AILI_LIVE=1

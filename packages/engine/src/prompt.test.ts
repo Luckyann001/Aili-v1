@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { SessionHistory } from "@aili/schemas";
-import { assembleProfessorPrompt, directorResponseJsonSchema, estimateTokens, NARRATION_MAX_CHARS, PROMPT_BUDGET_TOKENS, systemPrompt, type Shortlist } from "./index";
+import { assembleProfessorPrompt, directorResponseJsonSchema, estimateTokens, NARRATION_MAX_CHARS, PROMPT_BUDGET_TOKENS, RUN_RULE, shortlist, systemPrompt, type Shortlist } from "./index";
 import { fixtureShortlist } from "./__fixtures__/registry";
 import valid from "./__recordings__/valid-explain.hand-written.json";
 
@@ -308,5 +308,22 @@ describe("the learner's level is marked as not stated (Lucky's decision 2026-10-
   });
   it("the system prompt says never to claim the learner said what they did not write", () => {
     expect(systemPrompt(TEMPLATE)).toMatch(/Never say or imply the learner told you something they did not write/);
+  });
+});
+
+describe("the drone's prompt (step 4 session 2)", () => {
+  it("fits the budget with nothing dropped; the drone scene carries its presets and its run rule, other scenes do not", async () => {
+    const { fixtureRegistry } = await import("./__fixtures__/registry");
+    const reg = fixtureRegistry().registry;
+    const sl = shortlist(reg, { concepts: ["ctl.open-vs-closed-loop", "ctl.error", "ctl.proportional", "ctl.derivative", "ctl.integral", "ctl.steady-state-error", "ctl.overshoot"], level: "L2" });
+    const a = assemble({ shortlist: sl, learner_text: "how does a drone hold its height?" });
+    expect(a.dropped).toEqual([]);
+    expect(a.estimatedTokens).toBeLessThan(PROMPT_BUDGET_TOKENS);
+    const data = JSON.parse(unescape(blockOf(a.input, "shortlist")));
+    const drone = data.scenes.find((s: { id: string }) => s.id === "fx-drone-altitude");
+    expect(drone.presets).toEqual(["p-only", "p-d", "pid", "too-much-i", "gust"]);
+    expect(drone.run).toBe(RUN_RULE);
+    // The servo's typical prompt carries no run rule (its budget is unchanged).
+    expect(JSON.parse(unescape(blockOf(assemble().input, "shortlist"))).scenes.every((s: { run?: string }) => s.run === undefined)).toBe(true);
   });
 });

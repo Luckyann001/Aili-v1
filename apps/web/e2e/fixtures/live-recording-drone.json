@@ -1,0 +1,203 @@
+{
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING-DRONE (step 4 session 2, docs/drone-pid-plan.md, 23 Oct 2026). Not from a real model: written in the provider's output shape on the drone's published test fixtures. Turn 1 puts the drone on stage, points at the height sensor during the feedback loop, applies P only and runs it, and says the solver's gap; turn 2 answers the learner, applies PID and runs it, and says the I term's push at rest. Test builds only.",
+  "router": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1460,
+          "output_tokens": 90
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1490,
+          "output_tokens": 90
+        }
+      }
+    ]
+  },
+  "professor": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_1",
+            "state_rev": 1,
+            "move": "explain",
+            "concepts": [
+              "ctl.open-vs-closed-loop",
+              "ctl.proportional"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Here is a drone on a test stand: a post through its body lets it move only up and down.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-drone-altitude"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Its height sensor measures, the drone compares that with the dashed target line, and it corrects its thrust.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "sensor-altitude"
+                  },
+                  {
+                    "type": "play_animation",
+                    "animation": "feedback-loop"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Now P alone: push harder the bigger the gap. Watch it fly.",
+                "actions": [
+                  {
+                    "type": "apply_preset",
+                    "preset": "p-only"
+                  },
+                  {
+                    "type": "run_simulation",
+                    "by": "aili",
+                    "start": "ground"
+                  }
+                ]
+              },
+              {
+                "id": "n4",
+                "text": "It settles short of the line by {{c1.final_error_m}} metres."
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-pid-altitude-1d",
+                "simulation": "sim.fx-pid-altitude-1d",
+                "inputs": {
+                  "base_mass_kg": 1,
+                  "kp_n_per_m": 10,
+                  "ki_n_per_m_s": 0,
+                  "kd_n_s_per_m": 0,
+                  "target_m": 2
+                }
+              }
+            ],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Why do you think P alone leaves it hovering low?"
+            },
+            "assumptions": [
+              "the drone moves only up and down",
+              "drag is simplified and exaggerated so the bounce dies out quickly"
+            ],
+            "limitations": [
+              "real drones also tilt and move sideways",
+              "not settings for tuning a real drone"
+            ]
+          },
+          "input_tokens": 4300,
+          "output_tokens": 420
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_2",
+            "state_rev": 2,
+            "move": "explain",
+            "concepts": [
+              "ctl.steady-state-error",
+              "ctl.integral"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes: at rest the thrust must equal the weight, and P only pushes when there is a gap."
+              },
+              {
+                "id": "n2",
+                "text": "Adding I gives it a memory of the gap, and D a brake. Watch all three together.",
+                "actions": [
+                  {
+                    "type": "apply_preset",
+                    "preset": "pid"
+                  },
+                  {
+                    "type": "run_simulation",
+                    "by": "aili",
+                    "start": "ground"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "It reaches the line, and at rest the I term alone pushes up {{c1.final_i_n}} newtons, the drone's weight."
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-pid-altitude-1d",
+                "simulation": "sim.fx-pid-altitude-1d",
+                "inputs": {
+                  "base_mass_kg": 1,
+                  "kp_n_per_m": 10,
+                  "ki_n_per_m_s": 4,
+                  "kd_n_s_per_m": 6,
+                  "target_m": 2
+                }
+              }
+            ],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What would happen to the gap with P and D only if we bolted on a camera?"
+            },
+            "assumptions": [
+              "the drone moves only up and down",
+              "drag is simplified and exaggerated so the bounce dies out quickly"
+            ],
+            "limitations": [
+              "real drones also tilt and move sideways",
+              "not settings for tuning a real drone"
+            ]
+          },
+          "input_tokens": 4500,
+          "output_tokens": 360
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "id": "sim.fx-pid-altitude-1d",
+  "type": "simulation",
+  "title": "A drone holding its height with P, I and D",
+  "version": "0.1.0",
+  "teaches": [
+    "ctl.proportional",
+    "ctl.overshoot",
+    "ctl.steady-state-error",
+    "ctl.derivative",
+    "ctl.integral"
+  ],
+  "levels": [
+    "L1",
+    "L2"
+  ],
+  "fidelity": "simplified_teaching",
+  "provenance": "authored",
+  "review_status": "published",
+  "solver": {
+    "id": "solver.fx-pid-altitude-1d",
+    "version": "0.1.0"
+  },
+  "inputs": {
+    "base_mass_kg": {
+      "unit": "kg",
+      "min": 0.5,
+      "max": 2
+    },
+    "payload_kg": {
+      "unit": "kg",
+      "min": 0,
+      "max": 1,
+      "optional": true
+    },
+    "kp_n_per_m": {
+      "unit": "N/m",
+      "min": 0,
+      "max": 40
+    },
+    "ki_n_per_m_s": {
+      "unit": "N/(m·s)",
+      "min": 0,
+      "max": 100
+    },
+    "kd_n_s_per_m": {
+      "unit": "N·s/m",
+      "min": 0,
+      "max": 15
+    },
+    "target_m": {
+      "unit": "m",
+      "min": 0.5,
+      "max": 5
+    },
+    "thrust_to_weight_ratio": {
+      "unit": "ratio",
+      "min": 1.5,
+      "max": 3,
+      "optional": true
+    },
+    "drag_n_s_per_m": {
+      "unit": "N·s/m",
+      "min": 0,
+      "max": 5,
+      "optional": true
+    },
+    "wind_force_n": {
+      "unit": "N",
+      "min": 0,
+      "max": 5,
+      "optional": true
+    },
+    "wind_start_s": {
+      "unit": "s",
+      "min": 0,
+      "max": 15,
+      "optional": true
+    },
+    "wind_duration_s": {
+      "unit": "s",
+      "min": 0,
+      "max": 15,
+      "optional": true
+    }
+  },
+  "outputs": [
+    "final_error_m",
+    "final_height_m",
+    "peak_height_m",
+    "overshoot_m",
+    "settling_time_s",
+    "time_at_thrust_limit_s",
+    "weight_n",
+    "max_thrust_n",
+    "max_thrust_to_weight_ratio",
+    "final_thrust_n",
+    "final_p_n",
+    "final_i_n",
+    "final_d_n"
+  ],
+  "assumptions": [
+    "the drone moves only up and down",
+    "thrust changes instantly and stays between 0 N and the motors' maximum",
+    "a payload adds weight, not motor strength",
+    "air drag is a straight-line rule, simplified and exaggerated so the bounce dies out quickly",
+    "the D term acts on the measured speed",
+    "the I term stops adding while thrust is at a limit and the error pushes further past it",
+    "each run lasts 15 s from rest"
+  ],
+  "excludes": [
+    "tilting and sideways motion",
+    "motor spin-up time",
+    "sensor noise and filtering",
+    "a hover-thrust estimate and nested control loops",
+    "settings for tuning a real drone"
+  ],
+  "failure_states": [
+    {
+      "id": "cannot-lift-off",
+      "description": "The motors' maximum thrust is below the weight carried, so the drone stays on the ground."
+    },
+    {
+      "id": "still-oscillating",
+      "description": "The drone is still swinging at the end of the run, but less each time."
+    },
+    {
+      "id": "not-dying-out",
+      "description": "Past the stability limit the swing does not die out; the thrust limits hold it steady."
+    },
+    {
+      "id": "thrust-limit",
+      "description": "The controller asks for more thrust than the motors have, or for less than none."
+    }
+  ],
+  "test_fixture": true
+}

@@ -1,0 +1,231 @@
+{
+  "id": "fx-drone-altitude",
+  "title": "Generic drone holding its height (test fixture)",
+  "teaches": [
+    "ctl.open-vs-closed-loop",
+    "ctl.error",
+    "ctl.proportional",
+    "ctl.overshoot",
+    "ctl.steady-state-error",
+    "ctl.derivative",
+    "ctl.integral"
+  ],
+  "level": "L2",
+  "fidelity": "simplified_teaching",
+  "version": "0.1.0",
+  "review_status": "published",
+  "provenance": "authored",
+  "parts": [
+    {
+      "id": "body",
+      "name": "Body"
+    },
+    {
+      "id": "arm-1",
+      "name": "Arm 1"
+    },
+    {
+      "id": "arm-2",
+      "name": "Arm 2"
+    },
+    {
+      "id": "arm-3",
+      "name": "Arm 3"
+    },
+    {
+      "id": "arm-4",
+      "name": "Arm 4"
+    },
+    {
+      "id": "rotor-1",
+      "name": "Propeller 1"
+    },
+    {
+      "id": "rotor-2",
+      "name": "Propeller 2"
+    },
+    {
+      "id": "rotor-3",
+      "name": "Propeller 3"
+    },
+    {
+      "id": "rotor-4",
+      "name": "Propeller 4"
+    },
+    {
+      "id": "motor-1",
+      "name": "Motor 1"
+    },
+    {
+      "id": "motor-2",
+      "name": "Motor 2"
+    },
+    {
+      "id": "motor-3",
+      "name": "Motor 3"
+    },
+    {
+      "id": "motor-4",
+      "name": "Motor 4"
+    },
+    {
+      "id": "sensor-altitude",
+      "name": "Height sensor"
+    },
+    {
+      "id": "battery",
+      "name": "Battery"
+    },
+    {
+      "id": "payload-camera",
+      "name": "Camera (added payload)"
+    }
+  ],
+  "params": [
+    {
+      "id": "kp_n_per_m",
+      "label": "P gain (Kp)",
+      "unit": "N/m",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "id": "ki_n_per_m_s",
+      "label": "I gain (Ki)",
+      "unit": "N/(m·s)",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 0
+    },
+    {
+      "id": "kd_n_s_per_m",
+      "label": "D gain (Kd)",
+      "unit": "N·s/m",
+      "min": 0,
+      "max": 15,
+      "step": 0.5,
+      "default": 0
+    },
+    {
+      "id": "target_m",
+      "label": "Target height",
+      "unit": "m",
+      "min": 0.5,
+      "max": 3,
+      "step": 0.1,
+      "default": 2
+    },
+    {
+      "id": "payload_kg",
+      "label": "Camera mass",
+      "unit": "kg",
+      "min": 0,
+      "max": 1,
+      "step": 0.1,
+      "default": 0
+    },
+    {
+      "id": "wind_force_n",
+      "label": "Wind push (down)",
+      "unit": "N",
+      "min": 0,
+      "max": 5,
+      "step": 0.5,
+      "default": 0
+    },
+    {
+      "id": "wind_start_s",
+      "label": "Wind starts at",
+      "unit": "s",
+      "min": 0,
+      "max": 15,
+      "step": 0.5,
+      "default": 0
+    },
+    {
+      "id": "wind_duration_s",
+      "label": "Wind lasts",
+      "unit": "s",
+      "min": 0,
+      "max": 15,
+      "step": 0.5,
+      "default": 15
+    }
+  ],
+  "presets": [
+    {
+      "id": "p-only",
+      "label": "P only",
+      "values": {
+        "kp_n_per_m": 10,
+        "ki_n_per_m_s": 0,
+        "kd_n_s_per_m": 0
+      }
+    },
+    {
+      "id": "p-d",
+      "label": "P + D",
+      "values": {
+        "kp_n_per_m": 10,
+        "ki_n_per_m_s": 0,
+        "kd_n_s_per_m": 6
+      }
+    },
+    {
+      "id": "pid",
+      "label": "PID",
+      "values": {
+        "kp_n_per_m": 10,
+        "ki_n_per_m_s": 4,
+        "kd_n_s_per_m": 6
+      }
+    },
+    {
+      "id": "too-much-i",
+      "label": "Too much I",
+      "values": {
+        "kp_n_per_m": 10,
+        "ki_n_per_m_s": 40,
+        "kd_n_s_per_m": 6
+      }
+    },
+    {
+      "id": "gust",
+      "label": "Gust",
+      "values": {
+        "wind_force_n": 3,
+        "wind_start_s": 1,
+        "wind_duration_s": 0.5
+      }
+    }
+  ],
+  "animations": [
+    {
+      "id": "feedback-loop",
+      "description": "The Measure, Compare, Correct ring draws around the drone: the height sensor glows, the error bracket appears, the thrust arrow grows."
+    },
+    {
+      "id": "drone-explode",
+      "description": "The drone's parts move apart so each one can be seen (illustrative spacing).",
+      "uses_asset": true
+    },
+    {
+      "id": "drone-assemble",
+      "description": "The drone's parts go back together.",
+      "uses_asset": true
+    }
+  ],
+  "solver": {
+    "id": "solver.fx-pid-altitude-1d",
+    "constants": {
+      "base_mass_kg": 1,
+      "drag_n_s_per_m": 1,
+      "thrust_to_weight_ratio": 2
+    }
+  },
+  "asset": "asset.fx-quadcopter-generic",
+  "test_fixture": true
+}

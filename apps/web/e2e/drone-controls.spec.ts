@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { installVoiceFakes } from "./voiceFakes";
+import { fakeLog, installVoiceFakes } from "./voiceFakes";
 
 // The drone's controls and readouts (step 3b, docs/drone-pid-plan.md): switches with lamps, Run and Gust,
 // the advanced panel, the plot with its ghost, the thrust gauge, the P/I/D bars and the checks. Under
@@ -83,7 +83,7 @@ test.describe("reduced motion: a run shows its end at once", () => {
     await sw(page, "D").click();
     await page.getByRole("button", { name: "Gust" }).first().click();
     await openReadouts(page);
-    await expect(page.getByText("Gust with P + D.").first()).toBeVisible();
+    await expect(page.locator("svg[aria-label^='Gust with P + D.']").first()).toBeVisible();
     await expect(page.locator('[data-solver-value="gap"]').first()).toHaveText("0.98 m");
   });
 
@@ -139,5 +139,86 @@ test.describe("live mode on the drone scene (recorded provider)", () => {
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.locator("main").getByText("This is a prepared placeholder line, not a live answer.")).toBeVisible({ timeout: 10_000 });
     expect(turns).toEqual([]);
+  });
+});
+
+test.describe("laptop and recording (Lucky's ThinkPad, 23 Oct 2026)", () => {
+  for (const [width, height] of [
+    [1366, 768],
+    [1920, 1080],
+  ] as const) {
+    test(`at ${width}×${height}: the drone, the height plot and the thrust gauge are in view together, with no scrolling`, async ({ page }, info) => {
+      test.skip(info.project.name !== "desktop", "laptop sizes");
+      await page.setViewportSize({ width, height });
+      await openDrone(page);
+      await page.getByRole("button", { name: "Run", exact: true }).first().click();
+      const space = page.locator('section[aria-label="Explanation space"]');
+      await expect(space).toHaveAttribute("data-space", "column");
+      const panel = (await space.boundingBox())!;
+      for (const what of [page.locator("svg[aria-label*='Height over']").first(), page.getByRole("group", { name: "Thrust gauge" }).first()]) {
+        const b = (await what.boundingBox())!;
+        expect(b.y + b.height, "inside the panel without scrolling").toBeLessThanOrEqual(panel.y + panel.height + 1);
+        expect(b.y).toBeGreaterThanOrEqual(panel.y - 1);
+      }
+      expect(await space.evaluate((el) => el.scrollTop)).toBe(0);
+      // The drone's own box is on screen, left of the panel.
+      const [x0, , x1] = (await page.locator("[data-viewer]").getAttribute("data-model-box"))!.split(",").map(Number);
+      expect(x1!).toBeLessThanOrEqual(panel.x + 1);
+      expect(x1! - x0!).toBeGreaterThan(40);
+      await page.waitForTimeout(16000); // the run's end, for the screenshot with the checks' place in the panel
+      await page.screenshot({ path: `screenshots/drone-laptop/${width}x${height}.png` });
+    });
+  }
+
+  test("the closed demo controls are a small button in the toolbar, not a strip across the stage", async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "toolbar layout");
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/learn?demo=1");
+    await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
+    const summary = page.getByText("Demo controls (testing only)");
+    const b = (await summary.boundingBox())!;
+    expect(b.width).toBeLessThan(260);
+    expect(b.height).toBeLessThan(50);
+  });
+
+  test("a close-up stays put during a run: the camera keeps the learner's zoom", async ({ page }, info) => {
+    test.skip(info.project.name !== "desktop", "mouse wheel");
+    await openDrone(page);
+    await expect(page.locator("[data-viewer]")).toHaveAttribute("data-triangles-scene", "drone-altitude", { timeout: 15000 });
+    await page.waitForTimeout(800);
+    const canvas = (await page.locator("[data-viewer] canvas").boundingBox())!;
+    await page.mouse.move(canvas.x + canvas.width * 0.4, canvas.y + canvas.height * 0.6);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -200);
+    await page.waitForTimeout(500);
+    const zoomed = await page.locator("[data-viewer]").getAttribute("data-camera");
+    await page.getByRole("button", { name: "Run", exact: true }).first().click();
+    await page.waitForTimeout(3000);
+    expect(await page.locator("[data-viewer]").getAttribute("data-camera")).toBe(zoomed);
+    // Reset view hands framing back to the app.
+    await page.getByRole("button", { name: "Reset view" }).click();
+    await expect.poll(async () => page.locator("[data-viewer]").getAttribute("data-camera")).not.toBe(zoomed);
+  });
+});
+
+test.describe("live mode: a drone question, recorded provider (step 4 session 2)", () => {
+  test.setTimeout(90_000);
+  test.beforeEach(async ({ page, baseURL }) => {
+    await page.context().addCookies([{ name: "aili-e2e-live", value: "drone", url: baseURL! }]);
+  });
+
+  test("the professor puts the drone on stage, applies P only, runs it, and says the solver's gap", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 300 });
+    await page.goto("/learn");
+    const welcome = page.getByRole("textbox", { name: "What do you want to learn?" });
+    await expect(welcome).toBeVisible({ timeout: 20_000 });
+    await welcome.fill("how does a drone hold its height?");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect.poll(async () => (await stage(page)).scene, { timeout: 20_000 }).toBe("drone-altitude");
+    await expect.poll(async () => (await fakeLog(page)).spoken.some((l) => l.includes("short of the line by 0.98 metres")), { timeout: 20_000 }).toBe(true);
+    expect((await stage(page)).settings).toMatchObject({ kp_n_per_m: 10, ki_n_per_m_s: 0, kd_n_s_per_m: 0 });
+    await expect(page.locator('[data-badge="live"]')).toHaveText(/Live AI · Test fixture content/);
+    // The run the page flew is the same P-only run: its gap is the solver's.
+    await openReadouts(page);
+    await expect(page.locator('[data-solver-value="gap"]').first()).toHaveText(/0\.\d\d m/, { timeout: 20_000 });
   });
 });

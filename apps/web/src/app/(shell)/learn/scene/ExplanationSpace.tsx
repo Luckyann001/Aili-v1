@@ -275,6 +275,7 @@ export const SPACE_BLOCKS: Partial<Record<SceneId, Array<{ id: string; render: (
   ],
   // The drone (step 3b): the beginner controls first, then what the run shows, then the advanced panel.
   "drone-altitude": [
+    // The drone, the plot and the thrust gauge must be in view together at 1366×768 (Lucky, 23 Oct 2026).
     { id: "controls", render: () => <DroneControlsBlock key="controls" /> },
     { id: "note", render: () => <DroneRunNote key="note" /> },
     { id: "plot", render: () => <DroneHeightPlot key="plot" /> },

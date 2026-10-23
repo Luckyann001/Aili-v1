@@ -15,7 +15,8 @@ import { applyStageSetting, stageDefaults, type StageSettings } from "./stage";
 //   hover needs an I gain above zero in the settings at that point (the I term holds the weight).
 
 /** Solvers that run over time, so a beat can press Run on them. The others are single calculations. */
-export const RUNNABLE_SOLVERS: ReadonlySet<string> = new Set(["solver.pid-altitude-1d"]);
+/** (The test-fixture copy runs the same code, for demo mode and the recorded live path.) */
+export const RUNNABLE_SOLVERS: ReadonlySet<string> = new Set(["solver.pid-altitude-1d", "solver.fx-pid-altitude-1d"]);
 
 export interface BeatContext {
   scenes: SceneManifest[];

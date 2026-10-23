@@ -113,6 +113,7 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       {activeScene === "drone-altitude" && <DroneStand colors={props.colors} />}
       {activeScene === "drone-altitude" && <PropDiscs colors={props.colors} />}
       {activeScene === "drone-altitude" && <DroneArrows colors={props.colors} />}
+      {activeScene === "drone-altitude" && <DroneLoopRing colors={props.colors} />}
       {activeScene === "drone-altitude" && <DroneDriver reducedMotion={props.spatialMs <= 0} />}
       <CameraLimits />
       {activeScene === "servo-arm" && props.spatialMs <= 0 && <OffsetLines colors={props.colors} />}
@@ -121,6 +122,9 @@ export default function SceneCanvas(props: SceneCanvasProps) {
         makeDefault
         target={DEFAULT_VIEW.target}
         enableDamping={false}
+        onStart={() => {
+          frame.userMoved = true;
+        }}
         minDistance={MODELS[activeScene].camera?.minDistance ?? 0.15}
         maxDistance={MODELS[activeScene].camera?.maxDistance ?? 1.2}
         onChange={(e) => {
@@ -159,10 +163,11 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const ref = useRef<Mesh>(null);
   const state = { params, leverDistance_m, bagReach_m, servo, drone };
   const hidden = (useServoAway() && HIDDEN_WHILE_APART.has(id)) || !!MODELS[activeScene].hidden?.(state).has(id);
-  // The drone's downward rangefinder glows while it is pointed at (the "Measure" step, beat 1).
-  const glow = selected && activeScene === "drone-altitude" && id === "sensor-altitude";
+  // The drone's downward rangefinder glows while it is pointed at, and on the loop's "Measure" step (beat 1).
+  const loopMeasure = useScene((s) => s.droneLoop === 1 || s.droneLoop === 4);
+  const glow = (selected || loopMeasure) && activeScene === "drone-altitude" && id === "sensor-altitude";
 
-  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, bagReach_m, servo, drone, hidden, invalidate]);
+  useEffect(() => invalidate(), [selected, colors, params, leverDistance_m, bagReach_m, servo, drone, hidden, loopMeasure, invalidate]);
 
   // Size depends on the scene settings; position also on the explode amount (set per frame). The drone's
   // height is read live each frame from the run being played, so its parts never re-render to move.
@@ -568,6 +573,35 @@ function DroneDriver({ reducedMotion }: { reducedMotion: boolean }) {
   return null;
 }
 
+/** Beat 1's feedback loop: a dashed Copper ring around the drone while the loop plays (its steps are named on the stage). */
+const LOOP_RING_R = 0.5;
+const LOOP_DASHES = 18;
+function DroneLoopRing({ colors }: { colors: SceneColors }) {
+  const on = useScene((s) => s.droneLoop !== 0);
+  const ref = useRef<Group>(null);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [on, colors, invalidate]);
+  useFrame(() => {
+    if (!ref.current) return;
+    const body = layoutDrone(droneNow(useScene.getState())).body!;
+    ref.current.position.set(0, body.position[1], 0);
+  });
+  if (!on) return null;
+  return (
+    <group ref={ref} name="feedback-loop-ring">
+      {Array.from({ length: LOOP_DASHES }, (_, i) => {
+        const a = (i / LOOP_DASHES) * Math.PI * 2;
+        return (
+          <mesh key={i} position={[Math.cos(a) * LOOP_RING_R, 0, Math.sin(a) * LOOP_RING_R]} rotation={[0, -a, 0]} raycast={() => null}>
+            <boxGeometry args={[0.012, 0.012, ((Math.PI * 2 * LOOP_RING_R) / LOOP_DASHES) * 0.55]} />
+            <meshBasicMaterial color={colors.accent} toneMapped={false} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
 /** Newtons to metres for the force arrows: the same scale for both, so they are equal at hover. */
 const ARROW_M_PER_N = 0.025;
 const ARROW_X_M = 0.42;
@@ -790,7 +824,13 @@ const anatomyDir = new Vector3(-0.72, 0.4, 0.57).normalize();
 const ANATOMY_FILL = 0.8;
 const marginFor = () => (useScene.getState().cameraView === "anatomy" ? 1 / ANATOMY_FILL : MARGIN);
 /** Last known screen shape, kept by Framing. */
-const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1, fittedArea: 0 };
+/**
+ * `userMoved`: the learner orbited or zoomed. On a scene that reframes itself (refitOnGrow, the drone),
+ * the camera then stays where they put it, through runs and resizes, so a close-up can be recorded;
+ * Reset view or a new scene hands framing back to the app.
+ */
+const frame = { fov: 40, canvasH: 1, areaW: 1, areaH: 1, fittedArea: 0, userMoved: false };
+const keepsUserView = () => frame.userMoved && !!MODELS[useScene.getState().activeScene].refitOnGrow;
 
 const worldUp = new Vector3(0, 1, 0);
 const right = new Vector3();
@@ -847,7 +887,9 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
   const inspectorShown = useScene((s) => s.inspectorOpen && s.selectedId !== null);
   const gaugeShown = useLesson((s) => s.gauge);
   const marginShown = useScene((s) => s.activeScene === "servo-arm" && !s.inspectorOpen);
-  const reserveKey = `${inspectorShown}|${gaugeShown}|${marginShown}`;
+  // The drone's explanation space (its column, or the strip on narrow screens) arrives with the scene.
+  const droneSpaceShown = useScene((s) => s.activeScene === "drone-altitude" && !s.inspectorOpen);
+  const reserveKey = `${inspectorShown}|${gaugeShown}|${marginShown}|${droneSpaceShown}`;
   const placed = useRef(false);
   const lastReserve = useRef(reserveKey);
 
@@ -871,7 +913,9 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
       Object.assign(frame, { fov: camera.fov, canvasH: size.height, areaW: freeW, areaH: freeH });
       // If the free area shrank (a caption appeared, the screen is zoomed) and the model no longer
       // fits in it, refit from the current direction. A model that still fits is left alone.
-      if (placed.current && !modelFits(camera, size, { x: el.offsetLeft, y: el.offsetTop, w: freeW, h: freeH })) {
+      if (keepsUserView()) {
+        // The learner's own view of the drone (a close-up): leave it.
+      } else if (placed.current && !modelFits(camera, size, { x: el.offsetLeft, y: el.offsetTop, w: freeW, h: freeH })) {
         refitCamera.current?.();
       } else if (placed.current && MODELS[useScene.getState().activeScene].refitOnGrow && freeW * freeH > frame.fittedArea * 1.15) {
         // The drone: a panel or the live welcome went away and the stage has room again. Fill it, rather
@@ -897,7 +941,7 @@ function Framing({ safeArea }: { safeArea: RefObject<HTMLDivElement | null> }) {
       for (const r of reserved()) ro.observe(r);
       apply();
       // The free area changed size: refit the camera to it, keeping the viewing direction.
-      if (placed.current && lastReserve.current !== reserveKey) refitCamera.current?.();
+      if (placed.current && lastReserve.current !== reserveKey && !keepsUserView()) refitCamera.current?.();
       lastReserve.current = reserveKey;
     });
     return () => {
@@ -1211,7 +1255,10 @@ function CameraRig({ spatialMs, host }: { spatialMs: number; host: RefObject<HTM
     // Reset, a new scene, or a camera view change (the servo opened, exploded or went back together):
     // frame from that view's direction. The placeholder's explode keeps the current direction.
     const fromDefault = prev.resetToken !== resetToken || prev.activeScene !== activeScene || prev.cameraToken !== cameraToken;
-    if (fromDefault || prev.exploded !== exploded || prev.fitKey !== fitKey) moveTo(fromDefault);
+    if (fromDefault) frame.userMoved = false;
+    // A new run's range reframes the drone, unless the learner set their own view (kept for a close-up).
+    const refit = prev.fitKey !== fitKey && !keepsUserView();
+    if (fromDefault || prev.exploded !== exploded || refit) moveTo(fromDefault);
     writeData(host, "cameraView", useScene.getState().cameraView);
     return () => {
       refitCamera.current = null;
