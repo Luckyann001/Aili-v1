@@ -44,6 +44,7 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Lesson flow in the prepared/live system (chips-only prepared mode; typed answers and graded teach-back live only)
 - [ ] Cruise-control analogy scene (P and I; D introduced on the drone) and the full test suites
 - [ ] Founder review, phone dry run, demo recording
+- Known flaky test (left for now, Lucky 23 Oct 2026): `apps/web/e2e/gears.spec.ts` › "reduced motion: nothing turns" (servo gears). Its two canvas screenshots 170 ms apart sometimes differ; it fails on the step 3a code too (4 in 15 runs), so it predates the drone work.
 
 **Lab 2 (servo torque), partly built in M4 before Oct 21 2026; kept working as a second lesson and backup demo**
 - [ ] Servo + arm asset with named parts; load/torque sim (arm mass included) (built as drafts, not reviewed)
