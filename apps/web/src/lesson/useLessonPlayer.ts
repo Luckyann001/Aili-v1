@@ -6,7 +6,9 @@ import { LEVER_LENGTH_M } from "@/scene/layout";
 import { LEVER_SOLVER } from "@/scene/manifests";
 import type { SceneId } from "@/scene/models";
 import { slideWeightOut } from "@/scene/animations";
+import { runPlaceholders } from "@/scene/droneRun";
 import { useScene } from "@/scene/sceneStore";
+import { prefersReducedMotion } from "@/scene/useDronePlayback";
 import { useVoice } from "@/voice/store";
 import { feedbackText, fill, type BeatDef } from "./runner";
 import { useLesson } from "./store";
@@ -18,11 +20,40 @@ export const CLOSING_LINE = "That's one answer, not a test result. We'll come ba
 export const leverEffort = (d: number) =>
   relativeEffort({ ...LEVER_SOLVER, weight_distance_m: Math.min(LEVER_SOLVER.lever_length_m, Math.max(0, d)) });
 
-/** Values the narration's {{placeholders}} may use. All numbers come from the solver. */
+/** Values the narration's {{placeholders}} may use. All numbers come from the solver: the lever's, and the drone's latest run. */
 function placeholderValues(): Record<string, string> {
   const nearD = 0.05;
   const ratio = leverEffort(LEVER_LENGTH_M) / leverEffort(nearD);
-  return { effort_far_vs_near: String(Math.round(ratio)) };
+  const run = useScene.getState().droneRun;
+  return { effort_far_vs_near: String(Math.round(ratio)), ...(run ? runPlaceholders(run) : {}) };
+}
+
+/** The hint while a beat waits for the learner's Run press. */
+export const PRESS_RUN = "Press Run in the drone controls when you're ready.";
+
+type Action = NonNullable<BeatDef["actions"]>[number];
+const learnerRun = (beat: BeatDef) => (beat.actions ?? []).find((a) => a.type === "run_simulation" && a.by === "learner");
+
+/**
+ * Resolves true once a drone run newer than `afterSeq` has finished playing, false if the lesson moved on
+ * first (stopped, restarted or answered: its revision changed).
+ */
+function runFinished(afterSeq: number, rev: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (useLesson.getState().rev !== rev) return done(false);
+      const s = useScene.getState();
+      if (s.droneRun && s.droneRun.seq > afterSeq && !s.dronePlaying) done(true);
+    };
+    const offScene = useScene.subscribe(check);
+    const offLesson = useLesson.subscribe(check);
+    const done = (ok: boolean) => {
+      offScene();
+      offLesson();
+      resolve(ok);
+    };
+    check();
+  });
 }
 
 /** After an animation finishes, the result stays on screen at least this long before the next beat. */
@@ -75,7 +106,19 @@ export function useLessonPlayer(voice: Voice) {
             break;
           case "set_parameter":
             if (a.param === "weight_distance_m") scene.setLeverDistance(a.value as number);
+            else if (scene.activeScene === "drone-altitude") scene.setDroneSetting(a.param as string, a.value as number);
             else scene.setParam(a.param as never, a.value as number);
+            break;
+          case "apply_preset":
+            scene.applyDronePreset(a.preset as string);
+            break;
+          case "run_simulation":
+            // Aili's run plays while she speaks; a learner's run is waited for before the beat speaks.
+            if (a.by === "aili") {
+              const before = scene.droneRun?.seq ?? 0;
+              scene.startDroneRun("run", { snap: prefersReducedMotion(), start: (a.start as "ground" | "hover" | undefined) ?? "ground" });
+              work.push(runFinished(before, r).then(() => undefined));
+            }
             break;
           case "highlight_part":
             scene.highlight(a.part as string);
@@ -108,22 +151,39 @@ export function useLessonPlayer(voice: Voice) {
     if (status !== "playing" || !lesson.beats) return;
     const beat = lesson.beats[beatIndex]!;
     const r = rev;
-    const values = placeholderValues();
-    const lines = beat.narration.map((n) => fill(n.text, values));
-    // Feedback about an earlier answer (the reveal compares with the prediction), in plain words.
-    if (beat.feedback && beat.feedback.about !== beat.id) {
-      const text = feedbackText(beat.feedback, lesson.answers[beat.feedback.about]);
-      if (text) lines.push(text);
-    }
     if (beat.kind === "framing") useLesson.getState().setGauge(false);
-    const actions = applyActions(beat, r);
-    let spoken = false;
-    sayOwn(lines, () => {
-      spoken = true;
-      void actions.then(() => {
-        if (spoken && current(r)) useLesson.getState().dispatch({ type: "beatEnded", rev: r, beatIndex });
+    const speak = () => {
+      const values = placeholderValues();
+      const lines = beat.narration.map((n) => fill(n.text, values));
+      // Feedback about an earlier answer (the reveal compares with the prediction), in plain words.
+      if (beat.feedback && beat.feedback.about !== beat.id) {
+        const text = feedbackText(beat.feedback, lesson.answers[beat.feedback.about]);
+        if (text) lines.push(text);
+      }
+      const actions = applyActions(beat, r);
+      let spoken = false;
+      sayOwn(lines, () => {
+        spoken = true;
+        void actions.then(() => {
+          if (spoken && current(r)) useLesson.getState().dispatch({ type: "beatEnded", rev: r, beatIndex });
+        });
       });
-    });
+    };
+    // A beat whose words need the learner's run: set the stage, wait for Run and the run's end, then speak.
+    if (learnerRun(beat)) {
+      const before = useScene.getState().droneRun?.seq ?? 0;
+      void applyActions({ ...beat, actions: (beat.actions ?? []).filter((a: Action) => a.type !== "run_simulation") }, r);
+      useLesson.getState().setAwaitingRun(true);
+      useVoice.getState().setHint({ text: PRESS_RUN, kind: "info" });
+      void runFinished(before, r).then((ok) => {
+        if (!ok || !current(r)) return;
+        useLesson.getState().setAwaitingRun(false);
+        useVoice.getState().setHint(null);
+        speak();
+      });
+      return;
+    }
+    speak();
   }, [status, beatIndex, rev, sayOwn, applyActions, current]);
 
   // After the last answer: say its feedback and the closing line.
@@ -132,6 +192,20 @@ export function useLessonPlayer(voice: Voice) {
     if (status !== "done" || !answerFeedback) return;
     sayOwn([answerFeedback, CLOSING_LINE], () => {});
   }, [status, answerFeedback, sayOwn]);
+
+  // While the lesson waits for Run nothing is speaking, so Escape has no speech to stop: it stops the
+  // lesson itself (it can be continued; a later Run press does not run on into the next beat).
+  const awaitingRun = useLesson((s) => s.awaitingRun);
+  useEffect(() => {
+    if (!awaitingRun) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      useLesson.getState().dispatch({ type: "stop" });
+      useVoice.getState().setHint(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [awaitingRun]);
 
   // Anything else that moves the voice on (Stop, Escape, a typed question, the mic) stops the lesson.
   useEffect(

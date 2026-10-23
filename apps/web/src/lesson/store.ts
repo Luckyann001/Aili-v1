@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { initialLesson, lessonReducer, type BeatDef, type LessonEvent, type LessonState } from "./runner";
+import type { LessonId } from "./lessons";
 
 export interface LessonStore extends LessonState {
   beats: BeatDef[] | null;
@@ -10,7 +11,12 @@ export interface LessonStore extends LessonState {
   revealDone: boolean;
   /** Plain message when the lesson can't be shown (e.g. its scenes are not reviewed). */
   unavailable: string | null;
-  setScript: (beats: BeatDef[], title: string) => void;
+  /** The lesson loaded (beats and title belong to it). */
+  lessonId: LessonId | null;
+  /** True while a beat waits for the learner to press Run on the drone (its narration needs the result). */
+  awaitingRun: boolean;
+  setAwaitingRun: (on: boolean) => void;
+  setScript: (beats: BeatDef[], title: string, lessonId: LessonId) => void;
   setUnavailable: (msg: string | null) => void;
   setGauge: (on: boolean) => void;
   setRevealDone: (done: boolean) => void;
@@ -25,7 +31,10 @@ export const useLesson = create<LessonStore>()((set) => ({
   gauge: false,
   revealDone: false,
   unavailable: null,
-  setScript: (beats, title) => set({ beats, title, unavailable: null }),
+  lessonId: null,
+  awaitingRun: false,
+  setAwaitingRun: (awaitingRun) => set({ awaitingRun }),
+  setScript: (beats, title, lessonId) => set({ beats, title, lessonId, unavailable: null }),
   setUnavailable: (unavailable) => set({ unavailable }),
   setGauge: (gauge) => set({ gauge }),
   setRevealDone: (revealDone) => set({ revealDone }),
@@ -34,6 +43,7 @@ export const useLesson = create<LessonStore>()((set) => ({
       if (!s.beats) return {};
       const next = lessonReducer(s.beats, s, e);
       if (next === s) return {};
-      return e.type === "start" ? { ...next, gauge: false, revealDone: false } : next;
+      // A new start, a stop or an answer ends any wait for Run (a stale wait never resumes the lesson).
+      return e.type === "start" ? { ...next, gauge: false, revealDone: false, awaitingRun: false } : { ...next, awaitingRun: false };
     }),
 }));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ContentBadge, LiveContentBadge } from "@/components/ContentBadge";
 import { useDemoLabels, useDemoNote } from "@/turn/useDemoLabels";
 import { FOUNDER_DEMO } from "@/turn/contentMode";
@@ -41,6 +41,7 @@ import { EquationLabels } from "./scene/EquationLabels";
 import { SidePanel } from "./SidePanel";
 import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
 import { useDronePlayback } from "@/scene/useDronePlayback";
+import { DEFAULT_LESSON, LESSONS, lessonFromSearch } from "@/lesson/lessons";
 import styles from "./learn.module.css";
 
 // Focus targets where Space already means something (typing, pressing, switching tabs).
@@ -136,6 +137,8 @@ export function LearnStage() {
   const lessonStatus = useLesson((s) => s.status);
   const lessonChoices = useLesson((s) => s.choices);
   const lessonRev = useLesson((s) => s.rev);
+  // Which prepared lesson: `?lesson=drone-pid` for the drone (step 4), else the lever lesson.
+  const lessonId = useSyncExternalStore(() => () => {}, () => lessonFromSearch(window.location.search), () => DEFAULT_LESSON);
   const voicePrompt = useVoice((s) => s.prompt);
   const busy = isBusy(useVoice((s) => s.status));
 
@@ -143,8 +146,8 @@ export function LearnStage() {
   const runLesson = useCallback(async (how: "start" | "resume") => {
     const l = useLesson.getState();
     if (!l.beats) {
-      const { loadBeginnerLever } = await import("@/lesson/loadLesson");
-      const loaded = loadBeginnerLever();
+      const { loadLesson } = await import("@/lesson/loadLesson");
+      const loaded = loadLesson(lessonId);
       if ("errors" in loaded) {
         const drafts = !INCLUDE_DRAFTS;
         const text = drafts
@@ -154,11 +157,11 @@ export function LearnStage() {
         useVoice.getState().setHint({ text, kind: "info" });
         return;
       }
-      useLesson.getState().setScript(loaded.beats, loaded.title);
+      useLesson.getState().setScript(loaded.beats, loaded.title, lessonId);
     }
     if (how === "start") useStageContent.getState().setFixture(false); // the lesson takes the stage
     useLesson.getState().dispatch({ type: how });
-  }, []);
+  }, [lessonId]);
 
   // One open question at a time: the lesson's choices while it waits; otherwise Aili's quick
   // replies; otherwise an offer to start or continue the lesson (never in live mode; until the server
@@ -170,7 +173,7 @@ export function LearnStage() {
         ? null
         : lessonStatus === "stopped"
           ? { group: "Lesson", items: [{ id: "resume", label: "Continue the lesson" }], onPick: () => void runLesson("resume") }
-          : { group: "Lesson", items: [{ id: "start", label: lessonStatus === "done" ? "Start the lesson again" : "Start: why reach makes holding harder" }], onPick: () => void runLesson("start") };
+          : { group: "Lesson", items: [{ id: "start", label: lessonStatus === "done" ? "Start the lesson again" : LESSONS[lessonId].startLabel }], onPick: () => void runLesson("start") };
 
   const open = (view: SideView, el: HTMLButtonElement) => {
     lastTrigger.current = el;

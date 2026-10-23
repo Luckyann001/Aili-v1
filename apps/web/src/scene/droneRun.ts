@@ -43,8 +43,11 @@ export const SWITCH_ON: Record<string, number> = preset("pid");
 /** The four presets a learner can pick (the gust is a button of its own). */
 export const DRONE_PRESETS = PRESETS.filter((p) => p.id !== "gust");
 
-/** The solver input for these settings. A gust starts from rest where this controller holds the drone. */
-export function droneInput(settings: DroneSettings, kind: RunKind): PidAltitudeInput {
+/**
+ * The solver input for these settings. A gust starts from rest where this controller holds the drone; a
+ * run starts on the ground unless a beat asks for a start at hover (the lesson's hook).
+ */
+export function droneInput(settings: DroneSettings, kind: RunKind, start?: "ground" | "hover"): PidAltitudeInput {
   const wind = kind === "gust" ? GUST : { wind_force_n: settings.wind_force_n ?? 0, wind_start_s: settings.wind_start_s ?? 0, wind_duration_s: settings.wind_duration_s ?? 15 };
   return {
     base_mass_kg: DRONE_CONSTANTS.base_mass_kg,
@@ -56,11 +59,19 @@ export function droneInput(settings: DroneSettings, kind: RunKind): PidAltitudeI
     kd_n_s_per_m: settings.kd_n_s_per_m ?? 0,
     target_m: settings.target_m ?? 2,
     ...wind,
-    start: kind === "gust" ? "settled" : "ground",
+    start: kind === "gust" ? "settled" : (start ?? "ground"),
   };
 }
 
-export const runDrone = (settings: DroneSettings, kind: RunKind, seq: number): DroneRun => ({ kind, settings, seq, result: pidAltitude1d(droneInput(settings, kind)) });
+export const runDrone = (settings: DroneSettings, kind: RunKind, seq: number, start?: "ground" | "hover"): DroneRun => ({
+  kind,
+  settings,
+  seq,
+  result: pidAltitude1d(droneInput(settings, kind, start)),
+});
+
+/** The lesson's {{placeholders}} from a finished run: the gap and the bounce in metres, as the stage shows them. */
+export const runPlaceholders = (r: DroneRun): Record<string, string> => ({ final_error_m: m2(Math.abs(r.result.final_error_m)), overshoot_m: m2(r.result.overshoot_m) });
 
 /** The run's length, s (the trace's last sample). */
 export const runLength_s = (r: PidAltitudeResult) => r.trace.t_s.at(-1) ?? 0;

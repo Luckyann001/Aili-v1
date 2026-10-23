@@ -47,7 +47,7 @@ export interface SceneState {
   droneGhost: DroneRun | null;
   droneT_s: number;
   dronePlaying: boolean;
-  startDroneRun: (kind: RunKind, opts?: { snap?: boolean }) => void;
+  startDroneRun: (kind: RunKind, opts?: { snap?: boolean; start?: "ground" | "hover" }) => void;
   /** A playback step, ignored unless `seq` is the current run. Reaching the end stops it. */
   setDroneT: (seq: number, t_s: number) => void;
   /** The servo's rated torque, N·m, as the learner typed it from their datasheet; null until then. */
@@ -154,7 +154,7 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   dronePlaying: false,
   startDroneRun: (kind, opts = {}) =>
     set((s) => {
-      const run = runDrone(s.drone.settings, kind, (s.droneRun?.seq ?? 0) + 1);
+      const run = runDrone(s.drone.settings, kind, (s.droneRun?.seq ?? 0) + 1, opts.start);
       const h = run.result.trace.height_m;
       const t_s = opts.snap ? runLength_s(run.result) : 0;
       return {
