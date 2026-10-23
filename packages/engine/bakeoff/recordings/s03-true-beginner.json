@@ -1,0 +1,163 @@
+{
+  "source": "HAND-WRITTEN for slice 7a (not from a real model): proves the recorded-mode plumbing. The first answer has a hard-coded number (rejected), the repair passes.",
+  "scenario": "s03-true-beginner",
+  "router": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null
+          },
+          "input_tokens": 540,
+          "output_tokens": 45
+        }
+      }
+    ]
+  },
+  "professor": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_1",
+            "state_rev": 1,
+            "move": "explain",
+            "concepts": [
+              "mech.torque.static"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Holding it level takes 2.5 newton-metres."
+              }
+            ],
+            "actions": [
+              {
+                "type": "select_scene",
+                "scene": "fx-lever"
+              },
+              {
+                "type": "highlight_part",
+                "part": "weight"
+              },
+              {
+                "type": "set_parameter",
+                "param": "weight_distance_m",
+                "value": 0.2
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.2,
+                  "payload_kg": 0.3,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
+            "evidence": [
+              "read.fx-moments"
+            ],
+            "prompt": {
+              "text": "Where would you move the weight to make it easier to hold?",
+              "chips": [
+                "Closer to my hand",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "static hold only"
+            ],
+            "limitations": [
+              "does not cover acceleration"
+            ]
+          },
+          "input_tokens": 2700,
+          "output_tokens": 520
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_1",
+            "state_rev": 1,
+            "move": "explain",
+            "concepts": [
+              "mech.torque.static"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Holding this arm level takes {{c1.torque_nm}} newton-metres."
+              },
+              {
+                "id": "n2",
+                "text": "The payload at the tip gives {{c1.payload_torque_nm}} of that; the arm's own mass gives the rest."
+              }
+            ],
+            "actions": [
+              {
+                "type": "select_scene",
+                "scene": "fx-lever"
+              },
+              {
+                "type": "highlight_part",
+                "part": "weight"
+              },
+              {
+                "type": "set_parameter",
+                "param": "weight_distance_m",
+                "value": 0.2
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.2,
+                  "payload_kg": 0.3,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
+            "evidence": [
+              "read.fx-moments"
+            ],
+            "prompt": {
+              "text": "Where would you move the weight to make it easier to hold?",
+              "chips": [
+                "Closer to my hand",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "static hold only"
+            ],
+            "limitations": [
+              "does not cover acceleration"
+            ]
+          },
+          "input_tokens": 2800,
+          "output_tokens": 540
+        }
+      }
+    ]
+  }
+}

@@ -3,9 +3,21 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./stage": "./src/stage.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "dry-run": "rolldown scripts/dryRun.ts --platform node --format esm --file .script-build/dryRun.mjs --log-level warn && node .script-build/dryRun.mjs",
+    "bakeoff": "rolldown scripts/bakeoff.ts --platform node --format esm --file .script-build/bakeoff.mjs --log-level warn && node .script-build/bakeoff.mjs --mode recorded",
+    "bakeoff:live": "rolldown scripts/bakeoff.ts --platform node --format esm --file .script-build/bakeoff.mjs --log-level warn && node --env-file-if-exists=../../apps/web/.env.local .script-build/bakeoff.mjs --mode live",
+    "schema-probe": "rolldown scripts/schemaProbe.ts --platform node --format esm --file .script-build/schemaProbe.mjs --log-level warn && node --env-file-if-exists=../../apps/web/.env.local .script-build/schemaProbe.mjs"
+  },
+  "dependencies": {
+    "@aili/schemas": "^0.0.0",
+    "@aili/solvers": "^0.0.0",
+    "zod": "^4.6.5"
   }
 }

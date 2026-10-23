@@ -1,0 +1,25 @@
+{
+  "id": "read.fx-draft",
+  "type": "reading",
+  "version": "0.1.0",
+  "teaches": [
+    "mech.torque.static"
+  ],
+  "source": "src.fx-book",
+  "location": "Fixture section",
+  "level": "L2",
+  "purpose": "deepen",
+  "est_minutes": 20,
+  "guide": {
+    "key_claims": [
+      "Moment is force times distance"
+    ],
+    "misconceptions": [],
+    "teach_back_prompts": [
+      "Explain the moment arm"
+    ],
+    "application_question": "What changes when the arm tilts"
+  },
+  "review_status": "draft",
+  "test_fixture": true
+}

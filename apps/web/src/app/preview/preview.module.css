@@ -136,8 +136,10 @@
   transition: background var(--aili-duration-ui) var(--aili-ease-out);
 }
 
-.primaryButton:hover {
-  background: var(--aili-action-bg-hover);
+@media (hover: hover) {
+  .primaryButton:hover {
+    background: var(--aili-action-bg-hover);
+  }
 }
 
 .primaryButton:active {

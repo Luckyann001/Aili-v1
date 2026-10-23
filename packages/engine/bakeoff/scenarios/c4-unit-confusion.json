@@ -1,0 +1,19 @@
+{
+  "id": "c4-unit-confusion",
+  "title": "kg·cm and N·m are the same",
+  "source": "approved bake-off list: confident but wrong",
+  "category": "confident_wrong",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "kg·cm and N·m are the same unit, so a 2 kg·cm servo gives 2 N·m."
+    }
+  ],
+  "reviewer_notes": "Corrects the unit confusion without hard-coded conversion factors in text (placeholders or a calculation only)."
+}

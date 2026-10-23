@@ -1,0 +1,321 @@
+{
+  "id": "asset.fx-servo-generic-anatomy",
+  "type": "asset",
+  "version": "0.1.0",
+  "title": "Test fixture: generic micro servo anatomy (published copy for the demo)",
+  "label": "Generic micro servo, illustrative, not measured, not a named product",
+  "fidelity": "illustrative",
+  "provenance": "authored",
+  "provenance_note": "scripted in Blender 5.2.2, generic, not measured",
+  "license": "own work",
+  "review_status": "published",
+  "review": {
+    "by": "Test fixture: founder review",
+    "on": "2026-10-16",
+    "role": "founder"
+  },
+  "test_fixture": true,
+  "format": "glb",
+  "file": "authoring/servo-anatomy/out/servo-generic.glb",
+  "nodes": [
+    "board-and-cover",
+    "gear-train",
+    "horn",
+    "motor-and-sensor",
+    "upper-case"
+  ],
+  "size_kb": 233.3,
+  "triangles": 5216,
+  "budget": {
+    "triangles": 8000,
+    "glb_kb": 300,
+    "status": "provisional: re-check on the real Android phone before page integration (Lucky, 16 Oct 2026)"
+  },
+  "units": "metres",
+  "shaft_axis": {
+    "blender": "+Z (Blender is Z-up)",
+    "gltf": "+Y (the glTF exporter converts to Y-up)",
+    "origin": "every part's origin lies on the output-shaft axis (x = 0, z = 0 in glTF), at the part's lowest point"
+  },
+  "open_parts": [
+    "upper-case"
+  ],
+  "explode_note": "illustrative spacing for teaching, about 2x the servo's height along the shaft; not an assembly sequence, not measured",
+  "parts": [
+    {
+      "id": "horn",
+      "name": "Output horn and screw",
+      "role": "Carries the load: the arm or linkage bolts to it; the screw holds it on the splined shaft.",
+      "node": "horn",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.03
+      },
+      "bounds_gltf_m": {
+        "min": [
+          -0.008,
+          0.0245,
+          -0.0025
+        ],
+        "max": [
+          0.008,
+          0.0285,
+          0.0025
+        ]
+      }
+    },
+    {
+      "id": "upper-case",
+      "name": "Upper case",
+      "role": "Holds the gear train; the mounting ears bolt the servo down; the boss guides the output shaft.",
+      "node": "upper-case",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.028
+      },
+      "bounds_gltf_m": {
+        "min": [
+          -0.01025,
+          0.0012,
+          -0.0061
+        ],
+        "max": [
+          0.02225,
+          0.0245,
+          0.0061
+        ]
+      }
+    },
+    {
+      "id": "gear-train",
+      "name": "Gear train",
+      "role": "Trades speed for torque: a small motor pinion drives larger gears, stage by stage, to the splined output shaft.",
+      "node": "gear-train",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0.001
+      },
+      "bounds_gltf_m": {
+        "min": [
+          -0.00452,
+          0.0155,
+          -0.00499
+        ],
+        "max": [
+          0.00799,
+          0.027,
+          0.00379
+        ]
+      }
+    },
+    {
+      "id": "motor-and-sensor",
+      "name": "Motor and position sensor",
+      "role": "The motor turns fast with little torque; the potentiometer on the output shaft tells the board the angle.",
+      "node": "motor-and-sensor",
+      "explode": {
+        "direction_gltf": [
+          0,
+          1,
+          0
+        ],
+        "distance_m": 0
+      },
+      "bounds_gltf_m": {
+        "min": [
+          -0.002,
+          0.0035,
+          -0.0033
+        ],
+        "max": [
+          0.00717,
+          0.016,
+          0.002
+        ]
+      }
+    },
+    {
+      "id": "board-and-cover",
+      "name": "Control board and bottom cover",
+      "role": "The board compares the commanded angle with the sensor and drives the motor; the cover closes the case.",
+      "node": "board-and-cover",
+      "explode": {
+        "direction_gltf": [
+          0,
+          -1,
+          0
+        ],
+        "distance_m": 0.002
+      },
+      "bounds_gltf_m": {
+        "min": [
+          -0.00553,
+          0,
+          -0.00613
+        ],
+        "max": [
+          0.0235,
+          0.002,
+          0.00613
+        ]
+      }
+    }
+  ],
+  "materials": {
+    "palette": {
+      "case": "#8A8379, a warm neutral from the Ink family; renders mid-dark under the page's lights (lighter than Ink #282724, clearly darker than Canvas)",
+      "label_panel": "#A59E93, a lighter warm neutral (blank, no text)",
+      "seam_and_cable": "Ink #282724",
+      "gears": "Gold #C99A56",
+      "board": "Sage #83957E",
+      "sensor": "Plum #917383",
+      "horn": "Canvas #F5F1EB"
+    },
+    "exceptions": [
+      {
+        "part": "motor-and-sensor",
+        "colour": "silver #B8BCC2",
+        "why": "a motor can reads as metal; approved exception to the palette (Lucky, 16 Oct 2026)"
+      }
+    ]
+  },
+  "gear_train": {
+    "source": "gears.json",
+    "label": "illustrative example values, not measured",
+    "module_m": 0.0002,
+    "meshes": [
+      "10 → 40",
+      "10 → 36",
+      "10 → 32"
+    ],
+    "ratio": 46.080000000000005,
+    "ratio_note": "derived by code from the tooth counts (driven ÷ driver per mesh); never typed by hand",
+    "accuracy": "involute flanks approximated with a few points; no backlash, profile shift or tolerance; for looks only",
+    "gears": [
+      {
+        "id": "motor-pinion",
+        "node": "motor-pinion",
+        "teeth": 10,
+        "shaft": "motor",
+        "phase_rad": 0,
+        "shaft_xz_gltf_m": [
+          0.00467,
+          -0.000799
+        ]
+      },
+      {
+        "id": "stage-1-gear",
+        "node": "stage-1-gear",
+        "teeth": 40,
+        "shaft": "stage-1",
+        "phase_rad": 0.078539816,
+        "shaft_xz_gltf_m": [
+          -0.00033,
+          -0.000799
+        ]
+      },
+      {
+        "id": "stage-1-pinion",
+        "node": "stage-1-pinion",
+        "teeth": 10,
+        "shaft": "stage-1",
+        "phase_rad": 0.453785606,
+        "shaft_xz_gltf_m": [
+          -0.00033,
+          -0.000799
+        ]
+      },
+      {
+        "id": "stage-2-gear",
+        "node": "stage-2-gear",
+        "teeth": 36,
+        "shaft": "stage-2",
+        "phase_rad": 0.087266463,
+        "shaft_xz_gltf_m": [
+          0.0042,
+          0
+        ]
+      },
+      {
+        "id": "stage-2-pinion",
+        "node": "stage-2-pinion",
+        "teeth": 10,
+        "shaft": "stage-2",
+        "phase_rad": 0,
+        "shaft_xz_gltf_m": [
+          0.0042,
+          0
+        ]
+      },
+      {
+        "id": "output-gear",
+        "node": "output-gear",
+        "teeth": 32,
+        "shaft": "output",
+        "phase_rad": 0.09817477,
+        "shaft_xz_gltf_m": [
+          0,
+          0
+        ]
+      }
+    ],
+    "meshing": [
+      {
+        "driver": "motor-pinion",
+        "driven": "stage-1-gear"
+      },
+      {
+        "driver": "stage-1-pinion",
+        "driven": "stage-2-gear"
+      },
+      {
+        "driver": "stage-2-pinion",
+        "driven": "output-gear"
+      }
+    ]
+  },
+  "teaches": [
+    "act.servo-parts",
+    "act.servo-what-it-is",
+    "act.gear-ratio",
+    "act.torque-speed-tradeoff",
+    "sense.position-sensor",
+    "act.motor-basics"
+  ],
+  "teaches_proposed": [],
+  "teaches_note": "all in content/robotics/concepts.json (the four gear, motor and sensor concepts approved as drafts, Lucky 16 Oct 2026)",
+  "stills": [
+    {
+      "file": "servo-assembled.png",
+      "engine": "BLENDER_WORKBENCH"
+    },
+    {
+      "file": "servo-open.png",
+      "engine": "BLENDER_WORKBENCH"
+    },
+    {
+      "file": "servo-exploded.png",
+      "engine": "BLENDER_WORKBENCH"
+    },
+    {
+      "file": "servo-gear-train.png",
+      "engine": "BLENDER_WORKBENCH"
+    },
+    {
+      "file": "servo-top.png",
+      "engine": "BLENDER_WORKBENCH"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "s01-quick-question",
+  "title": "Quick question gets a direct answer",
+  "source": "behavior spec A14 test 1",
+  "category": "spec",
+  "posture": "answer",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Will this servo hold a 300 g camera at 20 cm?",
+      "expect": {
+        "moves": [
+          "answer"
+        ],
+        "asks": false,
+        "arm_weight": true
+      }
+    }
+  ],
+  "reviewer_notes": "A direct answer with a calculated value, its assumptions and a source; no quiz. The arm's own mass is included."
+}

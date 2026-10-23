@@ -1,0 +1,62 @@
+"use client";
+
+import type { RefObject } from "react";
+import { MODELS } from "@/scene/models";
+import { HIDDEN_WHILE_APART, useScene } from "@/scene/sceneStore";
+import { CheckIcon } from "./PartsList";
+import { SERVO_PARTS } from "@/scene/servoArm";
+import styles from "../learn.module.css";
+
+const SERVO_IDS = new Set(SERVO_PARTS.map((p) => p.id));
+
+/**
+ * Part labels as plain DOM inside the safe area (positioned by the 3D view each frame).
+ * The selected part always shows its label, marked "Selected" with an icon, never colour alone.
+ */
+/** The leader lines' layer, kept in the same map as the labels (the 3D view fills it each frame). */
+export const LEADER_LAYER = "__leaders";
+
+export function SceneLabels({ labels }: { labels: RefObject<Map<string, HTMLElement>> }) {
+  const selectedId = useScene((s) => s.selectedId);
+  const labelsOn = useScene((s) => s.labelsOn);
+  const activeScene = useScene((s) => s.activeScene);
+  const parts = MODELS[activeScene].parts;
+  // Servo + arm, open or exploded: the servo's parts carry their short names (the inside ones too).
+  const servoAway = useScene((s) => s.activeScene === "servo-arm" && s.servoView !== "assembled");
+  // The lever's hand end is always labelled (it anchors the analogy).
+  const always = activeScene === "lever-analogy" ? ["hand"] : [];
+  return (
+    <div className={styles.labelLayer} aria-hidden="true">
+      <div
+        className={styles.leaderLayer}
+        ref={(el) => {
+          if (el) labels.current.set(LEADER_LAYER, el);
+          else labels.current.delete(LEADER_LAYER);
+        }}
+      />
+      {parts.map((p) => {
+        const selected = selectedId === p.id;
+        const servoPart = SERVO_IDS.has(p.id);
+        // While the servo is apart, the hidden arm, load and base have no label either.
+        const dimmed = servoAway && HIDDEN_WHILE_APART.has(p.id);
+        const shown = !dimmed && (selected || always.includes(p.id) || (servoAway && servoPart) || (labelsOn && (!p.inside || servoAway)));
+        return (
+          <span
+            key={p.id}
+            ref={(el) => {
+              if (el) labels.current.set(p.id, el);
+              else labels.current.delete(p.id);
+            }}
+            className={selected ? styles.partLabelSelected : styles.partLabel}
+            data-part-id={p.id}
+            hidden={!shown}
+            style={{ visibility: "hidden" }}
+          >
+            {selected && <CheckIcon />}
+            {selected ? `Selected: ${p.name}` : p.name}
+          </span>
+        );
+      })}
+    </div>
+  );
+}

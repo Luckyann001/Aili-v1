@@ -13,31 +13,43 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] `design/tokens.css` (light + dark), self-hosted Newsreader + Inter, SVG logo set
 - [ ] Hosting, database and auth projects created by you; keys server-side only, `.env` ignored
 
-**M1 — App shell and Learn stage layout**
-- [ ] Landing, Home/Resume, top bar + menu
-- [ ] Learn stage layout: stage canvas, voice states, caption overlay, on-demand text panel, Library drawer
-- [ ] Auth, session create/resume
-- [ ] React Three Fiber scene: orbit, select, label, exploded view
-- [ ] Accessibility pass (contrast, keyboard, reduced motion); Prepared/Live badge
-- [ ] Check on a real mid-range Android phone
+**M1 — App shell and Learn stage layout (paused Oct 11 2026, not finished)**
+- [x] Landing v1, Home/Resume, top bar + menu (landing polish deferred, below)
+- [x] Learn stage layout: stage canvas, voice states, caption overlay, on-demand text panel, Library drawer
+- [ ] Auth, session create/resume (deferred, below)
+- [x] React Three Fiber scene: orbit, select, label, exploded view
+- [x] Accessibility pass (contrast, keyboard, reduced motion); Prepared/Live badge
+- [x] Check on a real low-end Android phone (Itel A667L, Android 14, Oct 11 2026)
 
 **M2 — Engine: registry, solver, validator**
-- [ ] Capability registry schema (JSON in git → DB)
+- [ ] Capability registry schema (validated JSON bundle in git; database sync deferred, below)
 - [ ] Solver package + tests against worked examples
 - [ ] Director-response schema + validator (no hard-coded engineering numbers, one question max)
-- [ ] Per-turn flow over WebSocket/SSE; interrupt + stale-action invalidation
+- [ ] Per-turn flow over SSE plus a POST interrupt; stale-action invalidation
 - [ ] Cost + token metering per session
 
-**M3 — Professor (live AI)**
-- [ ] Provider adapter (config-driven); postures (Answer/Learning/Build) and moves
-- [ ] Prediction → test → reveal; teach-back; reading assignment
-- [ ] 17 professor tests in CI; provider bake-off (~30 scenarios)
+**M3 — Professor (live AI) (closed Oct 14 2026 on the numbers; see `docs/m3-report.md`)**
+- [x] Provider adapter (config-driven); postures (Answer/Learning/Build) and moves
+- [x] Prediction → test → reveal; teach-back; reading assignment
+- [x] 17 professor tests in CI; provider bake-off (28 scenarios, one provider: Anthropic)
+- Open items, not done: Lucky has not yet read transcripts s13, s11, x1 and s05; pushback and "teach me
+  guitar" not yet tried by Lucky in the browser; s08 turns 3–4 not run live since their fix; the
+  highlight rule and the one-ask prompt line not yet exercised by the real model beyond the checks so
+  far; slice 7 (full live walkthrough) not run.
 
-**M4 — Robotics Lab 1 (servo torque) end to end**
-- [ ] Concept graph seed (~40 concepts, 3 labelled "lab")
-- [ ] Servo + arm asset with named parts; load/torque sim (arm mass included)
-- [ ] 1–2 analogies with "where it breaks down"
-- [ ] 5 reading items with human-written guides; study planner v1 with editable table of contents
+**M4 — Robotics Lab 1 (feedback control: a drone holding its altitude with PID) end to end** — changed from servo torque on Oct 21 2026; spec `docs/lesson-drone-pid.md`
+- [ ] Altitude PID solver (`solver.pid-altitude-1d`) with tests for every fact in the spec
+- [ ] Content as drafts: `ctl.*` concepts, simulation manifest with presets, cruise-control analogy, candidate reading items, the eight lesson beats
+- [ ] Coded generic quadcopter with named parts; stage: target line, ruler, error bracket, arrows, P/I/D bars, plot with ghost run, sliders, presets, checks
+- [ ] Lesson flow in the prepared/live system (chips-only prepared mode; typed answers and graded teach-back live only)
+- [ ] Cruise-control analogy scene (P and I; D introduced on the drone) and the full test suites
+- [ ] Founder review, phone dry run, demo recording
+- Known flaky test (left for now, Lucky 23 Oct 2026): `apps/web/e2e/gears.spec.ts` › "reduced motion: nothing turns" (servo gears). Its two canvas screenshots 170 ms apart sometimes differ; it fails on the step 3a code too (4 in 15 runs), so it predates the drone work.
+
+**Lab 2 (servo torque), partly built in M4 before Oct 21 2026; kept working as a second lesson and backup demo**
+- [ ] Servo + arm asset with named parts; load/torque sim (arm mass included) (built as drafts, not reviewed)
+- [ ] Shopping-bag analogy with "where it breaks down" (built as a draft, not reviewed)
+- [ ] Concept graph seed (~40 concepts, 3 labelled "lab"); 5 reading items with human-written guides; study planner v1 with editable table of contents
 - [ ] Beginner journey works end to end
 
 **M5 — Build Workbench v1 (parametric)**
@@ -49,8 +61,15 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Pan-tilt camera project template
 
 **M6 — Labs 2–3 and library**
-- [ ] Inside-the-servo/gearing lab; feedback-control lab
+- [ ] Servo torque lab finished; inside-the-servo/gearing lab
 - [ ] Reference library UI, 30–40 verified items
+
+**Deferred stage (after M6, before M7, and before any public deployment)** — decided Oct 11 2026. A real AI key may be used on Lucky's laptop only, never deployed and never on any hosting service, until this stage is done (Oct 12 2026).
+- [ ] Sign-in (M1 slice 8)
+- [ ] Saved sessions and migration (M1 slice 9)
+- [ ] Landing page polish
+- [ ] Waitlist
+- [ ] Registry database sync (JSON in git → Postgres)
 
 **M7 — Beta readiness**
 - [ ] Waitlist, invite codes, consent + data-deletion wording (check Kenya data-protection requirements)
@@ -58,6 +77,7 @@ Scope: a **fresh build** of the platform shell with **robotics as the only modul
 - [ ] Spend cap per user, error monitoring, backups
 - [ ] Billing decision recorded (beta free with caps; no forced paywall)
 - [ ] Frontier Lab: 5–10 verified cards (primary sources only)
+- [ ] A plain notice that learner text is sent to the AI provider, and the data-region and consent decision (added Oct 12 2026)
 
 **M8 — Beta run**
 - [ ] 20–30 invited users; weekly check-ins; one-week transfer question; summary of what worked

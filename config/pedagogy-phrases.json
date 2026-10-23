@@ -1,0 +1,39 @@
+{
+  "_about": "Phrases Aili must never say (behavior spec A11, A12, A8; meta_talk: Lucky's decision 2026-10-12, after a first live answer said \"with my tools\"). Matched case-insensitively as whole words, with curly and straight apostrophes treated alike. A phrase list catches only these exact wordings; it cannot judge intent. Add or remove entries only with review. See packages/engine/README.md. flattery_warn: mild praise reported as a WARNING only, never a rejection (Lucky's decision 2026-10-12).",
+  "flattery": [
+    "great question",
+    "excellent question",
+    "good question",
+    "brilliant answer",
+    "perfect answer",
+    "you're a natural",
+    "you are a natural"
+  ],
+  "mastery": [
+    "you've mastered",
+    "you have mastered",
+    "you now understand",
+    "you fully understand",
+    "you're an expert",
+    "you are an expert"
+  ],
+  "meta_talk": [
+    "my tools",
+    "the tools i have",
+    "my instructions",
+    "these instructions",
+    "i was instructed",
+    "i've been instructed",
+    "system prompt",
+    "the shortlist",
+    "my shortlist",
+    "data block",
+    "data blocks"
+  ],
+  "flattery_warn": [
+    "a good start",
+    "a fine start",
+    "a great start",
+    "a nice start"
+  ]
+}

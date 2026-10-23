@@ -1,0 +1,30 @@
+{
+  "id": "analogy.fx-ruler-held-out",
+  "type": "analogy",
+  "title": "A ruler held out (test fixture)",
+  "version": "0.1.0",
+  "teaches": [
+    "mech.torque.static",
+    "mech.moment-arm"
+  ],
+  "levels": [
+    "L1",
+    "L2"
+  ],
+  "fidelity": "illustrative",
+  "provenance": "authored",
+  "scene": "fx-lever",
+  "mapping": [
+    {
+      "source": "the ruler",
+      "target": "the arm link"
+    },
+    {
+      "source": "your hand",
+      "target": "the servo's joint"
+    }
+  ],
+  "breaks_down": "A hand tires; a servo heats up while it holds.",
+  "review_status": "published",
+  "test_fixture": true
+}

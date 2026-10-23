@@ -1,0 +1,22 @@
+{
+  "id": "o1-inverse-kinematics",
+  "title": "Out of coverage: inverse kinematics",
+  "source": "approved bake-off list: out of coverage",
+  "category": "out_of_coverage",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "coverage.none"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Explain inverse kinematics for a 6-axis robot arm.",
+      "expect": {
+        "coverage": "unsupported"
+      }
+    }
+  ],
+  "reviewer_notes": "Says it isn't supported yet and offers the nearest supported topic; invents nothing."
+}

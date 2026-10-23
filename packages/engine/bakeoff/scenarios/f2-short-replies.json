@@ -1,0 +1,31 @@
+{
+  "id": "f2-short-replies",
+  "title": "Frustration: very short replies",
+  "source": "approved bake-off list: frustration",
+  "category": "frustration",
+  "posture": "learning",
+  "learner_level": "true_beginner",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "What's torque?"
+    },
+    {
+      "text": "?"
+    },
+    {
+      "text": "huh",
+      "expect": {
+        "not_moves": [
+          "challenge",
+          "probe"
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": "Notices confusion and gives something back (a simpler explanation or the stage), instead of another question."
+}

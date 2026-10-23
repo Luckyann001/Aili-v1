@@ -47,6 +47,7 @@ export function R3FCheck() {
       <Canvas
         camera={{ position: [0.35, 0.25, 0.45], fov: 45, near: 0.01, far: 10 }}
         onCreated={({ gl }) => setRenderer(`WebGL ${gl.capabilities.isWebGL2 ? "2" : "1"} renderer active`)}
+        role="img"
         aria-label="Rotating cube rendered with React Three Fiber"
       >
         <ambientLight intensity={0.6} />

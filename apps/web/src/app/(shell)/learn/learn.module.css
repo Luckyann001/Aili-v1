@@ -1,0 +1,2016 @@
+/* Learn stage (stage layout doc §1): stage + command bar, with an on-demand right panel.
+   Desktop ≥ 900px: panel is a right column. Below 900px: panel is a bottom sheet. */
+
+.learn {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* The stage row is never shorter than its content, so on short or zoomed screens the page
+     scrolls instead of the stage spilling over the command bar. */
+  grid-template-rows: minmax(auto, 1fr) auto;
+  gap: var(--aili-space-3);
+  padding: var(--aili-space-3);
+}
+
+@media (min-width: 900px) {
+  .learn[data-side="explanation"],
+  .learn[data-side="library"] {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+
+  .side {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* ── Stage ── */
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-bg-recessed);
+  overflow: hidden;
+}
+
+/* The 3D view fills the whole stage behind everything else. */
+.canvasHost {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Control rows sit over the 3D view. Only actual controls catch the pointer; every gap
+   (between buttons, around the voice orb and its label) passes through to orbit and select. */
+.stageTop,
+.stageBottom {
+  position: relative;
+  z-index: 2;
+  padding: var(--aili-space-3);
+}
+
+/* Above the caption overlay (z-index 2, later in the page): the Parts list, eight parts long on the
+   servo + arm, reaches down past the captions on a laptop screen and must stay clickable. */
+.stageTop {
+  z-index: 3;
+}
+
+.stageTop,
+.stageTop *,
+.stageBottom,
+.stageBottom * {
+  pointer-events: none;
+}
+
+.stageTop :is(button, a, [role="option"], [role="note"]),
+.stageBottom :is(button, a) {
+  pointer-events: auto;
+}
+
+.stageTop {
+  display: grid;
+  gap: var(--aili-space-2);
+}
+
+.topRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+}
+
+.topLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-2);
+  min-width: 0;
+}
+
+.sceneTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1);
+}
+
+/* Servo + arm: Explode / Open / Assemble (text buttons, 44 px) and who did what. */
+.servoControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin-top: var(--aili-space-2);
+}
+
+.servoButton {
+  min-height: var(--aili-touch-target);
+  min-width: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.9rem var(--aili-font-ui);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* The current view: a heavier border and weight, not colour alone. */
+.servoButton[aria-pressed="true"] {
+  border-width: 2px;
+  font-weight: 700;
+}
+
+.servoNote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1) var(--aili-space-3);
+  margin: 0;
+  padding: 0 var(--aili-space-2);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 0.85rem var(--aili-font-ui);
+}
+
+.servoNote:empty {
+  display: none;
+}
+
+.actorLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 44 px icon tools; the tooltip shows on keyboard focus (and on hover with a mouse). */
+.iconTool {
+  position: relative;
+  width: var(--aili-touch-target);
+  padding: 0;
+}
+
+.tip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  padding: 2px var(--aili-space-2);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-text);
+  color: var(--aili-bg);
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.iconTool:focus-visible .tip {
+  visibility: visible;
+}
+
+@media (hover: hover) {
+  .iconTool:hover .tip {
+    visibility: visible;
+  }
+}
+
+/* "Prepared · placeholder" badge with its full wording on tap or focus */
+.badgeWrap {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+}
+
+.badgeButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--aili-touch-target);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--aili-text);
+  font: 500 0.8rem var(--aili-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The visible pill sits inside the 44 px target. */
+.badgePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  padding: 2px var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 14px;
+  background: var(--aili-surface);
+}
+
+.badgePill > svg {
+  flex: none;
+}
+
+.badgeDetail {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  width: min(280px, 80vw);
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+.badgeDetail[hidden] {
+  display: none;
+}
+
+/* Parts menu */
+.partsMenu {
+  position: relative;
+}
+
+.partsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  min-height: var(--aili-touch-target);
+  max-width: 100%;
+  padding: 0 var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.9rem var(--aili-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.partsCurrent {
+  overflow-wrap: anywhere;
+}
+
+.partsPopover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  padding: var(--aili-space-1);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+.clearSelection {
+  width: 100%;
+  min-height: var(--aili-touch-target);
+  margin-top: var(--aili-space-1);
+  padding: 0 var(--aili-space-3);
+  border: 0;
+  border-top: 1px solid var(--aili-border);
+  border-radius: 0 0 var(--aili-radius-sm) var(--aili-radius-sm);
+  background: transparent;
+  color: var(--aili-link);
+  font: 500 0.9rem var(--aili-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.clearSelection:disabled {
+  color: var(--aili-text-muted);
+  cursor: default;
+}
+
+/* Parts list (listbox, inside the Parts menu) */
+.parts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.partOption {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.9rem var(--aili-font-ui);
+  cursor: pointer;
+  user-select: none;
+}
+
+.partOption[aria-selected="true"] {
+  border-width: 2px;
+  border-color: var(--aili-text);
+  font-weight: 700;
+}
+
+.partOption:focus-visible {
+  outline: var(--aili-focus-width) solid var(--aili-focus-ring);
+  outline-offset: 2px;
+}
+
+/* [Captions, Mute] | voice + status (centre) | Library */
+.stageBottom {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: end;
+  gap: var(--aili-space-2);
+}
+
+.stageGroup {
+  display: flex;
+  gap: var(--aili-space-2);
+}
+
+.voiceSlot {
+  display: grid;
+  justify-items: center;
+  gap: var(--aili-space-1);
+}
+
+.voiceLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin: 0;
+  padding: 2px var(--aili-space-2);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.8rem var(--aili-font-ui);
+}
+
+/* Icon-only on phones (the name stays for screen readers); icon + word from 768 px. */
+.btnLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .btnLabel {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+}
+
+.stageBottom > :first-child {
+  justify-self: start;
+}
+
+/* Pinned to column 3: on phones the voice button is display:none and takes no cell. */
+.stageBottom > :last-child {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* Safe area between the top and bottom controls: the model is framed here, labels stay inside. */
+.scene {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  /* Never squeezed to a sliver (zoom, large text): the page scrolls instead. */
+  min-height: 200px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sceneLoading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--aili-text-muted);
+}
+
+/* Temporary inspector: inside the safe area, so it never covers the voice orb or captions. */
+.inspector {
+  position: absolute;
+  z-index: 3;
+  top: var(--aili-space-2);
+  right: var(--aili-space-2);
+  width: min(300px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: var(--aili-space-2) var(--aili-space-3) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  pointer-events: auto;
+}
+
+.inspectorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+}
+
+.inspectorTitle {
+  margin: 0;
+  font: 600 1rem var(--aili-font-ui);
+}
+
+.inspectorClose {
+  display: grid;
+  place-items: center;
+  width: var(--aili-touch-target);
+  height: var(--aili-touch-target);
+  margin-right: calc(-1 * var(--aili-space-2));
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--aili-text);
+  cursor: pointer;
+}
+
+.inspectorNote {
+  margin: 0 0 var(--aili-space-2);
+  color: var(--aili-text-muted);
+  font-size: 0.8rem;
+}
+
+.setting {
+  margin-top: var(--aili-space-2);
+}
+
+.settingTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.settingValue {
+  font-family: var(--aili-font-mono);
+  white-space: nowrap;
+}
+
+.slider {
+  width: 100%;
+  min-height: var(--aili-touch-target);
+  margin: 0;
+  accent-color: var(--aili-action-bg);
+}
+
+.settingBounds {
+  margin: 0;
+  color: var(--aili-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Below 900 px (phones and tablets): along the bottom of the safe area, so it never sits over
+   the model, which is re-framed above it. */
+@media (max-width: 899px) {
+  .inspector {
+    top: auto;
+    bottom: var(--aili-space-2);
+    left: var(--aili-space-2);
+    width: auto;
+  }
+}
+
+/* Effort gauge (lever lesson): bottom of the safe area; the model is framed above it. */
+.gauge {
+  position: absolute;
+  z-index: 3;
+  left: var(--aili-space-2);
+  bottom: var(--aili-space-2);
+  width: min(320px, calc(100% - 16px));
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  pointer-events: auto;
+}
+
+.gaugeHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 600 0.85rem var(--aili-font-ui);
+}
+
+.gaugeTag {
+  padding: 0 var(--aili-space-2);
+  border: 1px dashed var(--aili-border-strong);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.gaugeTrack {
+  height: 14px;
+  margin: var(--aili-space-2) 0;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-bg);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  height: 100%;
+  background: var(--aili-accent);
+}
+
+.gaugeWord {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin: 0;
+  font: 700 1rem var(--aili-font-ui);
+}
+
+.gaugeLine {
+  margin: var(--aili-space-1) 0 0;
+  font-size: 0.85rem;
+}
+
+.gaugeLine:empty {
+  display: none;
+}
+
+.labelLayer {
+  position: absolute;
+  inset: 0;
+}
+
+.partLabel,
+.partLabelSelected {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  padding: 2px var(--aili-space-2);
+  border-radius: 999px;
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.partLabel {
+  border: 1px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+}
+
+.partLabelSelected {
+  z-index: 1;
+  border: 2px solid var(--aili-text);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-weight: 700;
+}
+
+.partLabel[hidden],
+.partLabelSelected[hidden] {
+  display: none;
+}
+
+/* Still picture when WebGL isn't available */
+.fallback {
+  position: absolute;
+  inset: 28px var(--aili-space-3) 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--aili-space-2);
+}
+
+.fallbackNote {
+  margin: 0;
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 1.5px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.9rem;
+}
+
+.fallbackSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.fallbackSvg rect {
+  stroke: var(--aili-text);
+}
+
+.fill_explore {
+  fill: var(--aili-fill-explore);
+}
+
+.fill_technical {
+  fill: var(--aili-fill-technical);
+}
+
+.fill_discovery {
+  fill: var(--aili-fill-discovery);
+}
+
+.fill_expressive {
+  fill: var(--aili-fill-expressive);
+}
+
+.fallbackSvg line {
+  stroke: var(--aili-text);
+}
+
+.fallbackLeader {
+  stroke: var(--aili-text);
+}
+
+.fallbackText {
+  fill: var(--aili-text);
+  font: 11px var(--aili-font-ui);
+}
+
+/* The drone's stand in the still picture: the mast is a surface with a control-boundary outline, the
+   set-height collar is Copper (focus), like the 3D view. */
+.fallbackMast {
+  fill: var(--aili-surface);
+}
+
+.fallbackCollar {
+  fill: var(--aili-accent);
+}
+
+/* Messages and captions sit in the stage's flow, between the scene and the bottom controls,
+   so they can never cover a control. */
+.overlay {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: var(--aili-space-2);
+  padding: 0 var(--aili-space-3);
+  pointer-events: none;
+}
+
+.overlay > * {
+  pointer-events: auto;
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap; /* on narrow screens or with large text the badge sits above the words */
+  align-items: flex-start;
+  gap: var(--aili-space-2);
+  width: min(100%, 640px);
+  padding: var(--aili-space-2) var(--aili-space-4);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+}
+
+.caption p {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.voiceMessage {
+  width: min(100%, 640px);
+  margin: 0;
+  padding: var(--aili-space-2) var(--aili-space-4);
+  border-radius: var(--aili-radius-md);
+  border: 1.5px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.95rem;
+}
+
+.voiceMessage[data-kind="error"] {
+  border-color: var(--aili-status-fail-border);
+  border-width: 2px;
+}
+
+/* ── Command bar ── */
+
+.command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--aili-space-2);
+  min-width: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-2);
+}
+
+.chip {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-4);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 0.95rem var(--aili-font-ui);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--aili-bg-recessed);
+  }
+}
+
+.commandRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap; /* with large text, Send moves below rather than squeezing the text box */
+  align-items: center;
+  gap: var(--aili-space-2);
+}
+
+/* Phone placement: in the command bar beside the text box. */
+.voiceBar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 50%;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  cursor: pointer;
+}
+
+/* Tablet/desktop placement: large orb, bottom-centre of the stage. Icon is action-text on
+   accent/action-bg (light 3.81:1 and up, dark 5.96:1; icons need 3:1). */
+.voiceStage {
+  display: none;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--aili-accent), var(--aili-action-bg));
+  color: var(--aili-action-text);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .voiceStage {
+    display: grid;
+  }
+
+  .voiceBar {
+    display: none;
+  }
+}
+
+/* State shapes (never colour alone; icons and labels change too).
+   listening: thick ring · thinking: dashed ring · speaking: double ring · error: rounded square */
+.voiceStage[data-state="listening"],
+.voiceBar[data-state="listening"] {
+  outline: 4px solid var(--aili-accent);
+  outline-offset: 3px;
+  animation: listenPulse 1.4s ease-in-out infinite;
+}
+
+.voiceStage[data-state="thinking"],
+.voiceBar[data-state="thinking"] {
+  outline: 3px dashed var(--aili-text-muted);
+  outline-offset: 3px;
+}
+
+.voiceStage[data-state="speaking"],
+.voiceBar[data-state="speaking"] {
+  outline: 6px double var(--aili-accent);
+  outline-offset: 2px;
+}
+
+.voiceStage[data-state="error"],
+.voiceBar[data-state="error"] {
+  border-radius: var(--aili-radius-md);
+  border: 3px solid var(--aili-status-fail-border);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+}
+
+.voiceStage:focus-visible,
+.voiceBar:focus-visible {
+  outline: var(--aili-focus-width) solid var(--aili-focus-ring);
+  outline-offset: 6px;
+}
+
+@keyframes listenPulse {
+  50% {
+    outline-offset: 7px;
+  }
+}
+
+/* ── Consent dialog ── */
+
+.consent {
+  width: min(92vw, 520px);
+  padding: var(--aili-space-6);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.25);
+}
+
+.consent::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.consent p {
+  margin: 0 0 var(--aili-space-3);
+  line-height: 1.5;
+}
+
+.consentTitle {
+  margin: 0 0 var(--aili-space-4);
+  font-size: 1.5rem;
+}
+
+.consentActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--aili-space-2);
+  margin-top: var(--aili-space-4);
+}
+
+/* ── Demo controls (only with ?demo=1) ── */
+
+.demo {
+  position: relative;
+  z-index: 3;
+  margin: 0 var(--aili-space-3);
+  padding: var(--aili-space-2) var(--aili-space-3);
+  border: 2px dashed var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  font-size: 0.875rem;
+}
+
+.demo summary {
+  min-height: var(--aili-touch-target);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demoNote {
+  margin: 0 0 var(--aili-space-2);
+  color: var(--aili-text-muted);
+}
+
+.demoButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-2);
+}
+
+.demoButton {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-bg);
+  color: var(--aili-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.demoReadout {
+  margin-top: var(--aili-space-3);
+  padding-top: var(--aili-space-2);
+  border-top: 1px dashed var(--aili-border-strong);
+}
+
+.demoText {
+  display: block;
+  width: 100%;
+  margin-top: var(--aili-space-2);
+  font: 0.8rem var(--aili-font-mono);
+  color: var(--aili-text);
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border-strong);
+}
+
+.demoFacts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--aili-space-1) var(--aili-space-3);
+  margin: var(--aili-space-3) 0 0;
+}
+
+.demoFacts dt {
+  color: var(--aili-text-muted);
+}
+
+.demoFacts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 var(--aili-space-4);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 1rem var(--aili-font-ui);
+}
+
+.input::placeholder {
+  color: var(--aili-text-muted);
+  opacity: 1;
+}
+
+/* ── Side panel (Explanation / Library) ── */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border);
+  overflow: hidden;
+}
+
+.sideHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+  padding: var(--aili-space-2) var(--aili-space-2) 0 var(--aili-space-4);
+  border-bottom: 1px solid var(--aili-border);
+}
+
+.sideHeader > button {
+  margin-bottom: var(--aili-space-1);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--aili-space-1);
+}
+
+.tab {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--aili-text-muted);
+  font: 500 1rem var(--aili-font-ui);
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--aili-text);
+  border-bottom-color: var(--aili-accent);
+}
+
+.sideBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--aili-space-3) var(--aili-space-4) var(--aili-space-6);
+}
+
+.sampleNote {
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
+}
+
+.stepTitle {
+  margin: var(--aili-space-4) 0 var(--aili-space-2);
+  font-size: 1.25rem;
+}
+
+.listTitle {
+  margin: var(--aili-space-4) 0 var(--aili-space-1);
+  font: 600 0.8rem var(--aili-font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aili-text-muted);
+}
+
+.readings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--aili-space-3);
+}
+
+.reading {
+  padding: var(--aili-space-3) var(--aili-space-4);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-bg);
+}
+
+.reading p {
+  margin: var(--aili-space-1) 0 0;
+}
+
+.readingTitle {
+  margin: var(--aili-space-1) 0 0;
+  font-size: 1.1rem;
+}
+
+.sampleTag {
+  display: inline-block;
+  padding: 0 var(--aili-space-2);
+  border: 1px dashed var(--aili-border-strong);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Phones and narrow tablets: bottom sheet ── */
+
+@media (max-width: 899px) {
+  .learn {
+    padding: var(--aili-space-2);
+  }
+
+  .stageTop,
+  .stageBottom {
+    padding: var(--aili-space-2);
+  }
+
+  .side {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 70dvh;
+    border-radius: var(--aili-radius-lg) var(--aili-radius-lg) 0 0;
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 0.16);
+    animation: sheetIn var(--aili-duration-ui) var(--aili-ease-out);
+  }
+}
+
+@keyframes sheetIn {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+/* Very narrow screens (e.g. 200% zoom on a phone): the bottom row wraps instead of overflowing,
+   and the caption's Prepared badge sits above the text instead of squeezing it. */
+@media (max-width: 320px) {
+  .stageBottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+}
+
+/* Second stage badge: fake-director (test fixture) content is on stage. Flask icon + words. */
+.badgeFixture {
+  font: 500 0.8rem var(--aili-font-ui);
+  color: var(--aili-text);
+}
+
+/* A live answer on test-fixture content: "Live AI" (filled circle, accent outline) and the flask. */
+.badgeLive {
+  font: 500 0.8rem var(--aili-font-ui);
+  color: var(--aili-text);
+  border-color: var(--aili-accent);
+}
+
+.captionBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1);
+}
+
+/* A value a solver calculated: calculator icon + dotted underline (behavior spec A10). */
+.calc {
+  white-space: nowrap;
+  font-weight: 600;
+  text-decoration: underline dotted 1.5px;
+  text-underline-offset: 3px;
+}
+
+.calc > svg {
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+
+/* Near the input under ?demo=1: the fake director ignores what was typed. Always shown there. */
+.scriptedNote {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin: 0 0 var(--aili-space-2);
+  color: var(--aili-text);
+  font: 500 0.875rem var(--aili-font-ui);
+}
+
+/* Live mode's opening state (demo Option A): the stage is dimmed until a turn picks a scene, and a
+   calm, centred "What do you want to learn?" sits over it until the first message. */
+.canvasHost,
+.scene {
+  transition: opacity var(--aili-duration-spatial) var(--aili-ease-out);
+}
+
+.stage[data-dimmed] .canvasHost,
+.stage[data-dimmed] .scene {
+  opacity: 0.3;
+}
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: var(--aili-space-4);
+  pointer-events: none;
+  transition:
+    opacity var(--aili-duration-ui) var(--aili-ease-out),
+    transform var(--aili-duration-ui) var(--aili-ease-out);
+}
+
+.welcome[data-leaving] {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+.welcomeCard {
+  pointer-events: auto;
+  display: grid;
+  gap: var(--aili-space-3);
+  width: min(100%, 620px);
+  padding: var(--aili-space-6);
+  border-radius: var(--aili-radius-lg);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  box-shadow: 0 2px 14px rgb(0 0 0 / 0.08);
+}
+
+.welcomeTitle {
+  margin: 0;
+  font: 500 clamp(1.6rem, 4.5vw, 2.25rem) / 1.15 var(--aili-font-display);
+  text-align: center;
+}
+
+.welcomeNote {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--aili-space-2);
+  margin: 0;
+  font: 500 0.875rem var(--aili-font-ui);
+  text-align: center;
+}
+
+.welcomeNote > svg {
+  flex: none;
+  margin-top: 0.2em;
+  color: var(--aili-accent);
+}
+
+.welcomeRow {
+  display: flex;
+  flex-wrap: wrap; /* with large text, Send moves below rather than squeezing the box */
+  gap: var(--aili-space-2);
+}
+
+@media (max-width: 599px) {
+  .welcomeCard {
+    padding: var(--aili-space-4);
+  }
+}
+
+/* The text panel for turns (slice 3): the current step, then earlier steps collapsed below. */
+.turnStep + .turnStep {
+  margin-top: var(--aili-space-6);
+  padding-top: var(--aili-space-4);
+  border-top: 1px solid var(--aili-border);
+}
+
+.history {
+  margin-top: var(--aili-space-6);
+  border-top: 1px solid var(--aili-border);
+}
+
+.history > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font: 600 0.95rem var(--aili-font-ui);
+}
+
+.calcBlock > .sampleNote {
+  margin: 0 0 var(--aili-space-1);
+}
+
+.calcList {
+  display: grid;
+  gap: var(--aili-space-1);
+  margin: 0;
+}
+
+.calcList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--aili-space-3);
+}
+
+.calcList dt {
+  font-weight: 500;
+}
+
+.calcList dd {
+  margin: 0;
+}
+
+.calcInputs {
+  margin: var(--aili-space-2) 0 0;
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
+}
+
+/* ── Servo + arm: torque at the joint and the margin (M4 slice 2a) ── */
+
+/* Placed like the inspector: at the right from 900 px, along the bottom below (data-reserve="auto"). */
+.margin {
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+
+@media (min-width: 900px) {
+  .margin {
+    top: var(--aili-space-2);
+    right: var(--aili-space-2);
+    bottom: auto;
+    left: auto;
+    width: min(300px, calc(100% - 16px));
+  }
+}
+
+@media (max-width: 899px) {
+  .margin {
+    right: var(--aili-space-2);
+    width: auto;
+  }
+}
+
+.splitTrack {
+  display: flex;
+  height: 14px;
+  margin: var(--aili-space-2) 0 var(--aili-space-1);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-bg);
+  overflow: hidden;
+}
+
+/* Load: solid. Arm's own weight: striped. The legend names both, so colour is never the only cue. */
+.splitLoad,
+.swatchLoad {
+  background: var(--aili-fill-expressive);
+}
+
+.splitArm,
+.swatchArm {
+  background: repeating-linear-gradient(135deg, var(--aili-fill-discovery) 0 3px, var(--aili-surface) 3px 5px);
+}
+
+.splitLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1) var(--aili-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.splitLegend li {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+}
+
+.swatchLoad,
+.swatchArm {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: 2px;
+}
+
+.marginStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-1) var(--aili-space-2);
+  margin: var(--aili-space-2) 0 0;
+  padding: var(--aili-space-1) var(--aili-space-2);
+  border: 2px solid;
+  border-radius: var(--aili-radius-md);
+  color: var(--aili-text);
+  font-size: 0.85rem;
+}
+
+.marginStatus[data-status="pass"] {
+  border-color: var(--aili-status-pass-border);
+  background: var(--aili-status-pass-bg);
+}
+
+.marginStatus[data-status="warn"] {
+  border-style: dashed;
+  border-color: var(--aili-status-warn-border);
+  background: var(--aili-status-warn-bg);
+}
+
+.marginStatus[data-status="fail"] {
+  border-width: 3px;
+  border-color: var(--aili-status-fail-border);
+  background: var(--aili-status-fail-bg);
+}
+
+.marginNote {
+  margin: var(--aili-space-2) 0 0;
+  color: var(--aili-text-muted);
+  font-size: 0.75rem;
+}
+
+.linkButton {
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--aili-link);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin-top: var(--aili-space-1);
+}
+
+.ratingInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--aili-touch-target);
+  padding: 0 var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 1rem var(--aili-font-mono);
+}
+
+.ratingInput::placeholder {
+  color: var(--aili-text-muted);
+  opacity: 1;
+}
+
+.ratingInput[aria-invalid="true"] {
+  border-width: 2px;
+  border-color: var(--aili-status-fail-border);
+}
+
+/* An analogy told in words only (docs/m4-plan.md addendum A): beside the caption, never colour alone. */
+.analogyNote {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin: var(--aili-space-1) auto 0;
+  padding: 2px var(--aili-space-2);
+  width: fit-content;
+  max-width: 100%;
+  border: 1px dashed var(--aili-border-strong);
+  border-radius: 999px;
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 0.8rem;
+  pointer-events: auto;
+}
+
+/* τ = F × d on the servo + arm (M4 slice B): labels on the object, placed like part labels. The
+   latest step is a full label (square corners, heavier border: shape, not colour); earlier steps on
+   phones are small marks. Fades in over the UI duration (none under reduced motion, via the token). */
+.eqMark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  border: 1px solid var(--aili-border-strong);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font: 500 0.8rem var(--aili-font-ui);
+  white-space: nowrap;
+  will-change: transform;
+  animation: eqIn var(--aili-duration-ui) ease-out;
+}
+
+
+
+.eqMark {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+@keyframes eqIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+
+
+/* "The professor's numbers use the settings from its last turn." In the caption overlay (no layout
+   shift), caption-sized text, icon + words (not colour alone). */
+.settingsNote {
+  display: flex;
+  align-items: center;
+  gap: var(--aili-space-2);
+  width: fit-content;
+  max-width: min(100%, 640px);
+  margin: var(--aili-space-1) auto 0;
+  padding: var(--aili-space-1) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.settingsNote svg {
+  flex: none;
+}
+
+/* ── The stage's explanation space (16 Oct 2026): a column at the right from 1,100 px; below that a
+   one-line strip at the bottom of the safe area with a button that opens the same content as a sheet.
+   Both are reserved (data-reserve), so the model is framed clear of them and labels stay outside. ── */
+.space {
+  position: absolute;
+  z-index: 3;
+  top: var(--aili-space-2);
+  right: var(--aili-space-2);
+  bottom: var(--aili-space-2);
+  width: min(340px, calc(100% - 16px));
+  overflow-y: auto;
+  padding: var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  pointer-events: auto;
+}
+
+.spaceHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--aili-space-1);
+  margin-bottom: var(--aili-space-2);
+  font: 600 0.9rem var(--aili-font-ui);
+}
+
+.spaceBlock + .spaceBlock {
+  margin-top: var(--aili-space-3);
+  padding-top: var(--aili-space-3);
+  border-top: 1px solid var(--aili-border);
+}
+
+.totalLine {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--aili-space-1);
+}
+
+.totalLabel {
+  font-size: 0.85rem;
+}
+
+.totalValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.totalValue strong {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.spaceInputs {
+  margin: var(--aili-space-2) 0 0;
+  color: var(--aili-text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.spaceStrip {
+  position: absolute;
+  z-index: 3;
+  left: var(--aili-space-2);
+  right: var(--aili-space-2);
+  bottom: var(--aili-space-2);
+  padding: var(--aili-space-1) var(--aili-space-3);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-md);
+  background: var(--aili-surface);
+  color: var(--aili-text);
+  pointer-events: auto;
+}
+
+/* Open, the sheet covers the stage area above the captions, as the inspector does on phones; the
+   model waits unchanged behind it (a squeezed or half-hidden model is no use on a small screen). */
+.spaceStripOpen {
+  top: var(--aili-space-2);
+  overflow-y: auto;
+  padding-top: 0;
+}
+
+/* The button row stays in view while the open sheet scrolls. */
+.spaceStripOpen .stripRow {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-top: var(--aili-space-1);
+  background: var(--aili-surface);
+}
+
+.stripRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-1) var(--aili-space-2);
+}
+
+.stripText {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stripText svg {
+  width: 16px;
+  height: 16px;
+}
+
+.spaceSheet {
+  margin-top: var(--aili-space-2);
+}
+
+/* Equation lines in the explanation space: a round symbol chip, the formula in italic serif, the
+   solver's value large with tabular figures, a text tag (Now / Done / Next). Done is dimmed with the
+   muted text token (still 4.5:1); Now has a heavier left border and its tag; Next shows the formula
+   only. Lines fade in over the UI duration (none under reduced motion, via the token). */
+.eqLines {
+  display: grid;
+  gap: var(--aili-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eqLine {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--aili-space-2);
+  padding: var(--aili-space-1) var(--aili-space-2);
+  border-left: 3px solid transparent;
+  animation: eqIn var(--aili-duration-ui) ease-out;
+}
+
+.eqLine[data-state="now"] {
+  border-left-color: var(--aili-text);
+}
+
+.eqLine[data-state="done"],
+.eqLine[data-state="next"] {
+  color: var(--aili-text-muted);
+}
+
+.eqChip {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font: italic 600 0.95rem var(--aili-font-display);
+}
+
+.eqBody {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.eqFormula {
+  font: italic 1rem var(--aili-font-display);
+}
+
+.eqValue {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.eqNote {
+  font-size: 0.8rem;
+}
+
+.eqTag {
+  padding: 0 var(--aili-space-1);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* The micro servo's parts in the explanation space (slice 4): name, one-line role, the ratio line. */
+.partsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--aili-space-2);
+  margin: 0 0 var(--aili-space-2);
+  font-weight: 600;
+}
+
+.partsRoles {
+  display: grid;
+  gap: var(--aili-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.partsRoles li {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--aili-space-2);
+  border-left: 2px solid transparent;
+}
+
+/* The part Aili or the learner is pointing at: a thick left rule plus the "Now" tag, not colour alone. */
+.partsRoles li[data-current] {
+  border-left-color: var(--aili-border-strong);
+}
+
+.ratioLine {
+  font-size: 0.85rem;
+}
+
+/* Shown only under reduced motion (the gears' ratio text stands in for their turning). */
+.reducedOnly {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reducedOnly {
+    display: inline;
+  }
+}
+
+/* Leader lines from servo part labels to their parts (drawn by the 3D view each frame). */
+.leaderLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.leaderLayer line {
+  stroke: var(--aili-text);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+/* The servo's label and the "hidden" note on one row (slice: anatomy visibility, 16 Oct 2026). */
+.servoApartRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin: 0;
+}
+
+/* Narrow screens: only the latest "who did what" line, so the model keeps its room. */
+@media (max-width: 599px) {
+  .servoNote[data-testid="servo-note"] > :not(:last-child) {
+    display: none;
+  }
+}
+
+/* The "Now" tag beside a part's name keeps its own width (not stretched across the column). */
+.partsRoles li > .eqTag {
+  justify-self: start;
+}
+
+/* ── The drone's controls and readouts in the explanation space (step 3b) ──
+   Switches carry a lamp AND the word On/Off; checks reuse the Pass/Warn/Fail pattern (icon + word).
+   Sky for the drone's own bars, Gold for I (the discovery: at rest it alone holds the weight),
+   Copper for the target, Ink for the run's line. Brand tokens only. */
+.droneBlock {
+  display: grid;
+  gap: var(--aili-space-2);
+  margin-bottom: var(--aili-space-3);
+}
+
+.droneBlockHead {
+  margin: 0;
+  font-weight: 600;
+}
+
+.droneSwitches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-2);
+}
+
+.droneSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aili-space-1);
+  min-height: var(--aili-touch-target);
+  min-width: var(--aili-touch-target);
+  padding: 0 var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-bg);
+  color: var(--aili-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.droneSwitch[data-on="true"] {
+  border-width: 2px;
+  border-color: var(--aili-text);
+}
+
+.droneSwitch:focus-visible {
+  outline: var(--aili-focus-width) solid var(--aili-focus-ring);
+  outline-offset: 2px;
+}
+
+.droneLamp {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--aili-border-strong);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.droneSwitch[data-on="true"] .droneLamp {
+  border-color: var(--aili-text);
+  background: var(--aili-accent);
+}
+
+.droneSwitchName {
+  font-weight: 700;
+}
+
+.droneSwitchRole,
+.droneSwitchState {
+  font-size: 0.875rem;
+}
+
+.droneButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-2);
+}
+
+.droneStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-2);
+}
+
+.droneGauge {
+  position: relative;
+  height: 16px;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-bg);
+  overflow: hidden;
+}
+
+.droneGaugeFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--aili-fill-technical);
+}
+
+.droneGaugeTick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 3px;
+  margin-left: -1px;
+  background: var(--aili-text);
+}
+
+.droneGaugeText {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--aili-space-1) var(--aili-space-3);
+  margin: 0;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.droneBar {
+  display: grid;
+  grid-template-columns: 1.5em 1fr 5.5em;
+  align-items: center;
+  gap: var(--aili-space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.droneBarName {
+  font-weight: 700;
+}
+
+.droneBarTrack {
+  position: relative;
+  height: 14px;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  background: linear-gradient(to right, transparent calc(50% - 1px), var(--aili-text) calc(50% - 1px), var(--aili-text) calc(50% + 1px), transparent calc(50% + 1px)), var(--aili-bg);
+}
+
+.droneBarFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--aili-fill-technical);
+}
+
+.droneBar[data-bar="i"] .droneBarFill {
+  background: var(--aili-fill-discovery);
+}
+
+.droneBarValue {
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.dronePlot {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  background: var(--aili-bg);
+}
+
+.dronePlotGrid {
+  stroke: var(--aili-border);
+  stroke-width: 1;
+}
+
+.dronePlotText {
+  fill: var(--aili-text);
+  font: 10px var(--aili-font-ui);
+}
+
+.dronePlotTarget {
+  stroke: var(--aili-accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.dronePlotGhost {
+  fill: none;
+  stroke: var(--aili-text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+  opacity: 0.7;
+}
+
+.dronePlotRun {
+  fill: none;
+  stroke: var(--aili-text);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.dronePlotNow {
+  stroke: var(--aili-text-muted);
+  stroke-width: 1;
+}
+
+.dronePlotGap {
+  stroke: var(--aili-accent);
+  stroke-width: 2;
+}
+
+.droneChecks {
+  display: grid;
+  gap: var(--aili-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.droneChecks > li {
+  margin: 0;
+}
+
+.droneNote {
+  margin: 0 0 var(--aili-space-2);
+  color: var(--aili-text-muted);
+  font-size: 0.875rem;
+}
+
+.droneAdvanced {
+  margin-bottom: var(--aili-space-3);
+}
+
+.droneAdvanced > summary {
+  min-height: var(--aili-touch-target);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.droneSlider {
+  display: grid;
+  gap: var(--aili-space-1);
+  margin-top: var(--aili-space-2);
+}
+
+.droneSlider input[type="range"] {
+  width: 100%;
+  min-height: var(--aili-touch-target);
+  accent-color: var(--aili-action-bg);
+}
+
+.droneSliderBounds {
+  color: var(--aili-text-muted);
+  font-size: 0.75rem;
+}

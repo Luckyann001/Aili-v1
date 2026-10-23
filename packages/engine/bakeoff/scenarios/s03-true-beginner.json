@@ -1,0 +1,25 @@
+{
+  "id": "s03-true-beginner",
+  "title": "True beginner gets an explanation first",
+  "source": "behavior spec A14 test 3",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "true_beginner",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "What is a servo, and why does holding an arm out make it work harder?",
+      "expect": {
+        "moves": [
+          "explain"
+        ],
+        "arm_weight": true
+      }
+    }
+  ],
+  "reviewer_notes": "A short, clear explanation (three or four segments) before any question, then at most one check."
+}

@@ -1,0 +1,155 @@
+{
+  "id": "servo-arm",
+  "title": "Generic servo turning an arm with a load",
+  "teaches": [
+    "sys.joint-and-link",
+    "mech.pivot",
+    "mech.moment-arm",
+    "mech.mass-vs-weight",
+    "mech.torque.static",
+    "mech.arm-own-mass",
+    "act.servo-what-it-is",
+    "act.servo-parts",
+    "act.rated-vs-stall",
+    "mech.torque-margin"
+  ],
+  "level": "L2",
+  "fidelity": "simplified_teaching",
+  "version": "0.1.0",
+  "review_status": "draft",
+  "provenance": "authored",
+  "asset": "asset.servo-generic-anatomy",
+  "parts": [
+    {
+      "id": "base",
+      "name": "Base"
+    },
+    {
+      "id": "horn",
+      "name": "Output horn"
+    },
+    {
+      "id": "upper-case",
+      "name": "Servo case"
+    },
+    {
+      "id": "gear-train",
+      "name": "Gear train"
+    },
+    {
+      "id": "motor-and-sensor",
+      "name": "Motor and position sensor"
+    },
+    {
+      "id": "board-and-cover",
+      "name": "Control board and cover"
+    },
+    {
+      "id": "arm-link",
+      "name": "Arm link"
+    },
+    {
+      "id": "load",
+      "name": "Load"
+    }
+  ],
+  "params": [
+    {
+      "id": "arm_length_m",
+      "label": "Arm length",
+      "unit": "m",
+      "min": 0.08,
+      "max": 0.3,
+      "step": 0.01,
+      "default": 0.15
+    },
+    {
+      "id": "arm_mass_kg",
+      "label": "Arm mass",
+      "unit": "kg",
+      "min": 0.01,
+      "max": 0.2,
+      "step": 0.005,
+      "default": 0.04
+    },
+    {
+      "id": "load_mass_kg",
+      "label": "Load mass",
+      "unit": "kg",
+      "min": 0,
+      "max": 0.5,
+      "step": 0.01,
+      "default": 0.1
+    },
+    {
+      "id": "load_distance_m",
+      "label": "Load distance from the joint",
+      "unit": "m",
+      "min": 0.02,
+      "max": 0.3,
+      "step": 0.01,
+      "default": 0.08
+    },
+    {
+      "id": "rated_torque_nm",
+      "label": "Servo rated torque (from your datasheet)",
+      "unit": "N·m",
+      "min": 0.05,
+      "max": 5,
+      "step": 0.01,
+      "learner_supplied": true
+    }
+  ],
+  "animations": [
+    {
+      "id": "slide-load-out",
+      "description": "The load slides along the arm to its end."
+    },
+    {
+      "id": "eq-force",
+      "description": "Equation step 1: the load's weight, a force F, as a downward arrow at the load."
+    },
+    {
+      "id": "eq-distance",
+      "description": "Equation step 2: the distance d from the joint to the load, as a line along the arm."
+    },
+    {
+      "id": "eq-torque",
+      "description": "Equation step 3: F times d becomes the load's torque, the curved arrow at the joint."
+    },
+    {
+      "id": "eq-arm-share",
+      "description": "Equation step 4: the arm's own weight, at the middle of the arm, adds its share of torque."
+    },
+    {
+      "id": "eq-margin",
+      "description": "Equation step 5: the total torque against the servo's rated torque, the margin gauge."
+    },
+    {
+      "id": "servo-explode",
+      "description": "The servo's parts move apart along the shaft so each one can be seen.",
+      "uses_asset": true
+    },
+    {
+      "id": "servo-open",
+      "description": "The servo case lifts away; the gears, motor and board stay in place.",
+      "uses_asset": true
+    },
+    {
+      "id": "servo-assemble",
+      "description": "The servo's parts go back together.",
+      "uses_asset": true
+    },
+    {
+      "id": "servo-gears-turn",
+      "description": "Illustrative animation, not a simulation: the gears turn at the speeds their tooth counts give.",
+      "uses_asset": true
+    }
+  ],
+  "solver": {
+    "id": "solver.static-torque-single-link",
+    "constants": {
+      "angle_deg": 0
+    }
+  }
+}

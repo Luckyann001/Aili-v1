@@ -118,7 +118,7 @@ Bounds below come from the reference prototype. Static model: `tau = (m_p * l + 
   "outputs": ["torque_nm", "torque_kgcm", "share_of_rating"],
   "assumptions": ["static hold only", "uniform bar", "payload at the tip", "angle measured above horizontal"],
   "excludes": ["acceleration", "friction", "gear play", "structural stress", "temperature and duty cycle", "control stability"],
-  "fidelity": "verified_static_model",
+  "fidelity": "verified",
   "review_status": "draft"
 }
 ```
@@ -144,6 +144,14 @@ Bounds below come from the reference prototype. Static model: `tau = (m_p * l + 
 }
 ```
 
+
+### Solver: relative effort to hold a lever level [added M1 slice 4c, Oct 2026]
+Used by the beginner lever analogy to drive an illustrative, unitless effort gauge (`packages/solvers/src/leverEffort.ts`; details in `packages/solvers/README.md`).
+- **Assumptions:** rigid, uniform lever (its own mass acts at its middle); static case (held still and level); the hand grips one end, which is the pivot; the weight is a point mass; gravity straight down; friction and bending ignored.
+- **Model:** moment about the hand `M(d) = g · (m_weight · d + m_lever · L / 2)`; relative effort `= M(d) / M(L)`, so 1 with the weight at the far end. The lever's own mass is always included, so effort never reaches zero.
+- **Does not cover:** endurance, fatigue, heat, dynamic loads or any rating. It compares positions; it is not a sizing calculation.
+- **Worked example (in the test):** lever 0.30 m and 0.05 kg, weight 0.20 kg at 0.10 m → 0.0275 / 0.0675 = 0.407.
+
 ---
 
 ## 5. Per-turn request flow
@@ -154,7 +162,7 @@ Bounds below come from the reference prototype. Static model: `tau = (m_p * l + 
 4. The **validator** checks that IDs exist, values are in bounds, citations exist, narration contains no hard-coded engineering numbers, and pedagogy rules hold (for example, no more than one open question).
 5. The solver runs any calculation requests.
 6. The server compiles narration, scene actions, equations, evidence and the learner prompt, and sends events to the client over WebSocket or SSE. The client renders and interpolates locally.
-7. State is saved. A newer learner input (including an interrupt) invalidates stale queued narration and actions (sequence numbers, request IDs, idempotency).
+7. State is saved. *(Until the database stage, session state (history, open prompt, scene) is kept on the server in memory, keyed by page session, and is lost on restart; the client sends only its text. [Oct 12 2026, M3 slice 1])* A newer learner input (including an interrupt) invalidates stale queued narration and actions (sequence numbers, request IDs, idempotency).
 
 ```json
 {
@@ -162,16 +170,19 @@ Bounds below come from the reference prototype. Static model: `tau = (m_p * l + 
   "state_rev": 14,
   "move": "challenge",
   "narration": [
-    { "id": "n1", "text": "You said a bigger servo will do. Bigger by which number, and at what voltage?" }
+    { "id": "n1", "text": "You said a bigger servo will do. Bigger needs a number: datasheets give torque at a stated supply voltage." }
   ],
-  "actions": [ { "type": "focus", "object": "servo.horn" } ],
+  "actions": [ { "type": "highlight_part", "part": "servo-horn" } ],
   "calc_requests": [],
   "evidence": ["ev.datasheet-stall-torque"],
-  "prompt": { "text": "Which datasheet figure are you comparing?", "chips": ["I have a datasheet", "Not sure where to look"] },
+  "prompt": { "text": "Which datasheet figure are you comparing, and at what voltage?", "chips": ["I have a datasheet", "Not sure where to look"] },
   "assumptions": [],
   "limitations": []
 }
 ```
+
+The only question is in `prompt`; narration explains and never asks (one open question, behavior spec A5). Fidelity uses the schema's values: `verified`, `simplified_teaching`, `illustrative`. [Example corrected Oct 11 2026.]
+Actions use the schema's existing types: `highlight_part` (with a part ID of the scene on stage) replaces the earlier `focus`. [Oct 11 2026, M2 slice 3]
 
 Failure rule: on any validation, provider or solver failure, keep the last valid state and show a clear message. Never present prepared content as a live model response.
 
@@ -356,6 +367,7 @@ Store two things.
 - **Only verified items can be assigned.** The AI may suggest candidates into a review queue. A person checks that the link works and the content matches the claim.
 - **Re-check regularly:** automated weekly link checks, and flags for items that look outdated.
 - **Learner-added sources** are accepted and marked "unverified".
+- **Readings carry a source-verification record (who checked the source exists and matches, and when) instead of `fidelity`**, since a reading is not a model. [Oct 11 2026, M2 slice 1]
 - **Teach-back uses the human-written guide, not the source text.** This keeps the system clear of copyright problems and keeps grading consistent.
 - **Seed candidates to verify before adding** (from memory, not checked): Lynch and Park, *Modern Robotics* (reported to have a free online version and a course); Craig, *Introduction to Robotics: Mechanics and Control*; Siegwart and colleagues on autonomous mobile robots; Thrun, Burgard and Fox, *Probabilistic Robotics*; the official ROS 2 documentation. For the beta, 30 to 40 well-guided items are enough.
 

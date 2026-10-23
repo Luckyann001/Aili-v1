@@ -1,0 +1,37 @@
+{
+  "id": "sim.servo-static-load",
+  "type": "simulation",
+  "title": "Servo holding an arm still",
+  "version": "0.1.0",
+  "teaches": ["mech.torque.static"],
+  "levels": ["L2"],
+  "fidelity": "verified",
+  "provenance": "authored",
+  "review_status": "draft",
+  "solver": { "id": "solver.static-torque-single-link", "version": "0.1.0" },
+  "inputs": {
+    "arm_length_m": { "unit": "m", "min": 0.05, "max": 0.5 },
+    "payload_kg": { "unit": "kg", "min": 0.0, "max": 1.5 },
+    "arm_kg_per_m": { "unit": "kg/m", "min": 0.1, "max": 1.0 },
+    "angle_deg": { "unit": "deg", "min": 0, "max": 90 },
+    "rated_stall_torque_nm": { "unit": "N·m", "min": 0, "max": 100, "optional": true },
+    "rated_continuous_torque_nm": { "unit": "N·m", "min": 0, "max": 100, "optional": true }
+  },
+  "outputs": ["torque_nm", "torque_kgf_cm", "payload_torque_nm", "arm_torque_nm", "share_of_rating", "payload_force_n", "arm_weight_n", "extra_force_n"],
+  "assumptions": [
+    "static hold only",
+    "uniform bar: the arm's own mass acts at its middle",
+    "payload is a point mass at the tip",
+    "extra masses may sit beyond the arm's end",
+    "angle measured from horizontal: 0 degrees is level, 90 degrees is straight up",
+    "a torque rating is used only when the learner supplies one from a datasheet, and says whether it is a stall or continuous rating"
+  ],
+  "excludes": [
+    "acceleration",
+    "friction",
+    "gear play",
+    "structural stress",
+    "temperature and duty cycle",
+    "control stability"
+  ]
+}

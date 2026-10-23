@@ -1,0 +1,47 @@
+import { loadRegistry } from "@aili/engine";
+import concepts from "../../../../content/robotics/concepts.json";
+import solver from "../../../../content/robotics/capabilities/solver.static-torque-single-link.json";
+import sim from "../../../../content/robotics/capabilities/sim.servo-static-load.json";
+import srcUp1 from "../../../../content/robotics/capabilities/src.openstax-university-physics-1.json";
+import srcCp2 from "../../../../content/robotics/capabilities/src.openstax-college-physics-2e.json";
+import servoAsset from "../../../../content/robotics/capabilities/asset.servo-generic-anatomy.json";
+import arm from "../../../../content/robotics/scenes/base-joint-arm.json";
+import lever from "../../../../content/robotics/scenes/lever-analogy.json";
+import servoArm from "../../../../content/robotics/scenes/servo-arm.json";
+import bagHold from "../../../../content/robotics/scenes/bag-hold.json";
+import fxScene from "../../../../content/robotics/test-fixtures/scene.fx-lever.json";
+import fxServoArm from "../../../../content/robotics/test-fixtures/scene.fx-servo-arm.json";
+import fxBagHold from "../../../../content/robotics/test-fixtures/scene.fx-bag-hold.json";
+import fxSolver from "../../../../content/robotics/test-fixtures/solver.fx-torque.json";
+import fxSim from "../../../../content/robotics/test-fixtures/sim.fx-servo-load.json";
+import fxSource from "../../../../content/robotics/test-fixtures/src.fx-book.json";
+import fxReading from "../../../../content/robotics/test-fixtures/read.fx-moments.json";
+import fxDraft from "../../../../content/robotics/test-fixtures/read.fx-draft.json";
+import fxLeverBasics from "../../../../content/robotics/test-fixtures/read.fx-lever-basics.json";
+import fxWrench from "../../../../content/robotics/test-fixtures/analogy.fx-long-wrench.json";
+import fxBag from "../../../../content/robotics/test-fixtures/analogy.fx-shopping-bag.json";
+import fxRuler from "../../../../content/robotics/test-fixtures/analogy.fx-ruler-held-out.json";
+import fxServoAsset from "../../../../content/robotics/test-fixtures/asset.fx-servo-generic-anatomy.json";
+
+// The dev-only registry for the fake director and live dev turns: real content (all draft) plus
+// every test fixture (the same files as the bake-off's registry).
+// Loaded only through `loadFixtureRegistry` in server.ts, which exists only when the flag is set,
+// so a production build never includes these files.
+export function fixtureTurnRegistry() {
+  return loadRegistry(
+    {
+      concepts,
+      scenes: [
+        { file: "base-joint-arm.json", data: arm },
+        { file: "lever-analogy.json", data: lever },
+        { file: "servo-arm.json", data: servoArm },
+        { file: "bag-hold.json", data: bagHold },
+        { file: "test-fixtures/scene.fx-lever.json", data: fxScene },
+        { file: "test-fixtures/scene.fx-servo-arm.json", data: fxServoArm },
+        { file: "test-fixtures/scene.fx-bag-hold.json", data: fxBagHold },
+      ],
+      capabilities: [solver, sim, srcUp1, srcCp2, servoAsset, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler, fxServoAsset].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),
+    },
+    { allowTestFixtures: true },
+  );
+}

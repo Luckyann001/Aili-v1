@@ -1,0 +1,38 @@
+.wrap {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--aili-space-8) var(--aili-space-4) var(--aili-space-12);
+}
+
+.wrap h1 {
+  margin: 0 0 var(--aili-space-6);
+}
+
+.card {
+  margin-bottom: var(--aili-space-4);
+  padding: var(--aili-space-4) var(--aili-space-6) var(--aili-space-6);
+  background: var(--aili-surface);
+  border: 1px solid var(--aili-border);
+  border-radius: var(--aili-radius-md);
+}
+
+.card h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aili-space-2);
+  margin: var(--aili-space-2) 0;
+  font-size: 1.5rem;
+}
+
+.note {
+  margin: var(--aili-space-3) 0 0;
+  color: var(--aili-text-muted);
+}
+
+@media (max-width: 359px) {
+  .card {
+    padding: var(--aili-space-3);
+  }
+}

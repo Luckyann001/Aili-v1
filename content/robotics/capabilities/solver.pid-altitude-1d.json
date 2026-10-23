@@ -1,0 +1,64 @@
+{
+  "id": "solver.pid-altitude-1d",
+  "type": "solver",
+  "title": "Drone holding its altitude with a PID controller (up and down only)",
+  "version": "0.1.0",
+  "teaches": ["ctl.proportional", "ctl.derivative", "ctl.integral", "ctl.steady-state-error"],
+  "fidelity": "simplified_teaching",
+  "provenance": "authored",
+  "review_status": "draft",
+  "inputs": {
+    "base_mass_kg": { "unit": "kg", "min": 0.5, "max": 2 },
+    "payload_kg": { "unit": "kg", "min": 0, "max": 1, "optional": true },
+    "kp_n_per_m": { "unit": "N/m", "min": 0, "max": 40 },
+    "ki_n_per_m_s": { "unit": "N/(m·s)", "min": 0, "max": 100 },
+    "kd_n_s_per_m": { "unit": "N·s/m", "min": 0, "max": 15 },
+    "target_m": { "unit": "m", "min": 0.5, "max": 5 },
+    "thrust_to_weight_ratio": { "unit": "ratio", "min": 1.5, "max": 3, "optional": true },
+    "drag_n_s_per_m": { "unit": "N·s/m", "min": 0, "max": 5, "optional": true },
+    "wind_force_n": { "unit": "N", "min": 0, "max": 5, "optional": true },
+    "wind_start_s": { "unit": "s", "min": 0, "max": 15, "optional": true },
+    "wind_duration_s": { "unit": "s", "min": 0, "max": 15, "optional": true }
+  },
+  "outputs": {
+    "final_error_m": { "unit": "m" },
+    "final_height_m": { "unit": "m" },
+    "peak_height_m": { "unit": "m" },
+    "overshoot_ratio": { "unit": "ratio" },
+    "overshoot_m": { "unit": "m" },
+    "settling_time_s": { "unit": "s" },
+    "time_at_thrust_limit_s": { "unit": "s" },
+    "weight_n": { "unit": "N" },
+    "max_thrust_n": { "unit": "N" },
+    "max_thrust_to_weight_ratio": { "unit": "ratio" },
+    "final_thrust_n": { "unit": "N" },
+    "final_p_n": { "unit": "N" },
+    "final_i_n": { "unit": "N" },
+    "final_d_n": { "unit": "N" }
+  },
+  "assumptions": [
+    "the drone moves only up and down",
+    "thrust changes instantly and stays between 0 N and the motors' maximum",
+    "maximum thrust is the thrust-to-weight ratio times the base drone's weight; a payload adds weight, not thrust",
+    "air drag is a straight-line rule; the lesson's value is exaggerated so the bounce dies out quickly",
+    "the D term acts on the measured speed, not on the change in error",
+    "the I term stops adding while thrust is at a limit and the error pushes further past it (clamping anti-windup)",
+    "wind is a downward push for a set time, or steady",
+    "the drone starts at rest on the ground; settling time is given only when the run settled (within 2% of the final height, staying there)",
+    "gravity is standard gravity, 9.80665 m/s²",
+    "fixed 2 ms steps (semi-implicit Euler), 15 s per run"
+  ],
+  "excludes": [
+    "tilting and sideways motion",
+    "motor spin-up time",
+    "sensor noise and filtering",
+    "a hover-thrust estimate and nested control loops",
+    "settings for tuning a real drone"
+  ],
+  "worked_examples": [
+    {
+      "kind": "hand_derivation",
+      "location": "packages/solvers/src/pidAltitude.test.ts: steady-state gap m·g/Kp (P only, P + D, heavier drone, steady wind) and the linear stability limit (Kd + c)·Kp > m·Ki (Routh–Hurwitz); hand derivations, not textbook"
+    }
+  ]
+}

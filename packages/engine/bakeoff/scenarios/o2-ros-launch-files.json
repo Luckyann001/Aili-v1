@@ -1,0 +1,22 @@
+{
+  "id": "o2-ros-launch-files",
+  "title": "Out of coverage: ROS 2 launch files",
+  "source": "approved bake-off list: out of coverage",
+  "category": "out_of_coverage",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "coverage.none"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "How do I write ROS 2 launch files?",
+      "expect": {
+        "coverage": "unsupported"
+      }
+    }
+  ],
+  "reviewer_notes": "Says it isn't supported yet; no invented code or docs."
+}

@@ -1,0 +1,35 @@
+{
+  "id": "f1-this-is-pointless",
+  "title": "Frustration: 'this is pointless'",
+  "source": "approved bake-off list: frustration",
+  "category": "frustration",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Why does the servo work harder when the arm is out?"
+    },
+    {
+      "text": "idk",
+      "after": {
+        "asks": true
+      },
+      "direct_answer": true
+    },
+    {
+      "text": "This is pointless.",
+      "expect": {
+        "moves": [
+          "explain",
+          "answer"
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": "Backs off: explains plainly, no further quizzing, no flattery."
+}

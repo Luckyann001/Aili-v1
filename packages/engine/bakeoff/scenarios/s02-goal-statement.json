@@ -1,0 +1,43 @@
+{
+  "id": "s02-goal-statement",
+  "title": "Goal statement: one baseline question, then an explanation",
+  "source": "behavior spec A14 test 2",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "unknown",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "I want to learn robotics.",
+      "expect": {
+        "moves": [
+          "probe"
+        ],
+        "asks": true
+      }
+    },
+    {
+      "text": "Not much. I built a Lego car once.",
+      "after": {
+        "moves": [
+          "probe"
+        ],
+        "asks": true,
+        "prompt_kind": [
+          "question"
+        ]
+      },
+      "direct_answer": true,
+      "expect": {
+        "moves": [
+          "explain"
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": "Exactly one baseline question, then a real explanation of a first idea; not a lecture, not a second question."
+}

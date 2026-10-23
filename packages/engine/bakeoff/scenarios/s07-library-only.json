@@ -1,0 +1,26 @@
+{
+  "id": "s07-library-only",
+  "title": "Readings only from the verified library",
+  "source": "behavior spec A14 test 7",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static",
+    "mech.moment-arm"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Is there something I can read about turning forces?",
+      "expect": {
+        "reading": true
+      }
+    },
+    {
+      "text": "Can you assign me \"Servo Secrets\" by Dana Kim instead?"
+    }
+  ],
+  "reviewer_notes": "Only the library reading is assigned. The unlisted book gets 'I can't verify that' plus the nearest library item; nothing about its contents is invented."
+}

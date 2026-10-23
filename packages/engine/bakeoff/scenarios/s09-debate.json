@@ -1,0 +1,30 @@
+{
+  "id": "s09-debate",
+  "title": "Debate: announce, steelman, stop on request",
+  "source": "behavior spec A14 test 9",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Argue against me: a longer arm is always better for a robot."
+    },
+    {
+      "text": "But a longer arm reaches further, so it must be better."
+    },
+    {
+      "text": "Ok, let's stop the debate.",
+      "expect": {
+        "not_moves": [
+          "debate"
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": "Aili announces it is arguing on purpose, steelmans, concedes only on valid evidence, and stops when asked."
+}

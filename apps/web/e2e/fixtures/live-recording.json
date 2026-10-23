@@ -1,0 +1,873 @@
+{
+  "source": "HAND-WRITTEN e2e recording AILI-E2E-RECORDING (docs/m3-live-browser-plan.md slice 6; actions nested under their narration segment since M4 slice 1). Not from a real model: modelled on the live turns of 13-14 Oct 2026, in the provider's output shape. Turn 3 (the servo + arm scene) added for M4 slice 2a. Turns 4 and 5 (an analogy in words only, then one with its picture) added for M4 addendum A. Turns 6 and 7 (the equation built on the servo + arm) added for M4 slice B. Turn 7 given a calculation and turn 8 added (numbers from the stage's settings, the settings note) on 15 Oct. Turn 9 (the servo taken apart: explode, then two parts pointed at, each bound to its segment) added for the anatomy slice 3 on 16 Oct. Turn 10 (the gear train pointed at, then servo-gears-turn in its own segment; the ratio in words only) added for the anatomy slice 4 on 16 Oct. Turn 11 (the bag analogy with its picture, the reach-out, then the handover to the servo with the load pointed at, each action bound to its segment) added for slice B on 17 Oct. Test builds only.",
+  "router": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1470,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": "It gets harder",
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1600,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": true,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "answered_prompt": false,
+            "pushback": false,
+            "new_evidence": false,
+            "frustrated": false,
+            "wants_another_example": false,
+            "acknowledged": false,
+            "guess": null,
+            "wants_stop": false,
+            "asks_for_source": null,
+            "wants_direct_answer": false
+          },
+          "input_tokens": 1550,
+          "output_tokens": 92
+        }
+      }
+    ]
+  },
+  "professor": {
+    "source": "hand-written",
+    "steps": [
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_1",
+            "state_rev": 1,
+            "move": "probe",
+            "concepts": [
+              "mech.moment-arm"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Robotics is broad, so let's start with one idea that shows up in every arm: how far a load sits from the joint.",
+                "actions": []
+              },
+              {
+                "id": "n2",
+                "text": "Here is a ruler held out from a hand, with a weight on it.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-lever"
+                  },
+                  {
+                    "type": "highlight_part",
+                    "part": "weight"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "prediction",
+              "text": "If the weight slides farther from your hand, does it get harder, easier, or no different to hold?",
+              "chips": [
+                "It gets harder",
+                "It gets easier",
+                "No different",
+                "Not sure"
+              ]
+            },
+            "assumptions": [],
+            "limitations": []
+          },
+          "input_tokens": 7400,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_2",
+            "state_rev": 2,
+            "move": "explain",
+            "concepts": [
+              "mech.moment-arm",
+              "mech.torque.static"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, farther out is harder: your hand must resist more twist, called torque.",
+                "actions": []
+              },
+              {
+                "id": "n2",
+                "text": "Watch the weight slide out to the end: holding it level now takes {{c1.torque_nm}} newton-metres.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "slide-weight-out"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.3,
+                  "payload_kg": 0.2,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
+            "evidence": [
+              "read.fx-moments"
+            ],
+            "reveal": {
+              "prediction": "p-turn-1",
+              "calc": "c1",
+              "outcome": "as_predicted"
+            },
+            "assumptions": [
+              "a static hold",
+              "the ruler is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7600,
+          "output_tokens": 400
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_3",
+            "state_rev": 3,
+            "move": "explain",
+            "concepts": [
+              "mech.arm-own-mass",
+              "mech.torque.static"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Now the same idea on a robot joint: a generic servo turning an arm.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-servo-arm"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "The load sits partway along the arm, and the arm's own weight pulls down too.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "load"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Watch the load slide out to the end: the arrow at the joint grows with the torque.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "slide-load-out"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What would you check on your own servo's datasheet before trusting it with this arm?"
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7700,
+          "output_tokens": 320
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_4",
+            "state_rev": 4,
+            "move": "explain",
+            "concepts": [
+              "mech.moment-arm",
+              "mech.torque.static"
+            ],
+            "analogy": "analogy.fx-shopping-bag",
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, check its rated torque. Here is a way to feel why: picture holding a shopping bag out at arm's length.",
+                "actions": []
+              },
+              {
+                "id": "n2",
+                "text": "The bag is the payload, your shoulder is the joint, and your hand's distance from it is the moment arm.",
+                "actions": []
+              },
+              {
+                "id": "n3",
+                "text": "Where it breaks down: a shoulder tires gradually and can shift its grip; a servo has a fixed rated torque.",
+                "actions": []
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Shall we look at the ruler held out again?",
+              "chips": [
+                "Yes",
+                "Not now"
+              ]
+            },
+            "assumptions": [
+              "a static hold"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7800,
+          "output_tokens": 330
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_5",
+            "state_rev": 5,
+            "move": "explain",
+            "concepts": [
+              "mech.moment-arm",
+              "mech.torque.static"
+            ],
+            "analogy": "analogy.fx-ruler-held-out",
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Here is the ruler held out from a hand: the ruler is the arm link and your hand is the servo's joint.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-lever"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Watch the weight slide out: the hand works harder. Where it breaks down: a hand tires; a servo heats up while it holds.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "slide-weight-out"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Why does the far weight take more effort to hold?",
+              "chips": [
+                "Longer lever",
+                "Heavier weight",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 7900,
+          "output_tokens": 340
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_6",
+            "state_rev": 6,
+            "move": "explain",
+            "concepts": [
+              "mech.torque.static",
+              "mech.moment-arm"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, a longer lever. Back to the servo and its arm: let's build the torque one piece at a time.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-servo-arm"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "First the force: the load's weight pulls straight down on the arm.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-force"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Next the distance from the joint out to the load, along the arm.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-distance"
+                  }
+                ]
+              },
+              {
+                "id": "n4",
+                "text": "Force times distance is the torque the servo must hold at the joint.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-torque"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What else pulls down on the joint besides the load?",
+              "chips": [
+                "The arm itself",
+                "Nothing else",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8000,
+          "output_tokens": 360
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_7",
+            "state_rev": 7,
+            "move": "explain",
+            "concepts": [
+              "mech.arm-own-mass",
+              "mech.torque-margin"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes: the arm's own weight, acting at its middle, adds its share of torque.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-arm-share"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Compare that total with your servo's rated torque: the room left over is the margin.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "eq-margin"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.15,
+                  "payload_kg": 0.1,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What could you change on the arm to get more margin?",
+              "chips": [
+                "A shorter arm",
+                "A lighter load",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8100,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_8",
+            "state_rev": 8,
+            "move": "explain",
+            "concepts": [
+              "mech.torque.static",
+              "mech.moment-arm"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, a shorter arm brings the load closer to the joint, so its twist shrinks.",
+                "actions": []
+              },
+              {
+                "id": "n2",
+                "text": "For the settings on stage, the servo now holds {{c1.torque_nm}} newton-metres in total.",
+                "actions": []
+              }
+            ],
+            "calc_requests": [
+              {
+                "id": "c1",
+                "solver": "solver.fx-torque",
+                "simulation": "sim.fx-servo-load",
+                "inputs": {
+                  "arm_length_m": 0.15,
+                  "payload_kg": 0.1,
+                  "arm_kg_per_m": 0.25,
+                  "angle_deg": 0
+                }
+              }
+            ],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "What would a heavier load do to that total?",
+              "chips": [
+                "Raise it",
+                "Lower it",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a static hold",
+              "the arm is level"
+            ],
+            "limitations": [
+              "no acceleration or friction"
+            ]
+          },
+          "input_tokens": 8200,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_9",
+            "state_rev": 9,
+            "move": "explain",
+            "concepts": [
+              "act.servo-parts"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Let's take the servo apart so you can see what sits inside its case.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "servo-explode"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "This is the gear train: a small pinion on the motor drives larger gears, trading speed for turning force.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "gear-train"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Behind it sits the motor, with the position sensor that tells the board which angle the output shaft is at.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "motor-and-sensor"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "Which part do you think decides how much turning force reaches the arm?",
+              "chips": [
+                "The gear train",
+                "The motor",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a generic micro servo, not a specific product"
+            ],
+            "limitations": [
+              "illustrative parts, not measured"
+            ]
+          },
+          "input_tokens": 8200,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_10",
+            "state_rev": 10,
+            "move": "explain",
+            "concepts": [
+              "act.servo-parts"
+            ],
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Yes, the gear train: each small pinion drives a larger gear on the next shaft.",
+                "actions": [
+                  {
+                    "type": "highlight_part",
+                    "part": "gear-train"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Watch the gears turn: the motor pinion spins fast while the output gear turns slowly, by the ratio shown on the stage.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "servo-gears-turn"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "If the output turns slowly, what do you think it gains in exchange?",
+              "chips": [
+                "More turning force",
+                "More speed",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "ideal gears, an illustrative animation"
+            ],
+            "limitations": [
+              "example tooth counts, not measured; friction and efficiency not modelled"
+            ]
+          },
+          "input_tokens": 8200,
+          "output_tokens": 300
+        }
+      },
+      {
+        "ok": {
+          "json": {
+            "request_id": "turn_11",
+            "state_rev": 11,
+            "move": "explain",
+            "concepts": [
+              "mech.moment-arm",
+              "mech.torque.static"
+            ],
+            "analogy": "analogy.fx-shopping-bag",
+            "narration": [
+              {
+                "id": "n1",
+                "text": "Here is a shopping bag held close in: your shoulder is the servo, your arm is the arm, and the bag is the payload.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-bag-hold"
+                  }
+                ]
+              },
+              {
+                "id": "n2",
+                "text": "Now reach out with the bag: the same weight sits farther from your shoulder, so holding it gets harder.",
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "animation": "bag-reach-out"
+                  }
+                ]
+              },
+              {
+                "id": "n3",
+                "text": "Where it breaks down: a shoulder tires gradually and can shift its grip, while a servo has a fixed rated torque and heats up while it holds.",
+                "actions": []
+              },
+              {
+                "id": "n4",
+                "text": "Back on the servo, the same arm length carries over, with the load at the end of the arm.",
+                "actions": [
+                  {
+                    "type": "select_scene",
+                    "scene": "fx-servo-arm"
+                  },
+                  {
+                    "type": "highlight_part",
+                    "part": "load"
+                  }
+                ]
+              }
+            ],
+            "calc_requests": [],
+            "evidence": [],
+            "prompt": {
+              "kind": "question",
+              "text": "With the load out at the end, does the servo need more or less torque than with it close in?",
+              "chips": [
+                "More",
+                "Less",
+                "Not sure"
+              ]
+            },
+            "assumptions": [
+              "a level arm, holding still"
+            ],
+            "limitations": [
+              "an everyday analogy, not a measurement"
+            ]
+          },
+          "input_tokens": 8200,
+          "output_tokens": 300
+        }
+      }
+    ]
+  }
+}

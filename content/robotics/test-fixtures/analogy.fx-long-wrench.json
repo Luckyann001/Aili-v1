@@ -1,0 +1,33 @@
+{
+  "id": "analogy.fx-long-wrench",
+  "type": "analogy",
+  "title": "Loosening a stuck bolt with a long wrench (test fixture)",
+  "version": "0.1.0",
+  "teaches": [
+    "mech.torque.static",
+    "mech.moment-arm"
+  ],
+  "levels": [
+    "L1",
+    "L2"
+  ],
+  "fidelity": "illustrative",
+  "provenance": "authored",
+  "mapping": [
+    {
+      "source": "how hard you push",
+      "target": "the force"
+    },
+    {
+      "source": "how far from the bolt you push",
+      "target": "the moment arm"
+    },
+    {
+      "source": "the twist on the bolt",
+      "target": "the torque"
+    }
+  ],
+  "breaks_down": "You push the wrench for a moment and the force is yours to choose; a servo arm carries its load all the time, and the load's weight always pulls straight down, so tilting the arm changes the moment arm.",
+  "review_status": "published",
+  "test_fixture": true
+}

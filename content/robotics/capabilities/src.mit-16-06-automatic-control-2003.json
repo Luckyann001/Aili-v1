@@ -1,0 +1,14 @@
+{
+  "id": "src.mit-16-06-automatic-control-2003",
+  "type": "source",
+  "kind": "course",
+  "title": "16.06 Principles of Automatic Control, Fall 2003",
+  "authors": [
+    "MIT OpenCourseWare"
+  ],
+  "edition": "Fall 2003",
+  "url": "https://dspace.mit.edu/handle/1721.1/85861",
+  "access": "free",
+  "rights": "CC BY-NC-SA 3.0 (as stated in docs/lesson-drone-pid.md, not yet checked on the page): link only",
+  "verified": null
+}

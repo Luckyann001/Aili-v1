@@ -1,0 +1,105 @@
+import type { FakeCase } from "@aili/schemas";
+import type { TokenUsage } from "./metering";
+import { SOLVERS, type Director, type DirectorRequest, type SolverFn } from "./turn";
+
+// A scripted stand-in for the professor model (docs/m2-plan.md slice 5). No provider, no key, no
+// network. It answers from the test-fixture shortlist (scene "fx-lever", simulation
+// "sim.fx-servo-load", solver "solver.fx-torque", reading "read.fx-moments"), so it only works
+// with the dev-only fixture registry. Every case is labelled for what it is meant to trigger.
+
+// Cases (FAKE_CASES in @aili/schemas): valid (passes every check); invalid-id (a part not in the
+// scene); out-of-bounds (a setting outside its bounds); hard-coded-number (spec test 14);
+// pedagogy-violation (flattery); solver-failure (passes the validators; the solver refuses, through
+// fakeSolvers below, since a rating that the solver refused may no longer be supplied); slow (valid, after `slowMs`, for interrupt tests).
+export type { FakeCase };
+
+const CALC = { id: "c1", solver: "solver.fx-torque", simulation: "sim.fx-servo-load", inputs: { arm_length_m: 0.2, payload_kg: 0.3, arm_kg_per_m: 0.25, angle_deg: 0 } };
+
+function valid(req: DirectorRequest) {
+  return {
+    request_id: req.request_id,
+    state_rev: req.state_rev,
+    move: "explain",
+    concepts: ["mech.torque.static"],
+    narration: [
+      { id: "n1", text: "Holding this arm level takes {{c1.torque_nm}} newton-metres." },
+      { id: "n2", text: "The payload at the tip gives {{c1.payload_torque_nm}} of that; the arm's own mass gives the rest." },
+    ],
+    actions: [
+      { type: "select_scene", scene: "fx-lever" },
+      { type: "highlight_part", part: "weight" },
+      { type: "set_parameter", param: "weight_distance_m", value: 0.2 },
+    ],
+    calc_requests: [CALC],
+    evidence: ["read.fx-moments"],
+    prompt: { text: "Where would you move the weight to make it easier to hold?", chips: ["Closer to my hand", "Not sure"] },
+    assumptions: ["static hold only"],
+    limitations: ["does not cover acceleration"],
+  };
+}
+
+export function fakeResponse(c: FakeCase, req: DirectorRequest): unknown {
+  const r = valid(req);
+  switch (c) {
+    case "valid":
+    case "slow":
+      return r;
+    case "invalid-id":
+      return { ...r, actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "highlight_part", part: "servo-horn" }] };
+    case "out-of-bounds":
+      return { ...r, actions: [{ type: "select_scene", scene: "fx-lever" }, { type: "set_parameter", param: "weight_distance_m", value: 0.5 }] };
+    case "hard-coded-number":
+      return { ...r, narration: [{ id: "n1", text: "Holding this arm level takes 2.5 newton-metres." }] };
+    case "pedagogy-violation":
+      return { ...r, narration: [{ id: "n1", text: "Great question! Holding this arm level takes {{c1.torque_nm}} newton-metres." }] };
+    case "solver-failure":
+      // Valid inputs: the failure is scripted in the solver (fakeSolvers), not in the request.
+      return { ...r, calc_requests: [CALC] };
+  }
+}
+
+/**
+ * A director that plays `cases` in order, one per turn (the last one repeats). The "slow" case
+ * waits `slowMs` and gives up as soon as the turn is interrupted.
+ */
+/**
+ * Token counts the fake director reports for every turn (a scripted field, so tests can cross the
+ * session cap). Counts only: prices come from config.
+ */
+export const FAKE_USAGE: TokenUsage = { model: "professor", input_tokens: 1500, output_tokens: 400 };
+
+export function createFakeDirector(cases: FakeCase | FakeCase[], opts: { slowMs?: number; usage?: TokenUsage } = {}): Director & { calls: number } {
+  const list = Array.isArray(cases) ? cases : [cases];
+  const d = {
+    calls: 0,
+    async respond(req: DirectorRequest, signal: AbortSignal) {
+      const c = list[Math.min(d.calls, list.length - 1)]!;
+      d.calls++;
+      if (c === "slow") {
+        await new Promise<void>((resolve, reject) => {
+          const t = setTimeout(resolve, opts.slowMs ?? 1000);
+          signal.addEventListener("abort", () => {
+            clearTimeout(t);
+            reject(new Error("interrupted"));
+          }, { once: true });
+        });
+      }
+      return { response: fakeResponse(c, req), usage: opts.usage ?? FAKE_USAGE };
+    },
+  };
+  return d;
+}
+
+/**
+ * The solvers a fake-director session runs: the real ones, except that the solver-failure case gets
+ * a solver that refuses (scripted, labelled as such), so the engine's solver-failure path is tested.
+ */
+export function fakeSolvers(cases: FakeCase | readonly FakeCase[]): Record<string, SolverFn> | undefined {
+  if (!(Array.isArray(cases) ? cases : [cases]).includes("solver-failure")) return undefined;
+  return {
+    ...SOLVERS,
+    "solver.fx-torque": () => {
+      throw new RangeError("the solver refused this input (scripted solver failure, fake director only)");
+    },
+  };
+}

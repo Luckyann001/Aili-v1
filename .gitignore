@@ -15,3 +15,23 @@ next-env.d.ts
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# playwright
+test-results/
+playwright-report/
+packages/engine/.script-build/
+bakeoff-runs/
+
+# screenshots saved by e2e for review (apps/web/screenshots)
+screenshots/
+
+# local live-session logs (laptop only; npm run live-sessions:delete removes them)
+live-sessions/
+
+# offline authoring: the local Blender path and review stills (not committed)
+authoring/local.json
+authoring/**/stills/
+!authoring/servo-anatomy/out/
+
+# 3D assets copied into the web app by apps/web/scripts/copy-assets.mjs (generated)
+apps/web/public/assets/

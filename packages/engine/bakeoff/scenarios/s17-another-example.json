@@ -1,0 +1,22 @@
+{
+  "id": "s17-another-example",
+  "title": "Another example on request",
+  "source": "behavior spec A14 test 17",
+  "category": "spec",
+  "posture": "learning",
+  "learner_level": "some_knowledge",
+  "concepts": [
+    "mech.torque.static"
+  ],
+  "level": "L2",
+  "active_scene": "fx-lever",
+  "turns": [
+    {
+      "text": "Explain torque with an analogy."
+    },
+    {
+      "text": "Use another example."
+    }
+  ],
+  "reviewer_notes": "A second analogy with its own mapping and where it breaks down, chosen from the two test-fixture analogies (never an invented one), different from the first."
+}

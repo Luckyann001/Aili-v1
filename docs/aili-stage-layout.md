@@ -14,18 +14,18 @@ One app, **two stages, one shared engine**. This replaces the earlier "one stage
 ┌──────────────────────────────────────────────────────────┐
 │ logo  menu                                               │
 ├───────────────────────────────────────┬──────────────────┤
-│              STAGE                    │ Text explanation │
-│                                       │ (usually closed) │
+│     STAGE: scene        │ explanation │ Text explanation │
+│                         │ space       │ (usually closed) │
 │               voice                   │          [Library]
 └───────────────────────────────────────┴──────────────────┘
 ```
-- **Top bar:** logo (→ Home/Resume), menu (plan/table of contents, notes, settings, help, sign out). Thin; no mode dashboards.
-- **Stage:** large rounded canvas, one scene at a time. Orbit/zoom/pan, select, labelled anatomy, exploded view, reset camera. Selecting a part opens a temporary inspector with sliders (units + bounds). Status badge: *Prepared* / *Live* / *Illustrative (AI-composed)*. Numbers come only from solvers. Reduced-motion: cuts, no tweens.
+- **Top bar:** logo (→ Home/Resume), menu (**Plan** (planned), which opens the panel's Plan tab; notes, settings, help, sign out). Thin; no mode dashboards.
+- **Stage:** large rounded canvas, **one active scene at a time**, with an **explanation space** at its right inside the stage when the scene has one (the servo + arm today): the equation built step by step with the solver's numbers and units, finished steps dimmed, the current one marked "Now" in text; the needed torque, the rating field and the margin gauge. For the drone altitude scene (Oct 21 2026) the explanation space holds the height plot with a faint ghost of the previous run, the P/I/D bars, the Kp/Ki/Kd sliders, the presets, the Run button and a checks strip (final error, overshoot, settling time, stability; Pass/Warn/Fail with icon and word); on phones it opens as the bottom sheet. It is still one scene, not a second panel. The diagram itself carries only short symbols (F, d, τ, W). The space is not a second scene and never animates on its own. From 1,100 px it is a column; narrower, it is a one-line strip (the current step, or the total) with a button that opens it as a sheet. When an analogy hands over to a real-part scene, the analogy may stay as a **docked recap** (planned): a small still picture in a corner, with its own badge (for example *Illustrative (AI-composed)*), never animating and never a second 3D view. Tapping it makes it the active scene again. A new scene that is not the analogy's partner clears it. Reduced motion: the handover is a cut. Phones: the recap is a small thumbnail with a tap target of at least 44 px, or a "Recap" chip when the stage is too small, and it hides while the inspector or a panel is open. **Setup cards (planned):** before the first scene exists, at most three short cards (level, time, goal), one after another on the empty stage, each with chips and a Skip option. They are not scenes and never return once the plan exists. Orbit/zoom/pan, select, labelled anatomy, exploded view, reset camera. Selecting a part opens a temporary inspector with sliders (units + bounds). The servo's rated torque is entered in the explanation space (the servo's inspector links to it). Status badge: *Prepared* / *Live AI* / *Illustrative (AI-composed)*. A live answer that uses test-fixture content also shows *Test fixture content*. Numbers come only from solvers. Reduced-motion: cuts, no tweens.
 - **Voice (bottom-centre):** states idle / listening / thinking / speaking / error. **Interrupt** stops audio and queued actions immediately (stale actions invalidated by sequence numbers). Text box beside it; quick-reply chips for Aili's questions. Voice optional; falls back to text. Provider behind config; browser speech first.
 - **Captions:** because the right panel is closed most of the time, a short caption overlay sits above the voice button, synchronised with speech.
-- **Text explanation panel (right, on demand):** current explanation, equations with live values, evidence chips, open question, assumptions/limits; scrollable history; copy / pin note / "explain differently". Show only the current step by default (split-attention).
+- **Text explanation panel (right, on demand):** current explanation, equations with live values, evidence chips, open question, assumptions/limits; scrollable history; copy / pin note / "explain differently". **During equation steps the live equation is in the stage's explanation space**; the panel keeps the full record (inputs, outputs, evidence, limits). Show only the current step by default (split-attention); the explanation space shows finished steps dimmed and the current step marked, so the learner keeps the thread without reading back. **Plan tab (planned):** the study plan's table of contents (units in order, a checkpoint per unit, the current unit marked, done / not done by icon and label, an editable order within prerequisite limits), labelled "Draft plan, not yet expert-reviewed". Closed by default; opens once when the plan is first created. Never shown on the stage.
 - **Library [Confirm]:** tab → drawer over the right panel: verified reading items + guides + teach-back prompts; learner-added sources marked "unverified".
-- **Phone:** Stage on top, text panel as bottom sheet, voice floating bottom-centre, Library inside the sheet. Touch targets ≥44 px.
+- **Phone:** Stage on top, text panel as bottom sheet (with the Explanation and Library tabs; the Plan tab is planned), voice floating bottom-centre, Library inside the sheet. On phones the explanation space is a one-line "Now" strip above the captions, and an **Explanation space** button opens it in full as a sheet over the stage. Touch targets ≥44 px.
 
 ## 2. Build Workbench [Decision; Lucky: "like a test, guide… think Blender and workspace"]
 A professional-tool layout: dense but calm, panels dockable/collapsible, keyboard shortcuts, undo/redo.
@@ -74,4 +74,16 @@ Stage/viewport on Deep canvas (#EBE4DA), panels on Surface (#FFFDFA), Ink text, 
 ## 5. Build notes for Claude Code
 - Shell and tokens first, then Learn stage (placeholder scene), voice states, text panel, Library drawer.
 - One state store: scene state, revision number, request IDs (for interrupts). Workbench adds `design.json` with undo/redo history.
-- Performance budget for mid-range Android: assets low-poly, size limits, lazy loading, a fallback viewer. Test on a real mid-range phone.
+- Performance budget for a low-end Android phone (Itel A667L, Android 14): assets low-poly, size limits, lazy loading, a fallback viewer. Test on that real phone.
+
+### Learn stage 3D budget [set in M1 slice 4a, Oct 10 2026]
+Measured on a production build; enforced by `apps/web/e2e/scene.spec.ts` (the test fails if exceeded).
+| Item | Budget | Measured (slice 4a) |
+|---|---|---|
+| 3D code loaded after the page (three.js, React Three Fiber, drei orbit controls, glTF loader, scene components) | **≤ 300 KB gzip** | 264.8 KB gzip (985 KB raw), 3 chunks (16 Oct 2026, with the glTF loader; was 251.6 KB) |
+| Placeholder scene geometry | **≤ 2,000 triangles** | 132 |
+| 3D asset files | none yet (the placeholder is built in code); real assets get a per-asset size budget in M4 | 0 |
+- The 3D code is lazy-loaded: the rest of the stage (text box, voice, panels) works while it downloads (tested).
+- Rendering is on demand only (no continuous frames); device pixel ratio capped at 1.5.
+- If WebGL is unavailable or the context is lost, a still SVG picture of the parts replaces the 3D view; the parts list keeps working.
+- These are lab measurements in headless Chrome. Real speed is judged on the low-end test phone (CLAUDE.md), slice 6.

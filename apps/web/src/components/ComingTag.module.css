@@ -1,0 +1,12 @@
+.tag {
+  display: inline-block;
+  padding: 0 var(--aili-space-2);
+  border: 1px solid var(--aili-border-strong);
+  border-radius: var(--aili-radius-sm);
+  color: var(--aili-text);
+  font: 600 0.75rem/1.6 var(--aili-font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
