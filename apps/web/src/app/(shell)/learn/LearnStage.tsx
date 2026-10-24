@@ -58,6 +58,15 @@ const SPACE_OWNERS =
 // lesson offered, and no stage badge until a turn puts a scene on stage.
 const LIVE_NOTE = "Live AI: your message goes to a real AI model, on test-fixture content only.";
 /**
+ * A typed question is deliberate: it stops a running lesson (its open question closes; "Continue the
+ * lesson" brings it back). Accidental presses (the mic, Space, Escape while it waits) do not (24 Oct 2026).
+ */
+function stopLessonForQuestion() {
+  const l = useLesson.getState();
+  if (l.status === "playing" || l.status === "awaiting") l.dispatch({ type: "stop" });
+}
+
+/**
  * Live mode with the drone put on stage by the testing button: the server never saw that, so a live turn
  * would answer about another scene. A prepared line says so; a live turn puts the drone up itself.
  */
@@ -87,6 +96,13 @@ export function LearnStage() {
   const demoLabels = useDemoLabels();
   const demoNote = useDemoNote();
   const shown = sceneShown(activeScene) || demoLabels !== null;
+  // The page is prerendered without the address: which lesson (and so which scene) is known only on the
+  // client. Until then the stage shows no scene and no lesson chip, so neither lesson flashes the other's.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const toggleExploded = useScene((s) => s.toggleExploded);
   const focusParts = useCallback(
     () => document.querySelector<HTMLButtonElement>('section[aria-label="Stage"] button[aria-haspopup="listbox"]')?.focus(),
@@ -137,7 +153,7 @@ export function LearnStage() {
   }, [welcomeGone]);
   // Live mode: the stage is dimmed, with no badge or scene tools, until a turn picks a scene.
   const dimmed = live === true && !scenePicked;
-  const sceneUi = shown && !dimmed;
+  const sceneUi = shown && !dimmed && hydrated;
   // Fake-director demo (testing only): ?demo=1 in a build with both testing flags.
   const fakeDemo = demo && FAKE_DIRECTOR && live === false;
   const demoTurn = useDemoTurn(voice, live === true, setText);
@@ -193,7 +209,7 @@ export function LearnStage() {
             if (lessonId === "drone-pid" && id === "tell-me") void noteDemand().then((text) => useVoice.getState().setHint({ text, kind: "info" }));
           },
         }
-      : voicePrompt || busy || lessonStatus === "playing" || live === true
+      : voicePrompt || busy || lessonStatus === "playing" || live === true || !hydrated
         ? null
         : lessonStatus === "stopped"
           ? { group: "Lesson", items: [{ id: "resume", label: "Continue the lesson" }], onPick: () => void runLesson("resume") }
@@ -231,7 +247,7 @@ export function LearnStage() {
     <div className={styles.learn} data-side={side ?? "closed"} data-content-mode={FOUNDER_DEMO ? "founder-demo" : "standard"}>
       <h1 className={styles.srOnly}>Learn stage</h1>
       <section className={styles.stage} aria-label="Stage" data-dimmed={dimmed ? "" : undefined}>
-        {shown && <SceneViewport safeArea={safeArea} labels={labelEls} />}
+        {shown && hydrated && <SceneViewport safeArea={safeArea} labels={labelEls} />}
 
         <div className={styles.stageTop}>
           <div className={styles.topRow}>
@@ -262,7 +278,7 @@ export function LearnStage() {
 
         {/* Safe area: the model is framed here and labels never leave it (so they can't cover controls). */}
         <div ref={safeArea} className={styles.scene} data-safe-area="">
-          {!shown ? (
+          {!hydrated ? null : !shown ? (
             // Production without the dev flag: draft scenes are hidden, and we say so plainly.
             <p className={styles.sceneLoading}>No expert-reviewed scene is available yet.</p>
           ) : (
@@ -382,12 +398,16 @@ export function LearnStage() {
             : !fakeDemo && lessonId === "drone-pid" && INCLUDE_DRAFTS
             ? // The prepared drone lesson: typed questions get a prepared answer (or say plainly they need the live professor).
               (t) => {
+                stopLessonForQuestion();
                 const reply = preparedReplyFor(t);
                 voice.say(reply.lines, () => {}, { chips: reply.chips, source: reply.matched ? "answer" : "prepared" });
               }
             : fakeDemo
               ? (t) => void demoTurn.start("valid", t)
-              : voice.submit
+              : (t) => {
+                  stopLessonForQuestion();
+                  voice.submit(t);
+                }
         }
         note={
           live

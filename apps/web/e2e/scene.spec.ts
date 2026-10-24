@@ -549,7 +549,7 @@ test.describe("fallback", () => {
     await page.getByRole("link", { name: "AILI home" }).click();
     await expect(page).toHaveURL(/\/home$/);
     await page.goBack();
-    await expect(page).toHaveURL(/\/learn$/);
+    await expect(page).toHaveURL(/\/learn\?lesson=lever$/);
     await expect(ready(page)).toBeVisible({ timeout: 20000 });
     await expect(canvas(page)).toHaveCount(1);
     // Still rendering and interactive: selecting re-labels the part and the camera still orbits.

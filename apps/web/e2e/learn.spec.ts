@@ -10,6 +10,8 @@ const isWide = (p: Page) => p.viewportSize()!.width >= 900;
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/learn?lesson=lever");
+  // The page is interactive once it knows its lesson: the start chip appears only after hydration.
+  await expect(page.getByRole("group", { name: "Lesson" })).toBeVisible({ timeout: 20000 });
 });
 
 test("starts with the stage, command bar and captions; text panel closed", async ({ page }) => {
