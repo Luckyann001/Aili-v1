@@ -1,0 +1,59 @@
+{
+  "id": "cruise-control-hill",
+  "title": "Cruise control on a hill",
+  "teaches": [
+    "ctl.proportional",
+    "ctl.steady-state-error",
+    "ctl.integral"
+  ],
+  "level": "L1",
+  "fidelity": "illustrative",
+  "version": "0.1.0",
+  "review_status": "draft",
+  "provenance": "authored",
+  "parts": [
+    {
+      "id": "road",
+      "name": "Road"
+    },
+    {
+      "id": "hill",
+      "name": "Hill"
+    },
+    {
+      "id": "car",
+      "name": "Car"
+    },
+    {
+      "id": "cab",
+      "name": "Cab"
+    },
+    {
+      "id": "wheel-1",
+      "name": "Wheel 1"
+    },
+    {
+      "id": "wheel-2",
+      "name": "Wheel 2"
+    },
+    {
+      "id": "wheel-3",
+      "name": "Wheel 3"
+    },
+    {
+      "id": "wheel-4",
+      "name": "Wheel 4"
+    }
+  ],
+  "animations": [
+    {
+      "id": "car-p-then-i",
+      "description": "Illustrative animation, not a simulation: the car climbs the hill with a P-like rule and settles a little slower than its set speed, then a driver who notices 'slow for a while' (I) closes the gap."
+    },
+    {
+      "id": "dissolve-to-drone",
+      "description": "The car fades out as the drone fades in at the same place, with the mapping labelled (set speed to target height, hill to gravity, accelerator to thrust)."
+    }
+  ],
+  "auto_select": false
+}

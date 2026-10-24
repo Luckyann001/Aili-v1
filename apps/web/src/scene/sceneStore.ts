@@ -5,6 +5,7 @@ import { MODELS, type SceneId } from "./models";
 import { applyStageSetting } from "@aili/engine";
 import droneManifest from "../../../../content/robotics/scenes/drone-altitude.json";
 import { DEFAULT_DRONE, type DroneState } from "./drone";
+import { CRUISE_START, type CruiseState } from "./cruise";
 import { DRONE_PRESETS, runDrone, runLength_s, sampleAt, SWITCH_ON, SWITCHES, type DroneRun, type RunKind } from "./droneRun";
 import { DEFAULT_SERVO_PARAMS, parseRating, setServoParam, type EqStep, type ServoParamId, type ServoParams } from "./servoArm";
 
@@ -51,6 +52,9 @@ export interface SceneState {
    */
   droneLoop: 0 | 1 | 2 | 3 | 4;
   setDroneLoop: (step: 0 | 1 | 2 | 3 | 4) => void;
+  /** The cruise-control analogy's car and speedometer (illustrative, not a simulation). A new scene resets it. */
+  cruise: CruiseState;
+  setCruise: (c: Partial<CruiseState>) => void;
   droneT_s: number;
   dronePlaying: boolean;
   startDroneRun: (kind: RunKind, opts?: { snap?: boolean; start?: "ground" | "hover" }) => void;
@@ -125,12 +129,14 @@ export interface SceneState {
 }
 
 export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState>) => void): SceneState => ({
-  activeScene: "base-joint-arm",
+  // The default lesson's stage (the drone at rest), so the first paint never shows another scene; the
+  // lever lesson (?lesson=lever) switches to its own before the first paint (LearnStage).
+  activeScene: "drone-altitude",
   setScene: (id) =>
     set((s) =>
       s.activeScene === id
         ? {}
-        : { activeScene: id, droneLoop: 0, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene", gearsTurning: false, gearsBy: null, gearsSeq: s.gearsSeq + 1 },
+        : { activeScene: id, droneLoop: 0, cruise: CRUISE_START, selectedId: null, selectedBy: null, inspectorOpen: false, exploded: false, equation: [], eqGrow: 1, servoView: "assembled", servoFrom: "assembled", servoMotion: 1, servoSeq: s.servoSeq + 1, servoBy: null, cameraView: "scene", gearsTurning: false, gearsBy: null, gearsSeq: s.gearsSeq + 1 },
     ),
   leverDistance_m: 0.05,
   bagReach_m: 0.1,
@@ -158,6 +164,8 @@ export const createSceneSlice = (set: (fn: (s: SceneState) => Partial<SceneState
   droneGhost: null,
   droneLoop: 0,
   setDroneLoop: (droneLoop) => set(() => ({ droneLoop })),
+  cruise: CRUISE_START,
+  setCruise: (c) => set((s) => ({ cruise: { ...s.cruise, ...c } })),
   droneT_s: 0,
   dronePlaying: false,
   startDroneRun: (kind, opts = {}) =>

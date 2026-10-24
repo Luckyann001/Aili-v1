@@ -132,7 +132,7 @@ test.describe("home / resume", () => {
   });
 
   test("after opening the Learn stage: Pick up where you left off, said honestly", async ({ page }) => {
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     // The visit is recorded once the stage's scripts have run.
     await expect.poll(() => page.evaluate(() => localStorage.getItem("aili.learn.visited"))).toBe("1");
     await page.getByRole("link", { name: "AILI home" }).click();
@@ -146,7 +146,7 @@ test.describe("home / resume", () => {
     await page.addInitScript(() => {
       Object.defineProperty(window, "localStorage", { get: () => { throw new Error("blocked"); } });
     });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await page.goto("/home");
     await expect(page.getByRole("link", { name: "Start the demo lesson" })).toBeVisible();
   });

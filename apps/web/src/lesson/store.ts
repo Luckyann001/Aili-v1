@@ -16,6 +16,13 @@ export interface LessonStore extends LessonState {
   /** True while a beat waits for the learner to press Run on the drone (its narration needs the result). */
   awaitingRun: boolean;
   setAwaitingRun: (on: boolean) => void;
+  /**
+   * The drone run count when a beat first waited for the learner's Run: the beat speaks once a newer run
+   * has finished. Kept when the lesson is stopped and resumed on the same beat, so a Run pressed meanwhile
+   * (or before Continue) still counts and the explanation plays (Lucky, 24 Oct 2026).
+   */
+  runBaseline: { beatIndex: number; seq: number } | null;
+  setRunBaseline: (b: { beatIndex: number; seq: number } | null) => void;
   setScript: (beats: BeatDef[], title: string, lessonId: LessonId) => void;
   setUnavailable: (msg: string | null) => void;
   setGauge: (on: boolean) => void;
@@ -34,6 +41,8 @@ export const useLesson = create<LessonStore>()((set) => ({
   lessonId: null,
   awaitingRun: false,
   setAwaitingRun: (awaitingRun) => set({ awaitingRun }),
+  runBaseline: null,
+  setRunBaseline: (runBaseline) => set({ runBaseline }),
   setScript: (beats, title, lessonId) => set({ beats, title, lessonId, unavailable: null }),
   setUnavailable: (unavailable) => set({ unavailable }),
   setGauge: (gauge) => set({ gauge }),
@@ -44,6 +53,6 @@ export const useLesson = create<LessonStore>()((set) => ({
       const next = lessonReducer(s.beats, s, e);
       if (next === s) return {};
       // A new start, a stop or an answer ends any wait for Run (a stale wait never resumes the lesson).
-      return e.type === "start" ? { ...next, gauge: false, revealDone: false, awaitingRun: false } : { ...next, awaitingRun: false };
+      return e.type === "start" ? { ...next, gauge: false, revealDone: false, awaitingRun: false, runBaseline: null } : { ...next, awaitingRun: false };
     }),
 }));

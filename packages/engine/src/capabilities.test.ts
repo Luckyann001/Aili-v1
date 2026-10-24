@@ -103,7 +103,7 @@ describe("capability registry: the files in content/robotics", () => {
     expect(r.registry.simulations.map((s) => s.id).sort()).toEqual(["sim.pid-altitude-1d", "sim.servo-static-load"]);
     expect(r.registry.solvers.map((s) => s.id).sort()).toEqual(["solver.pid-altitude-1d", "solver.static-torque-single-link"]);
     expect(r.registry.sources.map((s) => s.id).sort()).toEqual(["src.mit-16-06-automatic-control-2003", "src.mit-16-30-feedback-control-2010", "src.openstax-college-physics-2e", "src.openstax-university-physics-1"]);
-    expect(r.registry.scenes.map((s) => s.id).sort()).toEqual(["bag-hold", "base-joint-arm", "drone-altitude", "lever-analogy", "servo-arm"]);
+    expect(r.registry.scenes.map((s) => s.id).sort()).toEqual(["bag-hold", "base-joint-arm", "cruise-control-hill", "drone-altitude", "lever-analogy", "servo-arm"]);
   });
 
   it("are drafts written by the AI: no review record, not fixtures", () => {

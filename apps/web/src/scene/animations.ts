@@ -1,4 +1,5 @@
 import { cssDurationMs } from "@/design/duration";
+import { cruiseAt } from "./cruise";
 import { BAG_REACH, LEVER_LENGTH_M } from "./layout";
 import type { AssetView } from "./assetPose";
 import { gearsInView, useScene, type Actor } from "./sceneStore";
@@ -181,8 +182,56 @@ const droneExploded = (on: boolean) => () => {
   return Promise.resolve();
 };
 
+/** The analogy's drive takes this long: an animation for the eye, not a simulation. */
+export const CRUISE_MS = 12000;
+/**
+ * The cruise-control analogy (illustrative, not a simulation): the car climbs the hill with a P-like rule
+ * and settles a little below its set speed, then closes the gap with I. Under reduced motion: the still
+ * frames (both phases shown at once), and the car where the drive ends.
+ */
+export function carPThenI(isCurrent: () => boolean): Promise<void> {
+  if (spatialMs() <= 0) {
+    useScene.getState().setCruise({ ...cruiseAt(1), phase: "still" });
+    return new Promise<void>((done) => setTimeout(done, LOOP_STEP_MS * 2));
+  }
+  return new Promise<void>((done) => {
+    const t0 = performance.now();
+    const step = (now: number) => {
+      if (!isCurrent()) return done();
+      const t = Math.min(1, (now - t0) / CRUISE_MS);
+      useScene.getState().setCruise(cruiseAt(t));
+      if (t < 1) requestAnimationFrame(step);
+      else done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** The dissolve: the car fades into the drone in the same frame, with the mapping labelled (a cut under reduced motion). */
+export function dissolveToDrone(isCurrent: () => boolean): Promise<void> {
+  const s = useScene.getState();
+  if (spatialMs() <= 0) {
+    s.setCruise({ pos: 1, fade: 1, phase: "map" });
+    return new Promise<void>((done) => setTimeout(done, LOOP_STEP_MS * 2));
+  }
+  s.setCruise({ phase: "map" });
+  return new Promise<void>((done) => {
+    const t0 = performance.now();
+    const step = (now: number) => {
+      if (!isCurrent()) return done();
+      const k = Math.min(1, (now - t0) / (LOOP_STEP_MS * 1.5));
+      useScene.getState().setCruise({ fade: k });
+      if (k < 1) requestAnimationFrame(step);
+      else done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 export const ANIMATIONS: Record<string, (isCurrent: () => boolean) => Promise<void>> = {
   "feedback-loop": feedbackLoop,
+  "car-p-then-i": carPThenI,
+  "dissolve-to-drone": dissolveToDrone,
   "drone-explode": droneExploded(true),
   "drone-assemble": droneExploded(false),
   "slide-weight-out": slideWeightOut,

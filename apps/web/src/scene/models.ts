@@ -4,6 +4,8 @@ import type { AssetPose } from "./assetPose";
 import bagManifest from "../../../../content/robotics/scenes/bag-hold.json";
 import droneManifest from "../../../../content/robotics/scenes/drone-altitude.json";
 import { droneFraming, hiddenDroneParts, layoutDrone, type DroneState } from "./drone";
+import cruiseManifest from "../../../../content/robotics/scenes/cruise-control-hill.json";
+import { cruiseFraming, layoutCruise, type CruiseState } from "./cruise";
 import { BAG_REACH, LEVER_LENGTH_M, layoutBag, layoutLever, layoutParts, type Params, type PartLayout } from "./layout";
 import { PLACEHOLDER_MODEL, type FillRole } from "./placeholderModel";
 import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams } from "./servoArm";
@@ -11,7 +13,7 @@ import { eqAnchors, layoutServoArm, SERVO_PARTS, servoFraming, type ServoParams 
 // The scenes the Learn stage can show (manifests: content/robotics/scenes/*.json). Each model lays
 // out its parts from the scene state; the 3D view, labels, framing and fallback all use this.
 
-export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm" | "bag-hold" | "drone-altitude";
+export type SceneId = "base-joint-arm" | "lever-analogy" | "servo-arm" | "bag-hold" | "drone-altitude" | "cruise-control-hill";
 
 export interface ModelState {
   params: Params;
@@ -23,6 +25,8 @@ export interface ModelState {
   servoPose?: AssetPose;
   /** The drone's settings and its height (from a solver run; 0 at rest). */
   drone: DroneState;
+  /** The cruise-control analogy's car (an illustrative animation, not a simulation). */
+  cruise: CruiseState;
 }
 
 export interface SceneModel {
@@ -62,6 +66,8 @@ export interface SceneModel {
 const SERVO_FILL: Record<string, FillRole> = { horn: "expressive", "upper-case": "technical", "gear-train": "discovery", "motor-and-sensor": "explore", "board-and-cover": "technical" };
 const SERVO_INSIDE = new Set(["gear-train", "motor-and-sensor"]);
 /** The drone is Sky (--aili-fill-technical); the battery and height sensor Sage, the added camera Plum. */
+/** The analogy's cast (brand doc: Sage, Sky, Gold, Plum fills with Ink outlines): road Sage, hill Gold, car Plum. */
+const CRUISE_FILL: Record<string, FillRole> = { road: "explore", hill: "discovery", car: "expressive", cab: "expressive", "wheel-1": "technical", "wheel-2": "technical", "wheel-3": "technical", "wheel-4": "technical" };
 const DRONE_FILL: Record<string, FillRole> = { battery: "explore", "sensor-altitude": "explore", "payload-camera": "expressive" };
 /** The servo parts' names on stage: short ones from the scene manifest (the asset manifest's are longer). */
 const sceneName = (id: string) => servoArmManifest.parts.find((p) => p.id === id)!.name;
@@ -134,6 +140,17 @@ export const MODELS: Record<SceneId, SceneModel> = {
     viewDir: [0.42, 0.22, 1],
     refitKey: (s) => `${s.drone.settings.target_m}|${s.drone.range?.low_m.toFixed(2) ?? ""}|${s.drone.range?.high_m.toFixed(2) ?? ""}`,
     refitOnGrow: true,
+  },
+  "cruise-control-hill": {
+    id: "cruise-control-hill",
+    title: "Cruise control on a hill",
+    parts: cruiseManifest.parts.map(({ id, name }) => ({ id, name, fill: CRUISE_FILL[id] ?? "explore" })),
+    note: `${contentLabel(cruiseManifest as LabelledItem).label}. Everyday analogy drawn from simple shapes; an illustrative animation, not a simulation: the car's speed is never calculated or shown as a number.`,
+    explodable: false,
+    layout: (s) => layoutCruise(s.cruise),
+    framing: () => cruiseFraming(),
+    camera: { far: 20, minDistance: 0.3, maxDistance: 8 },
+    viewDir: [0.15, 0.25, 1],
   },
 };
 

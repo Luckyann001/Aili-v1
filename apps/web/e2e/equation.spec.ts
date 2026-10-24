@@ -33,7 +33,7 @@ const N4 = /^Force times distance is the torque/;
  */
 async function toTurn6(page: Page, o: { muted?: boolean } = {}) {
   await installVoiceFakes(page, { speakMs: 3000 });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
   if (o.muted) await page.getByRole("button", { name: "Mute" }).click();
   await welcomeBox(page).fill("teach me robotics");

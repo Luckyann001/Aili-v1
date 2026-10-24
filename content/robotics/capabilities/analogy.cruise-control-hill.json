@@ -14,6 +14,7 @@
   "fidelity": "illustrative",
   "provenance": "authored",
   "review_status": "draft",
+  "scene": "cruise-control-hill",
   "mapping": [
     {
       "source": "set speed",

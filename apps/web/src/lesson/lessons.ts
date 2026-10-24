@@ -1,16 +1,17 @@
-// The prepared lessons the Learn stage can play (step 4 of docs/drone-pid-plan.md). The lever lesson
-// stays the default until Lucky approves the drone as the default; `?lesson=drone-pid` picks the drone.
+// The prepared lessons the Learn stage can play (step 4 of docs/drone-pid-plan.md). The drone lesson is
+// the default (Lucky, 24 Oct 2026); `?lesson=lever` picks the lever lesson, the second lesson and backup.
 // Kept free of content imports, so the start chip can read it without loading a script.
 
 export type LessonId = "beginner-lever" | "drone-pid";
 
-export const LESSONS: Record<LessonId, { startLabel: string; placeholders: readonly string[] }> = {
-  "beginner-lever": { startLabel: "Start: why reach makes holding harder", placeholders: ["effort_far_vs_near"] },
+/** `startScene`: what the stage shows before Start (the drone at rest on its stand; the lever lesson's arm). */
+export const LESSONS: Record<LessonId, { startLabel: string; placeholders: readonly string[]; startScene: "drone-altitude" | "base-joint-arm" }> = {
+  "beginner-lever": { startLabel: "Start: why reach makes holding harder", placeholders: ["effort_far_vs_near"], startScene: "base-joint-arm" },
   // The drone's numbers come from the run the learner just watched (solver results, never typed).
-  "drone-pid": { startLabel: "Start: a drone holding its height", placeholders: ["final_error_m", "overshoot_m"] },
+  "drone-pid": { startLabel: "Start: a drone holding its height", placeholders: ["final_error_m", "overshoot_m"], startScene: "drone-altitude" },
 };
 
-export const DEFAULT_LESSON: LessonId = "beginner-lever";
+export const DEFAULT_LESSON: LessonId = "drone-pid";
 
 /** The lesson the address asks for (`?lesson=drone-pid` or `?lesson=lever`), else the default. */
 export function lessonFromSearch(search: string): LessonId {

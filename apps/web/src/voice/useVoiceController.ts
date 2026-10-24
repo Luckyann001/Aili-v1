@@ -97,13 +97,13 @@ export function useVoiceController(opts: {
    * under; `onDone` fires only if nothing interrupted it.
    */
   const say = useCallback(
-    (lines: readonly string[], onDone: () => void) => {
+    (lines: readonly string[], onDone: () => void, opts: { chips?: string[]; source?: "prepared" | "answer" } = {}) => {
       const s = useVoice.getState();
       s.setHint(null);
       s.dispatch({ type: "submit" });
       stopEverything();
       const rev = useVoice.getState().rev;
-      playLines(rev, lines, undefined, onDone);
+      playLines(rev, lines, opts.chips, onDone, opts.source ? { source: opts.source } : undefined);
       return rev;
     },
     [playLines, stopEverything],

@@ -52,6 +52,14 @@ test.describe("drone PID lesson, prepared", () => {
     await pressRun(page);
     await said(page, "It rises, bobs, and settles below the line, short by 0.98 m.");
     await said(page, "You predicted below the target, and that is what happened.");
+    // The cruise-control analogy: the car on its hill (still frames under reduced motion), P then I, then
+    // the car becomes the drone, with the mapping and where it breaks down (D belongs to the drone).
+    await expect.poll(async () => (await stageOf(page)).scene, { timeout: 20000 }).toBe("cruise-control-hill");
+    const analogy = page.getByRole("region", { name: "Cruise control analogy" });
+    await expect(analogy).toContainText("Illustrative animation, not a simulation");
+    await expect(analogy).toContainText("P only: on the hill the car settles a little slower than its set speed.");
+    await expect(analogy).toContainText("gravity pulling the drone down");
+    await said(page, "That step is why the drone bounces and this car doesn't, so the car has no bounce for D to fix. D belongs to the drone.");
     // A much bigger P: the gap and the bounce (in metres) from that run.
     await pressRun(page);
     await said(page, "The gap shrinks to 0.33 m.");
@@ -92,27 +100,73 @@ test.describe("drone PID lesson, prepared", () => {
     expect((await spoken(page)).join(" ")).not.toMatch(/%|\[missing/);
   });
 
-  test("a stop while the lesson waits for Run: pressing Run later does not restart it", async ({ page }) => {
-    await installVoiceFakes(page, { speakMs: 40 });
+  test("harder to stop by accident: Escape and the mic while it waits for Run do nothing; after a stop, Run or Continue still plays the explanation", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 400 });
     await page.goto("/learn?lesson=drone-pid");
     await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
     await lessonChip(page).filter({ hasText: "Start: a drone holding its height" }).click();
     await answer(page, "Push harder");
     await answer(page, "Below it");
     await expect(page.getByText(PRESS_RUN)).toBeVisible({ timeout: 20000 });
+    // Waiting for Run: Escape does not stop the lesson.
     await page.keyboard.press("Escape");
-    await expect(lessonChip(page).filter({ hasText: "Continue the lesson" })).toBeVisible();
-    const before = (await spoken(page)).length;
+    await expect(lessonChip(page).filter({ hasText: "Continue the lesson" })).toHaveCount(0);
     await runButton(page).click();
-    await page.waitForTimeout(800);
-    expect((await spoken(page)).slice(before).some((l) => l.includes("short by"))).toBe(false);
+    await said(page, "It rises, bobs, and settles below the line, short by 0.98 m.");
+    // A stop while Aili explains: "Continue the lesson" replays the explanation from the run already flown.
+    await page.keyboard.press("Escape");
+    await expect(lessonChip(page).filter({ hasText: "Continue the lesson" })).toBeVisible({ timeout: 10000 });
+    const before = (await spoken(page)).length;
+    await lessonChip(page).filter({ hasText: "Continue the lesson" }).click();
+    await expect.poll(async () => (await spoken(page)).slice(before).some((l) => l.includes("short by 0.98 m")), { timeout: 20000 }).toBe(true);
     expect(await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze().then((r) => r.violations.map((v) => v.id))).toEqual([]);
   });
 
-  test("the lever lesson is still the default lesson", async ({ page }) => {
-    await installVoiceFakes(page, { speakMs: 40 });
+  test("typed questions get prepared answers, labelled, with the last run's numbers; anything else says plainly it needs the live professor", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 600 });
     await page.goto("/learn");
     await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
-    await expect(lessonChip(page).filter({ hasText: "Start: why reach makes holding harder" })).toBeVisible();
+    await expect(page.getByText("Typed questions get prepared answers here; the live professor is off.")).toBeVisible();
+    const box = page.getByRole("textbox", { name: /Ask Aili/ });
+    await box.fill("what does P do?");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.locator("main").getByText("Prepared answer · not reviewed").first()).toBeVisible({ timeout: 10000 });
+    await said(page, "P, for proportional, pushes harder the bigger the gap between the drone and the target.");
+    // After a run, the numbers are that run's.
+    await page.getByRole("button", { name: /^Run( again)?$/ }).first().click();
+    await box.fill("why does it stay below the line?");
+    await page.getByRole("button", { name: "Send" }).click();
+    await said(page, "In your last run, with P, the gap at the end was 0.98 m.", 30000);
+    // Not one of the prepared questions: said plainly, with the prepared questions as chips that send.
+    await box.fill("how much does a drone cost?");
+    await page.getByRole("button", { name: "Send" }).click();
+    await said(page, "I can't answer that here: typed questions need the live professor, which isn't on in this build.");
+    await replies(page).getByRole("button", { name: "What does D do?" }).click({ timeout: 15000 });
+    await said(page, "D, for derivative, pushes against the drone's speed.");
+  });
+
+  test("starting the drone lesson turns Captions on", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 300 });
+    await page.goto("/learn");
+    await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
+    const captions = page.getByRole("button", { name: "Captions" });
+    await captions.click();
+    await expect(captions).toHaveAttribute("aria-pressed", "false");
+    await lessonChip(page).filter({ hasText: "Start: a drone holding its height" }).click();
+    await expect(captions).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("the drone lesson is the default: its start chip, and the drone at rest on its stage before Start; the lever lesson at ?lesson=lever", async ({ page }) => {
+    await installVoiceFakes(page, { speakMs: 40 });
+    for (const path of ["/learn", "/learn?demo=1"]) {
+      await page.goto(path);
+      await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
+      await expect(lessonChip(page)).toHaveText("Start: a drone holding its height");
+      expect((await stageOf(page)).scene).toBe("drone-altitude");
+    }
+    await page.goto("/learn?lesson=lever");
+    await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
+    await expect(lessonChip(page)).toHaveText("Start: why reach makes holding harder");
+    expect((await stageOf(page)).scene).toBe("base-joint-arm");
   });
 });

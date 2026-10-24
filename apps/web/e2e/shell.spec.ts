@@ -15,7 +15,7 @@ test.describe("app shell", () => {
   }
 
   test("skip link is the first tab stop and moves focus to main", async ({ page }) => {
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await page.keyboard.press("Tab");
     const skip = page.getByRole("link", { name: "Skip to content" });
     await expect(skip).toBeFocused();
@@ -25,7 +25,7 @@ test.describe("app shell", () => {
   });
 
   test("logo links home", async ({ page }) => {
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await page.getByRole("link", { name: "AILI home" }).click();
     await expect(page).toHaveURL(/\/home$/);
   });
@@ -86,7 +86,7 @@ test.describe("app shell", () => {
   });
 
   test("the Prepared badge says what it means", async ({ page }) => {
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     const badge = page.getByRole("button", { name: /Prepared · Draft \(not expert-reviewed\)/ });
     await expect(badge).toBeVisible();
     await expect(badge).toHaveAccessibleDescription(/Not a live AI response/);

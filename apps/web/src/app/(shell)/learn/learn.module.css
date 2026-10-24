@@ -2095,3 +2095,53 @@
 .loopWhat {
   color: var(--aili-text-muted);
 }
+
+/* The cruise-control analogy's speedometer: the bar against a Copper set-speed mark (never colour alone:
+   the mark is a line and the words say it), the still frames, and the mapping table. */
+.cruiseOverlay {
+  width: min(420px, calc(100% - 16px));
+}
+
+.cruiseBarWrap {
+  display: grid;
+  gap: var(--aili-space-1);
+}
+
+.cruiseBarWrap .gaugeTrack {
+  position: relative;
+  overflow: visible;
+}
+
+.cruiseMark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  margin-left: -1px;
+  background: var(--aili-accent);
+}
+
+.cruiseFrames {
+  display: grid;
+  gap: var(--aili-space-2);
+}
+
+.cruiseMap {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.cruiseMap caption {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: var(--aili-space-1);
+}
+
+.cruiseMap th,
+.cruiseMap td {
+  padding: 2px var(--aili-space-1);
+  border-top: 1px solid var(--aili-border);
+  text-align: left;
+  font-weight: 400;
+}

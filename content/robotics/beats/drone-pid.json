@@ -312,6 +312,52 @@
         {
           "id": "p-analogy-3",
           "text": "With a P-like rule the car settles a little slower than the set speed, just as the drone settles a little low."
+        },
+        {
+          "id": "p-analogy-4",
+          "text": "A driver who notices the car has been slow for a while keeps pressing a little more, and closes the gap. That's I, which you'll try on the drone soon."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select_scene",
+          "scene": "cruise-control-hill"
+        },
+        {
+          "type": "play_animation",
+          "animation": "car-p-then-i"
+        }
+      ]
+    },
+    {
+      "id": "p-analogy-map",
+      "kind": "link",
+      "move": "explain",
+      "concepts": [
+        "ctl.steady-state-error"
+      ],
+      "narration": [
+        {
+          "id": "p-analogy-map-1",
+          "text": "Now the car becomes the drone: the set speed is the target height, the hill is gravity, and the accelerator is the thrust."
+        },
+        {
+          "id": "p-analogy-map-2",
+          "text": "Where it breaks down: a car controls speed, but the drone controls height, one more step between push and result."
+        },
+        {
+          "id": "p-analogy-map-3",
+          "text": "That step is why the drone bounces and this car doesn't, so the car has no bounce for D to fix. D belongs to the drone."
+        },
+        {
+          "id": "p-analogy-map-4",
+          "text": "And a driver sees the hill coming; a basic PID only reacts to the gap it already has."
+        }
+      ],
+      "actions": [
+        {
+          "type": "play_animation",
+          "animation": "dissolve-to-drone"
         }
       ]
     },
@@ -330,6 +376,10 @@
         }
       ],
       "actions": [
+        {
+          "type": "select_scene",
+          "scene": "drone-altitude"
+        },
         {
           "type": "set_parameter",
           "param": "kp_n_per_m",

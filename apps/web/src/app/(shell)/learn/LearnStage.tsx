@@ -26,6 +26,7 @@ import { CaptionText } from "./CalcText";
 import { CommandBar, type ChipOffer } from "./CommandBar";
 import { EffortGauge } from "./scene/EffortGauge";
 import { DroneLoopSteps } from "./scene/DroneLoopSteps";
+import { CruiseOverlay } from "./scene/CruiseOverlay";
 import { ConsentDialog } from "./ConsentDialog";
 import { DemoControls, useDemoMode } from "./DemoControls";
 import { IconTool } from "./IconTool";
@@ -44,6 +45,7 @@ import { VoiceButton, VoiceStatusLabel } from "./VoiceButton";
 import { useDronePlayback } from "@/scene/useDronePlayback";
 import { DEFAULT_LESSON, LESSONS, lessonFromSearch } from "@/lesson/lessons";
 import { noteDemand } from "@/lesson/demand";
+import { preparedReplyFor } from "@/lesson/preparedAnswers";
 import styles from "./learn.module.css";
 
 // Focus targets where Space already means something (typing, pressing, switching tabs).
@@ -144,6 +146,13 @@ export function LearnStage() {
   const lessonRev = useLesson((s) => s.rev);
   // Which prepared lesson: `?lesson=drone-pid` for the drone (step 4), else the lever lesson.
   const lessonId = useSyncExternalStore(() => () => {}, () => lessonFromSearch(window.location.search), () => DEFAULT_LESSON);
+  // Before Start, the stage shows the chosen lesson's own scene (before the first paint, so no other
+  // scene flashes). Only while nothing else has put a scene up.
+  useLayoutEffect(() => {
+    const scene = useScene.getState();
+    const start = LESSONS[lessonId].startScene;
+    if (scene.activeScene !== start && !useStageContent.getState().scenePicked && useLesson.getState().status === "idle") scene.setScene(start);
+  }, [lessonId]);
   const voicePrompt = useVoice((s) => s.prompt);
   const busy = isBusy(useVoice((s) => s.status));
 
@@ -165,6 +174,8 @@ export function LearnStage() {
       useLesson.getState().setScript(loaded.beats, loaded.title, lessonId);
     }
     if (how === "start") useStageContent.getState().setFixture(false); // the lesson takes the stage
+    // The drone lesson's explanations always show as text too: starting it turns Captions on (Lucky, 24 Oct 2026).
+    if (how === "start" && lessonId === "drone-pid" && !useLearnUi.getState().captionsOn) useLearnUi.getState().toggleCaptions();
     useLesson.getState().dispatch({ type: how });
   }, [lessonId]);
 
@@ -264,6 +275,7 @@ export function LearnStage() {
               <Inspector onClosed={focusParts} />
               <EffortGauge />
               <DroneLoopSteps />
+              <CruiseOverlay />
               <ExplanationSpace />
             </>
           )}
@@ -295,7 +307,7 @@ export function LearnStage() {
                   <LiveContentBadge demo={demoLabels} />
                 </span>
               ) : (
-                <ContentBadge kind={caption.source === "fixture" ? "fixture" : "prepared"} />
+                <ContentBadge kind={caption.source === "fixture" ? "fixture" : caption.source === "answer" ? "prepared-answer" : "prepared"} />
               )}
               <p aria-live={captionLive}>{caption.parts ? <CaptionText parts={caption.parts} /> : caption.text}</p>
             </div>
@@ -367,12 +379,26 @@ export function LearnStage() {
               () => void voice.say(DRONE_PLACEHOLDER, () => {})
             : live
             ? (t) => void demoTurn.start("valid", t) // the case is ignored by the live route
+            : !fakeDemo && lessonId === "drone-pid" && INCLUDE_DRAFTS
+            ? // The prepared drone lesson: typed questions get a prepared answer (or say plainly they need the live professor).
+              (t) => {
+                const reply = preparedReplyFor(t);
+                voice.say(reply.lines, () => {}, { chips: reply.chips, source: reply.matched ? "answer" : "prepared" });
+              }
             : fakeDemo
               ? (t) => void demoTurn.start("valid", t)
               : voice.submit
         }
-        note={live ? (demoNote ?? LIVE_NOTE) : fakeDemo ? "Scripted reply: it does not respond to what you typed." : undefined}
-        chipsSend={live === true}
+        note={
+          live
+            ? (demoNote ?? LIVE_NOTE)
+            : fakeDemo
+              ? "Scripted reply: it does not respond to what you typed."
+              : lessonId === "drone-pid" && INCLUDE_DRAFTS
+                ? "Typed questions get prepared answers here; the live professor is off."
+                : undefined
+        }
+        chipsSend={live === true || (!fakeDemo && lessonId === "drone-pid" && INCLUDE_DRAFTS)}
         onVoice={() => void voice.press()}
         inputRef={inputRef}
         offer={offer}

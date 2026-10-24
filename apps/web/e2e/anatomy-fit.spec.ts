@@ -16,7 +16,7 @@ type Box = [number, number, number, number];
 
 async function toServo(page: Page) {
   await installVoiceFakes(page, { speakMs: 1200 });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
   await welcomeBox(page).fill("teach me robotics");
   await page.getByRole("button", { name: "Send" }).click();

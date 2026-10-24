@@ -26,7 +26,7 @@ test("the whole lesson works by keyboard alone, with a visible focus ring at eve
   test.skip(info.project.name !== "desktop", "keyboard");
   test.setTimeout(120_000);
   await installVoiceFakes(page, { speakMs: 200 });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
 
   await tabTo(page, /^Start: why reach/);
@@ -71,7 +71,7 @@ for (const scene of ["arm", "lever"] as const) {
       } as typeof original;
     });
     await installVoiceFakes(page, { speakMs: 200 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.getByText("3D view isn't available on this device, so here is a still picture of the parts.")).toBeVisible({ timeout: 15000 }); // the still loading picture shows first
     if (scene === "lever") {
       await tabTo(page, /^Start: why reach/);
@@ -99,7 +99,7 @@ for (const scheme of ["light", "dark"] as const) {
     const { default: AxeBuilder } = await import("@axe-core/playwright");
     await page.emulateMedia({ colorScheme: scheme });
     await installVoiceFakes(page, { speakMs: 200 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
     const failures: string[] = [];
     for (let i = 0; i < 20; i++) {
@@ -117,7 +117,7 @@ test("reduced motion: every CSS animation and transition is effectively off", as
   test.skip(info.project.name !== "phone", "covers the sheet animation too");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installVoiceFakes(page, { speakMs: 200 });
-  await page.goto("/learn?demo=1");
+  await page.goto("/learn?lesson=lever&demo=1");
   await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
   // The listening pulse on the voice button (via the demo control)…
   await page.getByText("Demo controls (testing only)").click();

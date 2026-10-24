@@ -70,8 +70,14 @@ export const runDrone = (settings: DroneSettings, kind: RunKind, seq: number, st
   result: pidAltitude1d(droneInput(settings, kind, start)),
 });
 
-/** The lesson's {{placeholders}} from a finished run: the gap and the bounce in metres, as the stage shows them. */
-export const runPlaceholders = (r: DroneRun): Record<string, string> => ({ final_error_m: m2(Math.abs(r.result.final_error_m)), overshoot_m: m2(r.result.overshoot_m) });
+/** Which switches a run used, in words ("P + D", or "no terms on"). */
+export const runTerms = (r: DroneRun): string => {
+  const on = SWITCHES.filter((sw) => (r.settings[sw.gain] ?? 0) > 0).map((sw) => sw.name);
+  return on.length ? on.join(" + ") : "no terms on";
+};
+
+/** The lesson's {{placeholders}} from a finished run: the gap and the bounce in metres, as the stage shows them, and its terms in words. */
+export const runPlaceholders = (r: DroneRun): Record<string, string> => ({ final_error_m: m2(Math.abs(r.result.final_error_m)), overshoot_m: m2(r.result.overshoot_m), run_terms: runTerms(r) });
 
 /** The run's length, s (the trace's last sample). */
 export const runLength_s = (r: PidAltitudeResult) => r.trace.t_s.at(-1) ?? 0;

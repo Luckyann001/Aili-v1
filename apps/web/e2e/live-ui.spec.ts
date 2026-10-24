@@ -74,7 +74,7 @@ async function openLive(page: Page, turns: Ev[][]) {
     await r.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: sse(events, body.state_rev) });
   });
   await installVoiceFakes(page, { speakMs: 150 });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(welcome(page)).toBeVisible({ timeout: 20000 });
   return sent;
 }
@@ -216,7 +216,7 @@ test.describe("live mode (demo mode A), browser side, mocked server", () => {
   test("live mode off (the server says no): the prepared page as before", async ({ page }) => {
     await page.route("**/api/live", (r: Route) => r.fulfill({ json: { live: false } }));
     await installVoiceFakes(page);
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(box(page, "Ask Aili or answer")).toBeVisible();
     await expect(page.getByText(/^Start: why reach makes holding harder/)).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(/Live AI: your message/)).toHaveCount(0);
@@ -236,7 +236,7 @@ test.describe("live turns: waiting, failures and interrupt (slice 4, mocked serv
     await page.route("**/api/turn/interrupt", (r) => (interrupts.push(r.request().postDataJSON()), r.fulfill({ json: { stopped: true } })));
     await page.route("**/api/turn", (r) => respond(r, (r.request().postDataJSON() as { state_rev: number }).state_rev));
     await installVoiceFakes(page, { speakMs: 150 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(welcome(page)).toBeVisible({ timeout: 20000 });
     return interrupts;
   }

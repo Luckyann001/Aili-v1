@@ -8,6 +8,7 @@ import droneScript from "../../../../content/robotics/beats/drone-pid.json";
 import arm from "../../../../content/robotics/scenes/base-joint-arm.json";
 import lever from "../../../../content/robotics/scenes/lever-analogy.json";
 import drone from "../../../../content/robotics/scenes/drone-altitude.json";
+import cruise from "../../../../content/robotics/scenes/cruise-control-hill.json";
 import type { BeatDef } from "./runner";
 import { LESSONS, type LessonId } from "./lessons";
 
@@ -21,7 +22,13 @@ const SOURCES: Record<LessonId, { script: unknown; scenes: Array<{ file: string;
       { file: "lever-analogy.json", data: lever },
     ],
   },
-  "drone-pid": { script: droneScript, scenes: [{ file: "drone-altitude.json", data: drone }] },
+  "drone-pid": {
+    script: droneScript,
+    scenes: [
+      { file: "drone-altitude.json", data: drone },
+      { file: "cruise-control-hill.json", data: cruise },
+    ],
+  },
 };
 
 export function loadLesson(id: LessonId): { beats: BeatDef[]; title: string } | { errors: string[] } {

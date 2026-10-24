@@ -129,6 +129,20 @@ function droneSide(): Record<string, Shape> {
   return s;
 }
 
+/** The cruise-control analogy, side view (not to scale): the car on the flat road before the hill. */
+function cruiseSide(): Record<string, Shape> {
+  return {
+    road: { x: 20, y: 150, w: 130, h: 6, label: [85, 172] },
+    hill: { x: 150, y: 110, w: 150, h: 6, label: [225, 100] },
+    car: { x: 60, y: 126, w: 50, h: 14, label: [85, 116] },
+    cab: { x: 68, y: 116, w: 26, h: 10, label: [81, 108], quiet: true },
+    "wheel-1": { x: 98, y: 140, w: 8, h: 8, label: [102, 160], quiet: true },
+    "wheel-2": { x: 64, y: 140, w: 8, h: 8, label: [68, 160], quiet: true },
+    "wheel-3": { x: 100, y: 140, w: 6, h: 6, label: [103, 160], inside: true, quiet: true },
+    "wheel-4": { x: 66, y: 140, w: 6, h: 6, label: [69, 160], inside: true, quiet: true },
+  };
+}
+
 /** The stand behind the drone: plate, guide post, and the mast with the set-height collar (not to scale). */
 function DroneStandDecor() {
   return (
@@ -157,7 +171,7 @@ export function SceneFallback({ loading = false }: { loading?: boolean }) {
   const drone = useScene((s) => s.drone);
   const model = MODELS[activeScene];
   const shapes =
-    activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : activeScene === "bag-hold" ? bagHold(bagReach) : activeScene === "drone-altitude" ? droneSide() : ARM;
+    activeScene === "lever-analogy" ? lever(distance) : activeScene === "servo-arm" ? servoArm(servo) : activeScene === "bag-hold" ? bagHold(bagReach) : activeScene === "drone-altitude" ? droneSide() : activeScene === "cruise-control-hill" ? cruiseSide() : ARM;
   const hidden = model.hidden?.({ ...useScene.getState(), drone }) ?? new Set<string>();
   const names = model.parts.map((p) => p.name.toLowerCase()).join(", ");
   const parts = (activeScene === "servo-arm" ? SERVO_ORDER.map((id) => model.parts.find((p) => p.id === id)!) : model.parts).filter((p) => !hidden.has(p.id));

@@ -19,7 +19,7 @@ const axe = async (p: Page) =>
 
 async function openDemo(page: Page, speakMs = 300) {
   await installVoiceFakes(page, { speakMs });
-  await page.goto("/learn?demo=1");
+  await page.goto("/learn?lesson=lever&demo=1");
   await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
 }
 async function typeAndSend(page: Page, text = "Why is it hard to hold?") {
@@ -200,7 +200,7 @@ test("without ?demo=1 nothing changes: no scripted line, the prepared reply, no 
   const turnCalls: string[] = [];
   page.on("request", (r) => r.url().includes("/api/turn") && turnCalls.push(r.url()));
   await installVoiceFakes(page, { speakMs: 100 });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(page.getByText(SCRIPTED)).toHaveCount(0);
   await expect(page.getByText("Demo controls (testing only)")).toHaveCount(0);
   await typeAndSend(page);

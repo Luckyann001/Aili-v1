@@ -12,7 +12,8 @@ import { placeLabels, type LabelBox } from "@/scene/labelPlacement";
 import { settingsOf } from "@/scene/handover";
 import { cornersOf, layoutBag, type PartLayout } from "@/scene/layout";
 import { MODELS } from "@/scene/models";
-import { CYLINDER_SEGMENTS, PROP_DISC_R, STAND, collarHeight_m, layoutDrone, mastTicks } from "@/scene/drone";
+import { CYLINDER_SEGMENTS, DEFAULT_DRONE, PROP_DISC_R, STAND, collarHeight_m, layoutDrone, mastTicks } from "@/scene/drone";
+import { carCentre } from "@/scene/cruise";
 import { sampleAt } from "@/scene/droneRun";
 import { DEFAULT_VIEW, type FillRole } from "@/scene/placeholderModel";
 import { useLesson } from "@/lesson/store";
@@ -114,6 +115,8 @@ export default function SceneCanvas(props: SceneCanvasProps) {
       {activeScene === "drone-altitude" && <PropDiscs colors={props.colors} />}
       {activeScene === "drone-altitude" && <DroneArrows colors={props.colors} />}
       {activeScene === "drone-altitude" && <DroneLoopRing colors={props.colors} />}
+      {activeScene === "cruise-control-hill" && <CruiseDriver />}
+      {activeScene === "cruise-control-hill" && <DroneGhost colors={props.colors} />}
       {activeScene === "drone-altitude" && <DroneDriver reducedMotion={props.spatialMs <= 0} />}
       <CameraLimits />
       {activeScene === "servo-arm" && props.spatialMs <= 0 && <OffsetLines colors={props.colors} />}
@@ -161,7 +164,8 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   const drone = useScene((s) => s.drone);
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef<Mesh>(null);
-  const state = { params, leverDistance_m, bagReach_m, servo, drone };
+  const mat = useRef<Material & { opacity: number }>(null);
+  const state = { params, leverDistance_m, bagReach_m, servo, drone, cruise: useScene.getState().cruise };
   const hidden = (useServoAway() && HIDDEN_WHILE_APART.has(id)) || !!MODELS[activeScene].hidden?.(state).has(id);
   // The drone's downward rangefinder glows while it is pointed at, and on the loop's "Measure" step (beat 1).
   const loopMeasure = useScene((s) => s.droneLoop === 1 || s.droneLoop === 4);
@@ -172,13 +176,20 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
   // Size depends on the scene settings; position also on the explode amount (set per frame). The drone's
   // height is read live each frame from the run being played, so its parts never re-render to move.
   const isDrone = activeScene === "drone-altitude";
-  const live = () => (isDrone ? { ...state, drone: droneNow(useScene.getState()) } : state);
+  const isCruise = activeScene === "cruise-control-hill";
+  // The drone's height and the analogy's car are read live each frame (they move without re-renders).
+  const live = () => (isDrone ? { ...state, drone: droneNow(useScene.getState()) } : isCruise ? { ...state, cruise: useScene.getState().cruise } : state);
   const layoutAt = (k: number) => MODELS[activeScene].layout(live(), k)[id]!;
   const { kind, size } = layoutAt(0);
   const spins = isDrone && id.startsWith("rotor-");
   useFrame(() => {
-    ref.current?.position.set(...layoutAt(anim.explode).position);
+    const l = layoutAt(anim.explode);
+    ref.current?.position.set(...l.position);
+    if (l.rotation) ref.current?.rotation.set(...l.rotation);
     if (spins && ref.current) ref.current.rotation.y = droneSpin.angle * (id === "rotor-1" || id === "rotor-3" ? 1 : -1);
+    if (mat.current) mat.current.opacity = l.opacity ?? 1;
+    // Faded out (the analogy's car after the dissolve): hidden, outline included.
+    if (ref.current) ref.current.visible = (l.opacity ?? 1) > 0.02;
   });
 
   const geometry = (inflate: number) =>
@@ -192,13 +203,14 @@ function PartMesh({ id, fill, colors }: { id: string; fill: FillRole; colors: Sc
     <mesh
       ref={ref}
       position={layoutAt(anim.explode).position}
+      rotation={layoutAt(anim.explode).rotation ?? [0, 0, 0]}
       name={id}
       {...partEvents(id, select)}
     >
       {geometry(0)}
-      <meshStandardMaterial color={colors.fills[fill]} roughness={0.7} metalness={0.05} emissive={glow ? colors.accent : "#000000"} emissiveIntensity={glow ? 0.9 : 0} />
-      {/* The drone's figures carry Ink outlines (brand doc: fills with Ink outlines), so they read on the stage. */}
-      {isDrone && <InkEdges kind={kind === "box" ? "box" : "cylinder"} dims={size} color={colors.outline} />}
+      <meshStandardMaterial ref={mat} color={colors.fills[fill]} roughness={0.7} metalness={0.05} emissive={glow ? colors.accent : "#000000"} emissiveIntensity={glow ? 0.9 : 0} transparent={isCruise} />
+      {/* The drone's and the analogy's figures carry Ink outlines (brand doc: fills with Ink outlines). */}
+      {(isDrone || isCruise) && <InkEdges kind={kind === "box" ? "box" : "cylinder"} dims={size} color={colors.outline} />}
       {selected && (
         // Selection outline: an inverted shell OUTLINE_M larger on every side, drawn from inside.
         <mesh raycast={() => null}>
@@ -571,6 +583,40 @@ function DroneDriver({ reducedMotion }: { reducedMotion: boolean }) {
     droneSpin.angle = (droneSpin.angle + SPIN_AT_MAX_RAD_S * Math.sqrt(Math.max(0, thrust) / s.droneRun.result.max_thrust_n) * Math.min(dt, 0.1)) % (2 * Math.PI);
   });
   return null;
+}
+
+/** The analogy's car moves without re-renders: a frame whenever its state changes. */
+function CruiseDriver() {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => useScene.subscribe((s, prev) => (s.cruise !== prev.cruise ? invalidate() : undefined)), [invalidate]);
+  return null;
+}
+
+/**
+ * The dissolve: the drone fades in where the car is, in the same frame, as the car fades out (the
+ * analogy's "same frame" moment). Drawing only; not selectable; its opacity is the dissolve's.
+ */
+function DroneGhost({ colors }: { colors: SceneColors }) {
+  const fade = useScene((s) => s.cruise.fade);
+  const pos = useScene((s) => s.cruise.pos);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [fade, pos, colors, invalidate]);
+  if (fade <= 0) return null;
+  const parts = layoutDrone(DEFAULT_DRONE);
+  const body = parts.body!.position;
+  const at = carCentre(pos);
+  return (
+    <group name="drone-ghost" position={[at[0] - body[0], at[1] - body[1], at[2] - body[2]]}>
+      {Object.entries(parts)
+        .filter(([id]) => id !== "payload-camera")
+        .map(([id, p]) => (
+          <mesh key={id} position={p.position} raycast={() => null}>
+            {p.kind === "box" ? <boxGeometry args={p.size} /> : <cylinderGeometry args={[p.size[0], p.size[0], p.size[1], CYLINDER_SEGMENTS]} />}
+            <meshStandardMaterial color={colors.fills.technical} transparent opacity={fade} />
+          </mesh>
+        ))}
+    </group>
+  );
 }
 
 /** Beat 1's feedback loop: a dashed Copper ring around the drone while the loop plays (its steps are named on the stage). */
@@ -999,7 +1045,7 @@ function LabelTracker({
     const { takeW, takeH } = reservedSpace(area);
     const w = area.clientWidth - takeW;
     const h = area.clientHeight - takeH;
-    const state = { params, leverDistance_m, bagReach_m, servo, drone: activeScene === "drone-altitude" ? droneNow(useScene.getState()) : drone, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) };
+    const state = { params, leverDistance_m, bagReach_m, servo, drone: activeScene === "drone-altitude" ? droneNow(useScene.getState()) : drone, cruise: useScene.getState().cruise, servoPose: servoPoseOf({ servoFrom, servoView, servoMotion }) };
     const layout = MODELS[activeScene].layout(state, anim.explode);
     const hiddenParts = MODELS[activeScene].hidden?.(state);
     writeData(host, "modelBox", projectedBox(layout, camera, size));

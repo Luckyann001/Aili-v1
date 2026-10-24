@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DirectorSegment, SceneManifest } from "@aili/schemas";
 import { pidAltitude1d } from "@aili/solvers";
-import { loadRegistry, validateBeats, validateRegistry } from "./index";
+import { loadRegistry, matchAnswer, validateBeats, validatePreparedAnswers, validateRegistry } from "./index";
 
 // The drone altitude PID lesson's content (docs/lesson-drone-pid.md, step 2): all drafts in git.
 
@@ -161,5 +161,43 @@ describe("drone content: what the beats say happens, from the solver", () => {
   it("the camera makes the P + D gap bigger", () => {
     const pd = { ...base, kp_n_per_m: 10, ki_n_per_m_s: 0, kd_n_s_per_m: 6 };
     expect(pidAltitude1d({ ...pd, payload_kg: 0.5 }).final_error_m).toBeGreaterThan(pidAltitude1d(pd).final_error_m + 0.4);
+  });
+});
+
+describe("drone content: prepared answers for typed questions (24 Oct 2026)", () => {
+  const raw = () => readJson("answers/drone-pid.json");
+
+  it("validates: drafts, labelled, patterns compile, no typed numbers, each question finds its own answer", () => {
+    const r = validatePreparedAnswers(raw());
+    expect(r.errors).toEqual([]);
+    expect(r.answers!.review_status).toBe("draft");
+    expect(r.answers!.label).toBe("Prepared answer · not reviewed");
+    expect(r.answers!.answers.map((a) => a.question)).toEqual(["What does P do?", "What does I do?", "What does D do?", "Why does it stay below the line?", "Why does it bounce?", "What happens with a heavier drone?", "What is PID?"]);
+  });
+
+  it("typed variants match the right answer; anything else matches nothing", () => {
+    const a = validatePreparedAnswers(raw()).answers!;
+    const id = (t: string) => matchAnswer(a, t)?.id ?? null;
+    expect(id("what does P do")).toBe("what-p");
+    expect(id("What's the proportional part for?")).toBe("what-p");
+    expect(id("what is the I term")).toBe("what-i");
+    expect(id("explain derivative")).toBe("what-d");
+    expect(id("why does the drone hover below the target?")).toBe("why-below");
+    expect(id("why does it overshoot")).toBe("why-bounce");
+    expect(id("what if I add a camera")).toBe("heavier");
+    expect(id("what is PID")).toBe("what-pid");
+    expect(id("what do I do now?")).toBeNull();
+    expect(id("how much does a drone cost")).toBeNull();
+  });
+
+  it("refuses a typed number, an unknown placeholder and a bad pattern", () => {
+    const bad = (patch: (d: ReturnType<typeof raw>) => void) => {
+      const d = raw();
+      patch(d);
+      return validatePreparedAnswers(d).errors.join("\n");
+    };
+    expect(bad((d) => (d.answers[0].lines[0] = "It settles 0.98 m short."))).toMatch(/hard-coded number/);
+    expect(bad((d) => (d.answers[3].after_run[0] = "The gap was {{torque_nm}}."))).toMatch(/unknown placeholder/);
+    expect(bad((d) => (d.answers[0].match = ["(unclosed"]))).toMatch(/does not compile/);
   });
 });

@@ -24,7 +24,7 @@ const axe = async (p: Page) =>
 
 async function openLearn(page: Page, speakMs = 200) {
   await installVoiceFakes(page, { speakMs });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(page.locator('[data-viewer="ready"]')).toBeVisible({ timeout: 20000 });
 }
 
@@ -207,7 +207,7 @@ test.describe("beginner lever lesson", () => {
       } as typeof original;
     });
     await installVoiceFakes(page, { speakMs: 200 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await startLesson(page);
     await expect(page.getByRole("img", { name: /Still side view of the ruler held out with a weight/ })).toBeVisible({ timeout: 15000 });
     await replies(page).getByRole("button", { name: "Far from you" }).click({ timeout: 15000 });

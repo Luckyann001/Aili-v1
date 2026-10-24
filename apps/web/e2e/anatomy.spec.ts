@@ -32,7 +32,7 @@ const T9_Q = /^Which part do you think decides/;
 /** Turns 1 to 3 (the servo + arm on stage); each sent once the stage has what the next needs. */
 async function toServo(page: Page, speakMs = 1200) {
   await installVoiceFakes(page, { speakMs });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
   await welcomeBox(page).fill("teach me robotics");
   await page.getByRole("button", { name: "Send" }).click();

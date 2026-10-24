@@ -18,6 +18,8 @@ test("draft scenes are hidden: no 3D, no draft badge, a plain notice", async ({ 
 
 test("the lesson says plainly it isn't available yet, and asks nothing", async ({ page }) => {
   await page.goto("/learn");
+  // The default lesson is the drone's (24 Oct 2026); its scene is a draft, so production says so plainly.
+  await expect(page.getByRole("group", { name: "Lesson" }).getByRole("button")).toHaveText("Start: a drone holding its height");
   await page.getByRole("group", { name: "Lesson" }).getByRole("button").click();
   await expect(page.getByText("This lesson isn't available yet: its scenes are drafts that haven't been expert-reviewed.")).toBeVisible();
   await expect(page.getByRole("group", { name: "Suggested replies" })).toHaveCount(0);

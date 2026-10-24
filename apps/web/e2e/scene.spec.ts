@@ -25,7 +25,7 @@ const label = (p: Page, id: string) => p.locator(`span[data-part-id="${id}"]`);
 const camera = async (p: Page) => (await host(p).getAttribute("data-camera"))!.split(",").map(Number);
 const dist = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
 
-async function openScene(page: Page, path = "/learn") {
+async function openScene(page: Page, path = "/learn?lesson=lever") {
   await page.goto(path);
   await expect(ready(page)).toBeVisible({ timeout: 20000 });
 }
@@ -70,7 +70,7 @@ test.describe("loading and budget", () => {
       await route.fulfill({ response, body });
     });
     await installVoiceFakes(page);
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.getByText("Loading the 3D view… here is a still picture of the parts meanwhile.")).toBeVisible();
     // The rest of the stage works while the 3D code is still on its way.
     await page.getByRole("textbox", { name: "Ask Aili or answer" }).fill("What is a servo?");
@@ -95,7 +95,7 @@ test.describe("loading and budget", () => {
       await held; // keep the 3D code back until we have looked at the loading state
       await route.continue();
     });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     const still = page.locator('[data-fallback="loading"]');
     await expect(still).toBeVisible();
     await expect(page.getByRole("img", { name: /Still side view of the placeholder model/ })).toBeVisible();
@@ -526,7 +526,7 @@ test.describe("fallback", () => {
         return (original as (...a: unknown[]) => unknown).call(this, type, ...rest);
       } as typeof original;
     });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.getByText("3D view isn't available on this device, so here is a still picture of the parts.")).toBeVisible();
     await expect(page.locator("canvas")).toHaveCount(0);
     await expect(page.getByRole("img", { name: /Still side view of the placeholder model/ })).toBeVisible();
@@ -636,7 +636,7 @@ test.describe("testing-only performance readout (?demo=1)", () => {
   test("shows load, 3D-ready and orbit timings and the renderer; copies them as text", async ({ page, context }, info) => {
     test.skip(info.project.name === "tablet");
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await page.goto("/learn?demo=1");
+    await page.goto("/learn?lesson=lever&demo=1");
     await expect(ready(page)).toBeVisible({ timeout: 20000 });
     await page.getByText("Demo controls (testing only)").click();
     const panel = page.getByRole("region", { name: "Performance readout (testing only)" });
@@ -671,7 +671,7 @@ test.describe("testing-only performance readout (?demo=1)", () => {
   });
 
   test("is not shown without ?demo=1", async ({ page }) => {
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(ready(page)).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole("region", { name: "Performance readout (testing only)" })).toHaveCount(0);
   });

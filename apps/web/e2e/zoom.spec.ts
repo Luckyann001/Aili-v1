@@ -35,7 +35,7 @@ for (const mode of ["zoom200", "largeText"] as const) {
     else await page.setViewportSize({ width: 360, height: 740 });
     await installVoiceFakes(page, { speakMs: 200 });
     if (mode === "largeText") await page.addInitScript(() => document.addEventListener("DOMContentLoaded", () => (document.documentElement.style.fontSize = "200%")));
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await page.locator('[data-viewer="ready"]').waitFor({ timeout: 20000 });
     await audit(page, `${mode} /learn idle`, mode === "zoom200" ? 206 : 360);
     await page.screenshot({ path: info.outputPath(`${mode}-idle.png`), fullPage: true });

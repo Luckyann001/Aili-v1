@@ -19,7 +19,7 @@
     "predev:lan": "node scripts/copy-assets.mjs",
     "predev:live": "node scripts/copy-assets.mjs",
     "dev:demo": "AILI_LIVE=1 AILI_CONTENT_MODE=founder-demo next dev -H 127.0.0.1",
-    "dev:record": "AILI_RECORDING=1 next dev -H 127.0.0.1",
+    "dev:record": "AILI_RECORDING=1 NEXT_PUBLIC_AILI_DEMO_TOOLS=0 next dev -H 127.0.0.1",
     "predev:demo": "node scripts/copy-assets.mjs",
     "test:e2e:demo": "playwright test -c playwright.demo.config.ts"
   },

@@ -2,10 +2,12 @@ import { contentLabel, type LabelledItem } from "@aili/schemas/labels";
 import styles from "./ContentBadge.module.css";
 
 /** Prepared vs live vs AI-composed content must always be visibly labelled (CLAUDE.md, honesty rules). */
-export type ContentKind = "prepared" | "live" | "illustrative" | "fixture" | "fixture-content" | "demo-reviewed" | "demo-unreviewed";
+export type ContentKind = "prepared" | "prepared-answer" | "live" | "illustrative" | "fixture" | "fixture-content" | "demo-reviewed" | "demo-unreviewed";
 
 const LABEL: Record<ContentKind, string> = {
   prepared: "Prepared",
+  // A typed question matched to a prepared answer (the drone lesson, 24 Oct 2026): draft content.
+  "prepared-answer": "Prepared answer · not reviewed",
   live: "Live AI",
   illustrative: "Illustrative",
   fixture: "Test fixture",
@@ -17,6 +19,7 @@ const LABEL: Record<ContentKind, string> = {
 
 const DESCRIPTION: Record<ContentKind, string> = {
   prepared: "Prepared content, written in advance. Not a live AI response.",
+  "prepared-answer": "A prepared answer, written in advance as draft content and not reviewed yet. Not a live AI response; its numbers come from your last run.",
   live: "Live response from a real AI model. It can be wrong; its numbers come from Aili's calculators.",
   illustrative: "Illustrative. No verified model.",
   fixture: "Test fixture: a scripted fake-director turn for testing. Not a live AI response.",
@@ -47,7 +50,7 @@ export function ContentBadge({ kind, item }: { kind: ContentKind; item?: Labelle
 function BadgeIcon({ kind }: { kind: ContentKind }) {
   const p = { width: 14, height: 14, viewBox: "0 0 14 14", "aria-hidden": true, stroke: "currentColor", strokeWidth: 1.6 } as const;
   // Prepared, and the founder demo's prepared content (the words say whether it was reviewed).
-  if (kind === "prepared" || kind === "demo-reviewed" || kind === "demo-unreviewed")
+  if (kind === "prepared" || kind === "prepared-answer" || kind === "demo-reviewed" || kind === "demo-unreviewed")
     return (
       <svg {...p} fill="none">
         <rect x="2" y="2" width="10" height="10" rx="1.5" />

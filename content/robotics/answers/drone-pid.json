@@ -1,0 +1,128 @@
+{
+  "id": "drone-pid-answers",
+  "lesson": "drone-pid",
+  "review_status": "draft",
+  "label": "Prepared answer · not reviewed",
+  "placeholders": [
+    "final_error_m",
+    "overshoot_m",
+    "run_terms"
+  ],
+  "answers": [
+    {
+      "id": "what-p",
+      "question": "What does P do?",
+      "match": [
+        "\\bwhat (does|is|do) (the )?p\\b(?!\\w)",
+        "\\bp (term|gain|do|does)\\b",
+        "\\bproportional\\b"
+      ],
+      "lines": [
+        "P, for proportional, pushes harder the bigger the gap between the drone and the target.",
+        "No gap, no push: so with P alone the drone settles a little below the line, where the gap is just big enough to hold its weight."
+      ]
+    },
+    {
+      "id": "what-i",
+      "question": "What does I do?",
+      "match": [
+        "\\bwhat (does|is) (the )?i\\b(?!')",
+        "\\bi (term|gain)\\b",
+        "\\bintegral\\b"
+      ],
+      "lines": [
+        "I, for integral, keeps a running total of the gap over time.",
+        "While the drone stays low, that total grows and adds thrust until the gap is closed; at rest, I alone holds up the weight."
+      ]
+    },
+    {
+      "id": "what-d",
+      "question": "What does D do?",
+      "match": [
+        "\\bwhat (does|is) (the )?d\\b(?!\\w)",
+        "\\bd (term|gain)\\b",
+        "\\bderivative\\b"
+      ],
+      "lines": [
+        "D, for derivative, pushes against the drone's speed.",
+        "Rushing up, it eases off early, which damps the bounce; at rest the speed is zero, so D adds nothing."
+      ]
+    },
+    {
+      "id": "why-below",
+      "question": "Why does it stay below the line?",
+      "match": [
+        "\\b(stay|stays|sit|sits|hover|hovers|settle|settles|stop|stops)\\b.*\\b(below|low|under|short)\\b",
+        "\\bbelow the (line|target)\\b",
+        "\\bwhy\\b.*\\bgap\\b"
+      ],
+      "lines": [
+        "To hover, the thrust must equal the drone's weight, and P only pushes when there is a gap.",
+        "So the drone sinks until the gap is just big enough to make that thrust. A term that remembers the gap, I, closes it."
+      ],
+      "after_run": [
+        "In your last run, with {{run_terms}}, the gap at the end was {{final_error_m}}."
+      ]
+    },
+    {
+      "id": "why-bounce",
+      "question": "Why does it bounce?",
+      "match": [
+        "\\bbounc",
+        "\\bovershoot",
+        "\\boscillat",
+        "\\bring(s|ing)?\\b",
+        "\\bshoots? (past|over)\\b"
+      ],
+      "lines": [
+        "The drone rushes toward the line, and its speed carries it past, like a swing.",
+        "More P means harder pushes and a bigger bounce; D eases off as it rushes up, which damps it."
+      ],
+      "after_run": [
+        "In your last run, with {{run_terms}}, it rose {{overshoot_m}} past where it ended up."
+      ]
+    },
+    {
+      "id": "heavier",
+      "question": "What happens with a heavier drone?",
+      "match": [
+        "\\bheav(y|ier)\\b",
+        "\\bcamera\\b",
+        "\\bpayload\\b",
+        "\\bparcel\\b",
+        "\\bmore (mass|weight)\\b"
+      ],
+      "lines": [
+        "A heavier drone needs more thrust to hover.",
+        "With P and D only, P makes that thrust only from a gap, so the gap gets bigger; I brings it back to the line."
+      ]
+    },
+    {
+      "id": "what-pid",
+      "question": "What is PID?",
+      "match": [
+        "\\bpid\\b",
+        "\\bwhat is (a )?(feedback|controller|control loop)\\b"
+      ],
+      "lines": [
+        "PID is a rule for turning a gap into a push.",
+        "P pushes in proportion to the gap now, I adds up the gap over time, and D pushes against the speed."
+      ]
+    }
+  ],
+  "fallback": {
+    "lines": [
+      "I can't answer that here: typed questions need the live professor, which isn't on in this build.",
+      "These questions have prepared answers. Tap one, or keep going with the lesson."
+    ],
+    "suggest": [
+      "what-p",
+      "what-i",
+      "what-d",
+      "why-below",
+      "why-bounce",
+      "what-pid",
+      "heavier"
+    ]
+  }
+}

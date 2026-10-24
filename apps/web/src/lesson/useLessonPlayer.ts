@@ -175,7 +175,11 @@ export function useLessonPlayer(voice: Voice) {
     };
     // A beat whose words need the learner's run: set the stage, wait for Run and the run's end, then speak.
     if (learnerRun(beat)) {
-      const before = useScene.getState().droneRun?.seq ?? 0;
+      // The run count when this beat first waited; a stop and Continue on the same beat keep it, so a
+      // run already flown (or pressed while stopped) still counts.
+      const kept = useLesson.getState().runBaseline;
+      const before = kept && kept.beatIndex === beatIndex ? kept.seq : (useScene.getState().droneRun?.seq ?? 0);
+      useLesson.getState().setRunBaseline({ beatIndex, seq: before });
       void applyActions({ ...beat, actions: (beat.actions ?? []).filter((a: Action) => a.type !== "run_simulation") }, r);
       useLesson.getState().setAwaitingRun(true);
       useVoice.getState().setHint({ text: PRESS_RUN, kind: "info" });
@@ -197,19 +201,18 @@ export function useLessonPlayer(voice: Voice) {
     sayOwn([answerFeedback, CLOSING_LINE], () => {});
   }, [status, answerFeedback, sayOwn]);
 
-  // While the lesson waits for Run nothing is speaking, so Escape has no speech to stop: it stops the
-  // lesson itself (it can be continued; a later Run press does not run on into the next beat).
-  const awaitingRun = useLesson((s) => s.awaitingRun);
-  useEffect(() => {
-    if (!awaitingRun) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      useLesson.getState().dispatch({ type: "stop" });
-      useVoice.getState().setHint(null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [awaitingRun]);
+  // A Run pressed while the lesson is stopped on a beat that waits for one: the lesson continues, and the
+  // explanation plays once the run ends (the beat's run baseline is kept, so this run counts).
+  useEffect(
+    () =>
+      useScene.subscribe((s, prev) => {
+        if (!s.droneRun || s.droneRun.seq === prev.droneRun?.seq) return;
+        const l = useLesson.getState();
+        const beat = l.beats?.[l.beatIndex];
+        if (l.status === "stopped" && beat && learnerRun(beat)) l.dispatch({ type: "resume" });
+      }),
+    [],
+  );
 
   // Anything else that moves the voice on (Stop, Escape, a typed question, the mic) stops the lesson.
   useEffect(
@@ -217,7 +220,9 @@ export function useLessonPlayer(voice: Voice) {
       useVoice.subscribe((v, prev) => {
         if (saying.current || v.rev === prev.rev || v.rev === voiceRev.current) return;
         const l = useLesson.getState();
-        if (l.status === "playing" || l.status === "awaiting") l.dispatch({ type: "stop" });
+        // Only an interruption while the lesson is speaking stops it (Stop, Escape, the mic, Space, a typed
+        // question). Waiting for an answer or for Run, the mic, Space and Escape no longer stop it by accident.
+        if (l.status === "playing" && !l.awaitingRun) l.dispatch({ type: "stop" });
       }),
     [],
   );

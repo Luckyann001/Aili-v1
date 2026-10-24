@@ -8,12 +8,14 @@ import { fill } from "./runner";
 // Step 4 (session 1) of docs/drone-pid-plan.md: the drone lesson plays in the prepared system.
 
 describe("which lesson", () => {
-  it("the lever lesson stays the default; ?lesson=drone-pid picks the drone", () => {
-    expect(DEFAULT_LESSON).toBe("beginner-lever");
-    expect(lessonFromSearch("")).toBe("beginner-lever");
-    expect(lessonFromSearch("?lesson=drone-pid&demo=1")).toBe("drone-pid");
+  it("the drone lesson is the default (24 Oct 2026); ?lesson=lever picks the lever lesson", () => {
+    expect(DEFAULT_LESSON).toBe("drone-pid");
+    expect(lessonFromSearch("")).toBe("drone-pid");
+    expect(lessonFromSearch("?demo=1")).toBe("drone-pid");
     expect(lessonFromSearch("?lesson=lever")).toBe("beginner-lever");
-    expect(lessonFromSearch("?lesson=nonsense")).toBe("beginner-lever");
+    expect(lessonFromSearch("?lesson=nonsense")).toBe("drone-pid");
+    expect(LESSONS["drone-pid"].startScene).toBe("drone-altitude");
+    expect(LESSONS["beginner-lever"].startScene).toBe("base-joint-arm");
     expect(LESSONS["drone-pid"].startLabel).toBe("Start: a drone holding its height");
   });
 });
@@ -58,5 +60,26 @@ describe("the drone lesson's numbers come from the run just watched", () => {
     const run = runDrone({ ...DEFAULT_SETTINGS_FOR_TEST, kp_n_per_m: 10, ki_n_per_m_s: 4, kd_n_s_per_m: 6, wind_force_n: 4, wind_start_s: 1, wind_duration_s: 1 }, "run", 1, "hover");
     expect(run.result.trace.height_m[0]).toBeCloseTo(2, 9);
     expect(Math.abs(run.result.final_error_m)).toBeLessThan(0.005);
+  });
+});
+
+describe("prepared answers in the drone lesson (24 Oct 2026)", () => {
+  it("a matched question: its lines, and after a run, the run's own numbers and terms", async () => {
+    const { preparedReplyFor } = await import("./preparedAnswers");
+    const { useScene } = await import("@/scene/sceneStore");
+    useScene.setState({ droneRun: null });
+    expect(preparedReplyFor("why does it stay below the line?").lines.join(" ")).not.toMatch(/\d/);
+    useScene.setState({ droneRun: runDrone({ ...DEFAULT_SETTINGS_FOR_TEST, kp_n_per_m: 10, ki_n_per_m_s: 0, kd_n_s_per_m: 0 }, "run", 1) });
+    const r = preparedReplyFor("why does it stay below the line?");
+    expect(r.matched).toBe(true);
+    expect(r.lines.at(-1)).toBe("In your last run, with P, the gap at the end was 0.98 m.");
+  });
+
+  it("nothing matched: said plainly, with the prepared questions as chips", async () => {
+    const { preparedReplyFor } = await import("./preparedAnswers");
+    const r = preparedReplyFor("how much does a drone cost?");
+    expect(r.matched).toBe(false);
+    expect(r.lines[0]).toMatch(/typed questions need the live professor/);
+    expect(r.chips).toEqual(["What does P do?", "What does I do?", "What does D do?", "Why does it stay below the line?", "Why does it bounce?", "What is PID?", "What happens with a heavier drone?"]);
   });
 });

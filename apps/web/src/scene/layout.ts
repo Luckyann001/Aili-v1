@@ -46,6 +46,10 @@ export interface PartLayout {
   size: Vec3;
   position: Vec3;
   labelAnchor: Vec3;
+  /** Turned about x, y, z (radians), e.g. the analogy's car on its hill. Framing uses the unturned box. */
+  rotation?: Vec3;
+  /** Below 1: see-through (the analogy's car fading into the drone). */
+  opacity?: number;
 }
 
 const ARM_Y = 0.066;

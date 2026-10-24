@@ -30,7 +30,7 @@ const N3 = /^Watch the load slide out to the end/;
 /** Turns 1 and 2 (the lever), then turn 3 puts the servo + arm on stage. Returns once turn 3 is sent. */
 async function toServoTurn(page: Page, o: { speakMs: number; muted?: boolean }) {
   await installVoiceFakes(page, { speakMs: o.speakMs });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
   if (o.muted) await page.getByRole("button", { name: "Mute" }).click();
   await welcomeBox(page).fill("teach me robotics");

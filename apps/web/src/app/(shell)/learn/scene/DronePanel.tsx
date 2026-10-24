@@ -4,7 +4,7 @@ import { useId } from "react";
 import { Button } from "@/components/Button";
 import { ComingTag } from "@/components/ComingTag";
 import { StatusIcon } from "@/components/StatusIcon";
-import { CHECKS_LABEL, DRONE_PRESETS, droneChecks, m2, n1, runLength_s, sampleAt, SWITCHES, type DroneRun } from "@/scene/droneRun";
+import { CHECKS_LABEL, DRONE_PRESETS, droneChecks, m2, n1, runLength_s, runTerms, sampleAt, SWITCHES, type DroneRun } from "@/scene/droneRun";
 import { useScene } from "@/scene/sceneStore";
 import { prefersReducedMotion } from "@/scene/useDronePlayback";
 import { MANIFESTS } from "@/scene/manifests";
@@ -66,10 +66,7 @@ export function DroneRunButtons() {
 }
 
 /** Which switches a run used, in words. */
-const usedTerms = (r: DroneRun) => {
-  const on = SWITCHES.filter((sw) => (r.settings[sw.gain] ?? 0) > 0).map((sw) => sw.name);
-  return on.length ? on.join(" + ") : "no terms on";
-};
+const usedTerms = runTerms;
 
 /** True when the settings changed since the run: its readouts are then the last run's, and we say so. */
 const useStale = () =>

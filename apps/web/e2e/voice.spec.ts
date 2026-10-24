@@ -38,13 +38,13 @@ test.describe("voice states (demo controls)", () => {
   ] as const;
 
   test("demo controls are hidden from normal users", async ({ page }) => {
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.getByText("Demo controls (testing only)")).toHaveCount(0);
   });
 
   test("each state has its own label, icon, shape and button name", async ({ page }) => {
     await installVoiceFakes(page);
-    await page.goto("/learn?demo=1");
+    await page.goto("/learn?lesson=lever&demo=1");
     await page.getByText("Demo controls (testing only)").click();
     const icons = new Set<string>();
     const shapes = new Set<string>();
@@ -70,7 +70,7 @@ test.describe("voice states (demo controls)", () => {
     test(`screenshots and axe for every state, ${scheme}`, async ({ page }, info) => {
       await installVoiceFakes(page);
       await page.emulateMedia({ colorScheme: scheme });
-      await page.goto("/learn?demo=1");
+      await page.goto("/learn?lesson=lever&demo=1");
       await expect(page.getByText("Demo controls (testing only)")).toBeVisible(); // hydrated
       for (const s of STATES) {
         await page.evaluate(() => (document.querySelector("details") as HTMLDetailsElement).open = true);
@@ -90,7 +90,7 @@ test.describe("prepared reply, captions and interrupt", () => {
   test.beforeEach(async ({ page }, info) => {
     const slow = /interrupt|Escape|replaces|toggle/.test(info.title);
     await installVoiceFakes(page, { speakMs: slow ? 4000 : 1500 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
   });
 
   test("typing a question → thinking → speaking with captions in order → ready", async ({ page }) => {
@@ -182,7 +182,7 @@ test.describe("prepared reply, captions and interrupt", () => {
 test.describe("consent before the microphone", () => {
   test("Version B when on-device recognition isn't confirmed; Type instead keeps the mic off", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "downloadable" });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(dialog(page)).toBeVisible();
     await expect(dialog(page)).toContainText(
@@ -203,7 +203,7 @@ test.describe("consent before the microphone", () => {
 
   test("Version A only when the language pack is confirmed; listens on-device", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "available", listenMs: 2000 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(dialog(page)).toContainText(
       "Your device can turn your speech into text by itself, so your voice recording stays on this device.",
@@ -219,7 +219,7 @@ test.describe("consent before the microphone", () => {
 
   test("a browser without the availability check uses online mode (Version B)", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "no-available-api", listenMs: 2000 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(dialog(page)).toContainText("online speech service");
     await dialog(page).getByRole("button", { name: "Use voice" }).click();
@@ -229,14 +229,14 @@ test.describe("consent before the microphone", () => {
 
   test("a saved yes skips the notice, but on-device consent does not cover online", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "downloadable", consent: { choice: "voice", mode: "on-device" } });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(dialog(page)).toContainText("online speech service");
   });
 
   test("with a saved yes for this mode, the mic starts straight away", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "downloadable", listenMs: 2000, consent: { choice: "voice", mode: "online" } });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(dialog(page)).toHaveCount(0);
     await expect(status(page)).toHaveText("Listening (online speech service)");
@@ -244,7 +244,7 @@ test.describe("consent before the microphone", () => {
 
   test("Escape closes the notice without saving and returns focus to the voice button", async ({ page }) => {
     await installVoiceFakes(page);
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).focus();
     await page.keyboard.press("Enter");
     await expect(dialog(page)).toBeVisible();
@@ -258,7 +258,7 @@ test.describe("consent before the microphone", () => {
 test.describe("fallbacks, errors and keyboard", () => {
   test("no speech recognition: says so plainly and moves to the text box", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "none" });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(page.getByText("Voice input isn't available in this browser. Type your question in the box below.")).toBeVisible();
     await expect(textbox(page)).toBeFocused();
@@ -267,7 +267,7 @@ test.describe("fallbacks, errors and keyboard", () => {
 
   test("a refused microphone shows the error state with a plain message; pressing again retries", async ({ page }) => {
     await installVoiceFakes(page, { recError: "not-allowed", consent: { choice: "voice", mode: "online" } });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await expect(status(page)).toHaveText("Voice error");
     await expect(page.locator("main").getByRole("alert")).toHaveText(
@@ -281,7 +281,7 @@ test.describe("fallbacks, errors and keyboard", () => {
 
   test("Space starts voice when focus is on the page, never while typing", async ({ page }) => {
     await installVoiceFakes(page, { listenMs: 2000, consent: { choice: "voice", mode: "online" } });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await textbox(page).click();
     await page.keyboard.type("a b c");
     await expect(textbox(page)).toHaveValue("a b c");
@@ -300,7 +300,7 @@ test.describe("fallbacks, errors and keyboard", () => {
 
   test("the page never records audio itself (no getUserMedia, no MediaRecorder)", async ({ page }) => {
     await installVoiceFakes(page, { recognition: "available", listenMs: 500, speakMs: 4000 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await voiceBtn(page).click();
     await dialog(page).getByRole("button", { name: "Use voice" }).click();
     await expect(textbox(page)).toHaveValue("what is a servo");
@@ -314,7 +314,7 @@ test.describe("fallbacks, errors and keyboard", () => {
 
   test("leaving the page stops Aili speaking", async ({ page }) => {
     await installVoiceFakes(page, { speakMs: 5000 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await ask(page);
     await expect(page.getByText(REPLY[0]!)).toBeVisible();
     const before = (await fakeLog(page)).cancels;
@@ -327,7 +327,7 @@ test.describe("fallbacks, errors and keyboard", () => {
 test.describe("settings", () => {
   test("the menu opens Settings; the voice choice can be changed and forgotten", async ({ page }) => {
     await installVoiceFakes(page, { consent: { choice: "voice", mode: "online" } });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/settings$/);
@@ -344,7 +344,7 @@ test.describe("settings", () => {
     await installVoiceFakes(page);
     await page.goto("/settings");
     await page.getByRole("checkbox", { name: /Mute Aili's voice/ }).check();
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.getByRole("button", { name: "Mute" })).toHaveAttribute("aria-pressed", "true");
   });
 });

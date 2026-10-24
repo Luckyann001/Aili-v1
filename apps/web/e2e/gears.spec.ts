@@ -39,7 +39,7 @@ async function closeSpace(page: Page) {
 /** Turns 1 to 3: the servo + arm on stage, the GLB loaded, turn 3's load slide finished. */
 async function toServo(page: Page, speakMs = 1200) {
   await installVoiceFakes(page, { speakMs });
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
   await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
   await welcomeBox(page).fill("teach me robotics");
   await page.getByRole("button", { name: "Send" }).click();

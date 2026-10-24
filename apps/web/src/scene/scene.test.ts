@@ -35,6 +35,8 @@ describe("scene selection state", () => {
   let store: StoreApi<SceneState>;
   beforeEach(() => {
     store = createStore<SceneState>()((set) => createSceneSlice(set));
+    // The store starts on the drone (the default lesson, 24 Oct 2026); these tests use the placeholder arm.
+    store.getState().setScene("base-joint-arm");
   });
 
   it("starts with nothing selected and labels off", () => {

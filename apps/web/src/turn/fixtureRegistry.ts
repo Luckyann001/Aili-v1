@@ -24,6 +24,7 @@ import fxRuler from "../../../../content/robotics/test-fixtures/analogy.fx-ruler
 import fxServoAsset from "../../../../content/robotics/test-fixtures/asset.fx-servo-generic-anatomy.json";
 // The drone altitude lesson (step 4 session 2): its real drafts and their published fixture copies.
 import droneScene from "../../../../content/robotics/scenes/drone-altitude.json";
+import cruiseScene from "../../../../content/robotics/scenes/cruise-control-hill.json";
 import droneSolver from "../../../../content/robotics/capabilities/solver.pid-altitude-1d.json";
 import droneSim from "../../../../content/robotics/capabilities/sim.pid-altitude-1d.json";
 import droneAsset from "../../../../content/robotics/capabilities/asset.quadcopter-generic.json";
@@ -54,6 +55,7 @@ export function fixtureTurnRegistry() {
         { file: "test-fixtures/scene.fx-servo-arm.json", data: fxServoArm },
         { file: "test-fixtures/scene.fx-bag-hold.json", data: fxBagHold },
         { file: "drone-altitude.json", data: droneScene },
+        { file: "cruise-control-hill.json", data: cruiseScene },
         { file: "test-fixtures/scene.fx-drone-altitude.json", data: fxDroneScene },
       ],
       capabilities: [solver, sim, srcUp1, srcCp2, servoAsset, fxSolver, fxSim, fxSource, fxReading, fxDraft, fxLeverBasics, fxWrench, fxBag, fxRuler, fxServoAsset, droneSolver, droneSim, droneAsset, cruiseAnalogy, pidReading, srcMit1630, srcMit1606, fxDroneSolver, fxDroneSim, fxDroneAsset, fxCruise].map((data) => ({ file: `${(data as { id: string }).id}.json`, data })),

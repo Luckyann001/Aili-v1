@@ -24,7 +24,7 @@ test.describe("live path with the recorded provider (slice 6)", () => {
 
   test("type → question with chips → tap a chip → calculated value → stage action → explanation panel", async ({ page }) => {
     await installVoiceFakes(page, { speakMs: 150 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
     await expect(stage(page)).toHaveAttribute("data-dimmed", "");
     expect(await axe(page)).toEqual([]);
@@ -66,7 +66,7 @@ test.describe("live path with the recorded provider (slice 6)", () => {
   test("without the test's cookie the page is the normal prepared page", async ({ page }) => {
     await installVoiceFakes(page, { speakMs: 150 });
     await page.context().clearCookies();
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(page.getByRole("textbox", { name: "Ask Aili or answer" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/^Start: why reach makes holding harder/)).toBeVisible();
     await expect(welcomeBox(page)).toHaveCount(0);
@@ -82,7 +82,7 @@ test.describe("live path with the recorded provider (slice 6)", () => {
   for (const mode of ["voice on", "captions only"] as const) {
     test(`${mode}: the scene appears with the segment that names it, not before`, async ({ page }) => {
       await installVoiceFakes(page, { speakMs: 3000 });
-      await page.goto("/learn");
+      await page.goto("/learn?lesson=lever");
       await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
       if (mode === "captions only") await page.getByRole("button", { name: "Mute" }).click();
       await welcomeBox(page).fill("teach me robotics");
@@ -109,7 +109,7 @@ test.describe("live path with the recorded provider (slice 6)", () => {
   test("interrupt during the first segment: queued actions never run, the panel says where it stopped, the next message carries the note", async ({ page }) => {
     const sent = recordTurnRequests(page);
     await installVoiceFakes(page, { speakMs: 4000 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
     await welcomeBox(page).fill("teach me robotics");
     await page.getByRole("button", { name: "Send" }).click();
@@ -137,7 +137,7 @@ test.describe("live path with the recorded provider (slice 6)", () => {
   test("a new message during the first segment (no Escape): its own request carries the note, and the stage never shows the unseen scene", async ({ page }) => {
     const sent = recordTurnRequests(page);
     await installVoiceFakes(page, { speakMs: 4000 });
-    await page.goto("/learn");
+    await page.goto("/learn?lesson=lever");
     await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
     await welcomeBox(page).fill("teach me robotics");
     await page.getByRole("button", { name: "Send" }).click();
@@ -162,7 +162,7 @@ test.describe("live path with the recorded provider (slice 6)", () => {
   for (const mode of ["voice on", "captions only"] as const) {
     test(`${mode}: the weight-slide animation moves the weight as its segment plays`, async ({ page }) => {
       await installVoiceFakes(page, { speakMs: 2500 });
-      await page.goto("/learn");
+      await page.goto("/learn?lesson=lever");
       await expect(welcomeBox(page)).toBeVisible({ timeout: 20_000 });
       if (mode === "captions only") await page.getByRole("button", { name: "Mute" }).click();
       await welcomeBox(page).fill("teach me robotics");

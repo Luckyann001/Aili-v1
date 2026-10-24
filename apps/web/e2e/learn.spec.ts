@@ -9,7 +9,7 @@ const libraryBtn = (p: Page) => stage(p).getByRole("button", { name: "Library" }
 const isWide = (p: Page) => p.viewportSize()!.width >= 900;
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/learn");
+  await page.goto("/learn?lesson=lever");
 });
 
 test("starts with the stage, command bar and captions; text panel closed", async ({ page }) => {
