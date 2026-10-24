@@ -75,6 +75,8 @@
 }
 
 .stageTop {
+  /* The open demo panel is placed below the whole toolbar (it is a child of a toolbar row). */
+  position: relative;
   display: grid;
   gap: var(--aili-space-2);
 }
@@ -873,9 +875,10 @@
 /* ── Demo controls (only with ?demo=1) ── */
 
 /* Testing-only demo controls: a small dashed button in the stage toolbar; opened, the panel drops
-   over the stage below it, so it never takes a strip of the stage (Lucky, 23 Oct 2026). */
+   over the stage below the whole toolbar (never over the view tools, which wrap to a second row on a
+   phone), so it never takes a strip of the stage (Lucky, 23 Oct 2026). */
 .demo {
-  position: relative;
+  position: static;
   z-index: 5;
   padding: 0 var(--aili-space-2);
   border: 2px dashed var(--aili-border-strong);
@@ -886,6 +889,7 @@
 
 .demoBody {
   position: absolute;
+  z-index: 5;
   top: calc(100% + var(--aili-space-1));
   left: 0;
   width: min(640px, calc(100vw - 48px));
